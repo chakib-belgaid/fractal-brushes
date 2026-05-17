@@ -21,7 +21,7 @@ Fractal Brushes is a browser-native canvas app for making luminous mirrored brus
 - Luminous brush family: Fairy, Flame, Thunder, Silk Ribbon, Comet Trail, Nebula Smoke, Crystal Filament.
 - Elemental brush family: Water, Ember, Frost, Plasma.
 - Export presets for Current Resolution PNG, 4K 16:9 PNG, and 4K Square PNG.
-- GitHub Pages workflow, `.nojekyll`, README, MIT license, third-party notices, and project docs.
+- GitHub Pages workflow, `.nojekyll`, README, MIT license, asset log, and project docs.
 
 ## Not Included
 

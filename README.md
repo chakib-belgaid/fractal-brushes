@@ -80,4 +80,4 @@ After visual changes, verify both routes in a browser with Playwright:
 
 Fractal Brushes is released under the MIT License. See `LICENSE`.
 
-The package currently has no external runtime dependencies. Canvas visuals and SVG branding are code-native assets. See `THIRD_PARTY_NOTICES.md` and `docs/legal/asset-log.md`.
+The package currently has no external runtime dependencies. Canvas visuals and SVG branding are code-native assets. See `docs/legal/asset-log.md`.
