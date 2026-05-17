@@ -1,5 +1,8 @@
 # Fractal Brushes
 
+[![Deploy GitHub Pages](https://github.com/chakib-belgaid/fractal-brushes/actions/workflows/pages.yml/badge.svg)](https://github.com/chakib-belgaid/fractal-brushes/actions/workflows/pages.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 Fractal Brushes is a static HTML5 canvas drawing toy for luminous symmetry art. It pairs mirrored pointer drawing with particle-like tendril brushes, a dual-handle circular color picker, zoom slider, undo/redo, and PNG export presets up to 4K.
 
 The package is designed for GitHub Pages and has no build step or runtime dependencies.
