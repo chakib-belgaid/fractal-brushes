@@ -13,9 +13,10 @@ Fractal Brushes is a browser-native canvas app for making luminous mirrored brus
 - Fractal Brushes product naming across titles, visible branding, metadata, exports, and documentation.
 - Code-native SVG logo shared by the landing page and app.
 - HTML5 canvas drawing with mirrored symmetry.
-- Undo, redo, clear, mirror toggle, brush menu, color menu, randomize, export, and zoom controls.
+- Undo, redo, clear, mirror toggle, brush menu, color menu, randomize, export, and zoom slider.
 - Independent brush and color panels.
-- Circular hue picker with Primary and Blend targets.
+- Brush expansion slider for spread and density control.
+- Circular hue picker with separate Primary and Blend handles.
 - Blend toggle and preset color chips.
 - Luminous brush family: Fairy, Flame, Thunder, Silk Ribbon, Comet Trail, Nebula Smoke, Crystal Filament.
 - Elemental brush family: Water, Ember, Frost, Plasma.
@@ -37,9 +38,9 @@ Fractal Brushes is a browser-native canvas app for making luminous mirrored brus
 
 - The package can be served as plain static files.
 - The landing page introduces Fractal Brushes and links to `/app/`.
-- The app supports drawing, brush selection, color selection, zoom, and PNG export.
+- The app supports drawing, brush selection, color selection, zoom slider control, and PNG export.
 - Desktop and mobile layouts keep controls usable without incoherent overlap.
-- Playwright verification covers landing render, app render, panel interactions, zoom controls, and export menu presence.
+- Playwright verification covers landing render, app render, panel interactions, zoom slider, and export menu presence.
 
 ## Publication Status
 

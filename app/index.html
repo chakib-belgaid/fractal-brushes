@@ -267,6 +267,11 @@
       right: 18px;
       bottom: 18px;
       opacity: 0.72;
+      display: grid;
+      grid-template-columns: minmax(124px, 180px) 56px;
+      gap: 10px;
+      width: min(260px, calc(100vw - 36px));
+      padding: 8px 10px;
     }
 
     .zoom-value {
@@ -471,18 +476,40 @@
       content: "";
     }
 
-    .hue-ring::after {
+    .hue-handle {
       position: absolute;
-      left: calc(50% + cos((var(--ring-hue) - 90) * 1deg) * 62px);
-      top: calc(50% + sin((var(--ring-hue) - 90) * 1deg) * 62px);
-      width: 16px;
-      height: 16px;
+      left: calc(50% + cos((var(--handle-hue) - 90) * 1deg) * 62px);
+      top: calc(50% + sin((var(--handle-hue) - 90) * 1deg) * 62px);
+      width: 14px;
+      height: 14px;
       border: 2px solid rgba(255, 255, 255, 0.96);
       border-radius: 50%;
-      background: hsl(var(--ring-hue) 100% 62%);
-      box-shadow: 0 0 16px hsl(var(--ring-hue) 100% 62% / 0.48);
-      content: "";
+      background: hsl(var(--handle-hue) 100% 62%);
+      box-shadow: 0 0 16px hsl(var(--handle-hue) 100% 62% / 0.48);
+      pointer-events: none;
       transform: translate(-50%, -50%);
+      transition: width 120ms ease, height 120ms ease, opacity 120ms ease;
+    }
+
+    .hue-handle.primary {
+      --handle-hue: var(--primary-hue);
+    }
+
+    .hue-handle.blend {
+      --handle-hue: var(--blend-hue);
+      border-style: double;
+    }
+
+    .hue-ring[data-target="primary"] .hue-handle.blend,
+    .hue-ring[data-target="blend"] .hue-handle.primary {
+      opacity: 0.58;
+    }
+
+    .hue-ring[data-target="primary"] .hue-handle.primary,
+    .hue-ring[data-target="blend"] .hue-handle.blend {
+      width: 18px;
+      height: 18px;
+      z-index: 1;
     }
 
     .target-row,
@@ -640,6 +667,7 @@
       .zoom-cluster {
         right: 10px;
         bottom: 10px;
+        width: min(250px, calc(100vw - 20px));
       }
     }
 
@@ -745,6 +773,13 @@
       </div>
     </div>
     <div class="field">
+      <span class="field-label">Expansion</span>
+      <div class="slider-row">
+        <input id="expansion" type="range" min="35" max="160" value="85" aria-label="Brush expansion">
+        <span class="value" id="expansionValue">85%</span>
+      </div>
+    </div>
+    <div class="field">
       <span class="field-label">Symmetry</span>
       <div class="slider-row">
         <input id="symmetry" type="range" min="1" max="16" value="6" aria-label="Symmetry">
@@ -761,7 +796,10 @@
       </button>
     </div>
     <div class="hue-wrap">
-      <button id="hueRing" class="hue-ring" type="button" aria-label="Hue ring"></button>
+      <button id="hueRing" class="hue-ring" type="button" aria-label="Hue ring">
+        <span class="hue-handle primary" aria-hidden="true"></span>
+        <span class="hue-handle blend" aria-hidden="true"></span>
+      </button>
     </div>
     <div class="target-row">
       <div class="segmented" role="group" aria-label="Color target">
@@ -793,15 +831,7 @@
   </aside>
 
   <div class="zoom-cluster" aria-label="Zoom controls">
-    <button class="tool" id="zoomOut" type="button" title="Zoom out" aria-label="Zoom out">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M8 11h6"/><path d="m16 16 4 4"/></svg>
-    </button>
-    <button class="tool" id="resetZoom" type="button" title="Reset zoom" aria-label="Reset zoom">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12a7 7 0 1 0 2.05-4.95"/><path d="M5 5v5h5"/></svg>
-    </button>
-    <button class="tool" id="zoomIn" type="button" title="Zoom in" aria-label="Zoom in">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M8 11h6"/><path d="M11 8v6"/><path d="m16 16 4 4"/></svg>
-    </button>
+    <input id="zoom" type="range" min="50" max="220" step="5" value="100" aria-label="Zoom">
     <span class="zoom-value" id="zoomValue">100%</span>
   </div>
 
@@ -834,9 +864,7 @@
         targets: Array.from(document.querySelectorAll(".target")),
         presetRow: document.getElementById("presetRow"),
         blend: document.getElementById("blend"),
-        zoomIn: document.getElementById("zoomIn"),
-        zoomOut: document.getElementById("zoomOut"),
-        resetZoom: document.getElementById("resetZoom"),
+        zoom: document.getElementById("zoom"),
         zoomValue: document.getElementById("zoomValue"),
         hue: document.getElementById("hue"),
         hueValue: document.getElementById("hueValue"),
@@ -844,6 +872,8 @@
         hue2Value: document.getElementById("hue2Value"),
         size: document.getElementById("size"),
         sizeValue: document.getElementById("sizeValue"),
+        expansion: document.getElementById("expansion"),
+        expansionValue: document.getElementById("expansionValue"),
         symmetry: document.getElementById("symmetry"),
         symmetryValue: document.getElementById("symmetryValue"),
         status: document.getElementById("status")
@@ -873,20 +903,21 @@
           name: "Flame",
           hues: [28, 348],
           dot: ["#ffb13d", "#ff4a3d", "#fff3c8"],
-          count: [4, 6],
-          spread: 0.72,
-          velocity: [0.42, 1.9],
-          life: [34, 82],
-          width: [0.62, 1.28],
+          count: [2, 4],
+          spread: 0.58,
+          velocity: [0.38, 1.58],
+          life: [26, 62],
+          width: [0.46, 0.92],
           jitter: 0.13,
           curl: 0.2,
-          branch: 0.006,
-          drag: 0.964,
+          branch: 0.002,
+          drag: 0.956,
           lift: [0.1, 0.65],
-          alpha: 0.18,
+          alpha: 0.105,
           hueShift: [-14, 24],
           cap: "round",
-          layers: [[5.2, -10, 42, 0.12], [2.4, 8, 52, 0.24], [0.9, 26, 68, 0.45], [0.22, 0, 96, 0.52, "warm"]]
+          maxTendrils: 900,
+          layers: [[3.8, -10, 38, 0.08], [1.85, 8, 50, 0.16], [0.62, 26, 64, 0.28], [0.12, 0, 88, 0.18, "warm"]]
         },
         thunder: {
           name: "Thunder",
@@ -1084,6 +1115,7 @@
         hue2: 314,
         blend: false,
         size: 7,
+        expansion: 0.85,
         symmetry: 6,
         mirror: true,
         zoom: 1,
@@ -1142,7 +1174,9 @@
         root.style.setProperty("--active-soft", `hsl(${Math.round(state.hue)} 100% 62% / 0.18)`);
         root.style.setProperty("--secondary", secondaryColor());
         root.style.setProperty("--target-color", targetColor());
-        root.style.setProperty("--ring-hue", String(Math.round(state.colorTarget === "primary" ? state.hue : state.hue2)));
+        root.style.setProperty("--primary-hue", String(Math.round(state.hue)));
+        root.style.setProperty("--blend-hue", String(Math.round(state.hue2)));
+        ui.hueRing.dataset.target = state.colorTarget;
         ui.undo.disabled = state.history.length === 0;
         ui.redo.disabled = state.redo.length === 0;
         ui.mirror.setAttribute("aria-pressed", String(state.mirror));
@@ -1156,8 +1190,11 @@
         ui.hue2Value.textContent = String(Math.round(state.hue2));
         ui.size.value = String(state.size);
         ui.sizeValue.textContent = String(state.size);
+        ui.expansion.value = String(Math.round(state.expansion * 100));
+        ui.expansionValue.textContent = `${Math.round(state.expansion * 100)}%`;
         ui.symmetry.value = String(state.symmetry);
         ui.symmetryValue.textContent = String(state.symmetry);
+        ui.zoom.value = String(Math.round(state.zoom * 100));
         ui.zoomValue.textContent = `${Math.round(state.zoom * 100)}%`;
         Array.from(ui.brushList.querySelectorAll(".brush")).forEach((button) => {
           button.setAttribute("aria-pressed", String(button.dataset.brush === state.brush));
@@ -1310,13 +1347,19 @@
         const speed = Math.hypot(dx, dy);
         const baseAngle = Math.atan2(dy, dx);
         const sizeScale = 0.42 + Math.pow(state.size / 6, 1.22);
-        const extraTendrils = Math.floor(clamp((state.size - 5) / 4, 0, 3));
-        const count = Math.floor(rand(profile.count[0], profile.count[1] + 1)) + extraTendrils;
+        const expansionScale = clamp(state.expansion, 0.35, 1.6);
+        const spreadScale = 0.45 + expansionScale * 0.85;
+        const densityScale = 0.55 + expansionScale * 0.45;
+        const lifeScale = 0.74 + expansionScale * 0.34;
+        const velocityScale = 0.82 + expansionScale * 0.28;
+        const widthScale = 0.86 + expansionScale * 0.18;
+        const extraTendrils = Math.floor(clamp((state.size - 5) / 4, 0, 3) * densityScale);
+        const count = Math.max(1, Math.floor(rand(profile.count[0], profile.count[1] + 1) * densityScale) + extraTendrils);
 
         for (let i = 0; i < count; i += 1) {
-          const angle = baseAngle + rand(-profile.spread, profile.spread);
-          const velocity = rand(profile.velocity[0], profile.velocity[1]) * (0.55 + Math.min(speed * 0.045, 1.6));
-          const life = rand(profile.life[0], profile.life[1]);
+          const angle = baseAngle + rand(-profile.spread, profile.spread) * spreadScale;
+          const velocity = rand(profile.velocity[0], profile.velocity[1]) * velocityScale * (0.55 + Math.min(speed * 0.045, 1.6));
+          const life = rand(profile.life[0], profile.life[1]) * lifeScale;
           const lift = rand(profile.lift[0], profile.lift[1]) * state.dpr;
           const hue = tendrilHue(profile, state.hue);
           const hue2 = state.blend ? tendrilHue(profile, state.hue2) : hue;
@@ -1330,7 +1373,7 @@
             hue,
             hue2,
             blend: state.blend,
-            width: rand(profile.width[0], profile.width[1]) * sizeScale,
+            width: rand(profile.width[0], profile.width[1]) * sizeScale * widthScale,
             jitter: profile.jitter,
             curl: profile.curl,
             drag: profile.drag,
@@ -1343,8 +1386,9 @@
           });
         }
 
-        if (state.tendrils.length > 1600) {
-          state.tendrils.splice(0, state.tendrils.length - 1600);
+        const maxTendrils = Math.round((profile.maxTendrils || 1600) * (0.72 + expansionScale * 0.34));
+        if (state.tendrils.length > maxTendrils) {
+          state.tendrils.splice(0, state.tendrils.length - maxTendrils);
         }
       }
 
@@ -1352,7 +1396,7 @@
         const dx = x1 - x0;
         const dy = y1 - y0;
         const distance = Math.hypot(dx, dy);
-        const spacing = clamp(12 - state.size * 0.35, 5.5, 11);
+        const spacing = clamp((12 - state.size * 0.35) / (0.75 + state.expansion * 0.35), 5.5, 13);
         const steps = Math.max(1, Math.floor(distance / spacing));
         for (let i = 1; i <= steps; i += 1) {
           const t = i / steps;
@@ -1414,7 +1458,9 @@
           tendril.vy *= tendril.drag;
           tendril.life -= 1;
 
-          if (tendril.life > 12 && Math.random() < tendril.branch && state.tendrils.length < 1600) {
+          const activeProfile = brushProfiles[tendril.brush] || brushProfiles.thunder;
+          const maxTendrils = Math.round((activeProfile.maxTendrils || 1600) * (0.72 + state.expansion * 0.34));
+          if (tendril.life > 12 && Math.random() < tendril.branch && state.tendrils.length < maxTendrils) {
             branchFrom(tendril, speed);
           }
 
@@ -1467,7 +1513,6 @@
           state.hue = (state.hue + 0.34) % 360;
           root.style.setProperty("--active", activeColor());
           root.style.setProperty("--active-soft", `hsl(${Math.round(state.hue)} 100% 62% / 0.18)`);
-          root.style.setProperty("--ring-hue", String(Math.round(state.colorTarget === "primary" ? state.hue : state.hue2)));
           ui.hue.value = String(Math.round(state.hue));
           ui.hueValue.textContent = String(Math.round(state.hue));
         }
@@ -1518,6 +1563,11 @@
 
       function setSize(size) {
         state.size = clamp(Number(size), 1, 18);
+        updateUi();
+      }
+
+      function setExpansion(expansion) {
+        state.expansion = clamp(Number(expansion), 0.35, 1.6);
         updateUi();
       }
 
@@ -1574,6 +1624,7 @@
         state.hue2 = (state.hue + Math.floor(80 + Math.random() * 190)) % 360;
         state.blend = Math.random() > 0.28;
         state.size = Math.floor(3 + Math.random() * 13);
+        state.expansion = rand(0.55, 1.28);
         state.symmetry = Math.floor(2 + Math.random() * 15);
         state.mirror = Math.random() > 0.22;
         updateUi();
@@ -1764,13 +1815,13 @@
       ui.closeBrushPanel.addEventListener("click", () => togglePanel(ui.brushPanel, ui.brushToggle, false));
       ui.closeColorPanel.addEventListener("click", () => togglePanel(ui.colorPanel, ui.colorToggle, false));
       ui.blend.addEventListener("click", toggleBlend);
-      ui.zoomIn.addEventListener("click", () => stepZoom(0.1));
-      ui.zoomOut.addEventListener("click", () => stepZoom(-0.1));
-      ui.resetZoom.addEventListener("click", () => setZoom(1));
+      ui.zoom.addEventListener("input", (event) => setZoom(Number(event.target.value) / 100));
+      ui.zoom.addEventListener("dblclick", () => setZoom(1));
       ui.randomize.addEventListener("click", randomize);
       ui.hue.addEventListener("input", (event) => setHue(event.target.value));
       ui.hue2.addEventListener("input", (event) => setHue2(event.target.value));
       ui.size.addEventListener("input", (event) => setSize(event.target.value));
+      ui.expansion.addEventListener("input", (event) => setExpansion(Number(event.target.value) / 100));
       ui.symmetry.addEventListener("input", (event) => setSymmetry(event.target.value));
       ui.targets.forEach((button) => {
         button.addEventListener("click", () => {

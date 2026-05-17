@@ -1,6 +1,6 @@
 # Fractal Brushes
 
-Fractal Brushes is a static HTML5 canvas drawing toy for luminous symmetry art. It pairs mirrored pointer drawing with particle-like tendril brushes, a circular color picker, zoom controls, undo/redo, and PNG export presets up to 4K.
+Fractal Brushes is a static HTML5 canvas drawing toy for luminous symmetry art. It pairs mirrored pointer drawing with particle-like tendril brushes, a dual-handle circular color picker, zoom slider, undo/redo, and PNG export presets up to 4K.
 
 The package is designed for GitHub Pages and has no build step or runtime dependencies.
 
@@ -23,8 +23,9 @@ Then visit the local server URL and open `/app/` for the drawing experience.
 
 - Draw on the canvas with pointer, mouse, or touch input.
 - Use the main toolbar for undo, redo, export, clear, mirror, brush menu, color menu, and random brush selection.
-- Use the bottom-right zoom controls to zoom out, reset, zoom in, and inspect the current zoom percentage.
+- Use the bottom-right zoom slider to adjust zoom and inspect the current zoom percentage. Double-click the slider to reset to 100%.
 - Open the brush and color panels independently. Panels are intended to be draggable and clamped within the viewport.
+- Use Brush Expansion to control how far and how densely the active brush spreads.
 - Keyboard shortcuts for core drawing actions should remain available when supported by the app.
 
 ## Brush Modes
@@ -38,7 +39,7 @@ Each brush profile tunes tendril spawn count, spread, speed, lifetime, width, cu
 
 ## Color
 
-The color panel centers on a circular hue picker. Users can target either the Primary or Blend color, enable blend mode, and use preset chips as fast shortcuts. When blend is enabled, new strokes interpolate between the selected primary and blend hues.
+The color panel centers on a circular hue picker with two handles: one for Primary and one for Blend. Users can target either color, enable blend mode, and use preset chips as fast shortcuts. When blend is enabled, new strokes interpolate between the selected primary and blend hues.
 
 ## Export Formats
 

@@ -9,7 +9,7 @@ Fractal Brushes should feel like a focused creative instrument: dark canvas, lum
 ## Layout
 
 - Main toolbar sits at the top-left and carries the logo plus primary commands.
-- Zoom controls sit at the bottom-right with zoom out, reset, zoom in, and current percentage.
+- Zoom control sits at the bottom-right as a slider with current percentage. Double-click resets to 100%.
 - Brush panel opens on the right side.
 - Color panel opens under the main toolbar by default.
 - Export panel opens from the main toolbar and contains only export presets.
@@ -40,6 +40,8 @@ Represent brushes declaratively where possible. Each profile may tune:
 - Glow layering
 - Color bias
 
+Brush size, expansion, and symmetry stay in the brush panel. Expansion controls stroke spread, density, lifetime, and velocity scaling for the active brush.
+
 Brush families:
 
 - Luminous: Fairy, Flame, Thunder, Silk Ribbon, Comet Trail, Nebula Smoke, Crystal Filament.
@@ -50,6 +52,7 @@ Randomize should choose from the full brush list.
 ## Color Panel
 
 - Hue ring is the primary color input.
+- Hue ring shows separate Primary and Blend handles, with the selected target emphasized.
 - Target selector switches between Primary and Blend.
 - Blend toggle controls whether strokes interpolate between hues.
 - Preset chips provide quick color shortcuts.
@@ -80,7 +83,7 @@ Expose three PNG presets:
 - App route renders the SVG logo and has no console errors.
 - Brush panel opens and selection updates active state.
 - Color panel opens, hue changes Primary, target switch changes Blend, and dragging works.
-- Zoom controls render bottom-right and update zoom.
+- Zoom slider renders bottom-right and updates zoom.
 - Export menu lists Current Resolution, 4K 16:9, and 4K Square.
 - Export code creates PNG download URLs without crashing.
 - Desktop and mobile screenshots show coherent control placement.
