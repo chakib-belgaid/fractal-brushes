@@ -1,0 +1,677 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>Fractal Brushes - Generative Symmetry Drawing</title>
+  <meta name="description" content="Fractal Brushes is a browser-based generative canvas for drawing luminous mirrored tendrils with expanded brush families, draggable color controls, zoom tools, and 4K PNG export presets.">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #04050a;
+      --panel: rgba(9, 13, 26, 0.68);
+      --panel-strong: rgba(13, 19, 37, 0.88);
+      --line: rgba(188, 215, 255, 0.16);
+      --text: #eef5ff;
+      --muted: #97a7bd;
+      --cyan: #38e8ff;
+      --magenta: #ff4fd8;
+      --coral: #ff735c;
+      --green: #74ff9b;
+      --gold: #ffd166;
+      --shadow: 0 24px 80px rgba(0, 0, 0, 0.52);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 70% 12%, rgba(255, 79, 216, 0.16), transparent 30%),
+        radial-gradient(circle at 14% 22%, rgba(56, 232, 255, 0.18), transparent 34%),
+        linear-gradient(135deg, #07101b, #04050a 48%, #020308);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      border-bottom: 1px solid rgba(188, 215, 255, 0.1);
+      background: rgba(4, 5, 10, 0.68);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+
+    .nav {
+      width: min(1160px, calc(100% - 32px));
+      min-height: 68px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 780;
+    }
+
+    .mark {
+      width: 34px;
+      height: 34px;
+      flex: 0 0 auto;
+      color: var(--cyan);
+      filter: drop-shadow(0 0 18px rgba(56, 232, 255, 0.32));
+    }
+
+    .mark-lg {
+      width: 74px;
+      height: 74px;
+      color: var(--cyan);
+      filter:
+        drop-shadow(0 0 18px rgba(56, 232, 255, 0.36))
+        drop-shadow(0 0 30px rgba(255, 209, 102, 0.18));
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 620;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 42px;
+      padding: 0 16px;
+      border: 1px solid rgba(188, 215, 255, 0.2);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.055);
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 720;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    }
+
+    .button.primary {
+      border-color: color-mix(in srgb, var(--cyan) 60%, white 12%);
+      background: color-mix(in srgb, var(--cyan) 20%, transparent);
+      box-shadow: 0 0 34px rgba(56, 232, 255, 0.18);
+    }
+
+    .hero {
+      position: relative;
+      min-height: calc(100vh - 68px);
+      display: grid;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    #heroCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0.9;
+    }
+
+    .hero::after {
+      position: absolute;
+      inset: 0;
+      content: "";
+      pointer-events: none;
+      background:
+        linear-gradient(90deg, rgba(4, 5, 10, 0.88) 0%, rgba(4, 5, 10, 0.62) 42%, rgba(4, 5, 10, 0.18) 100%),
+        linear-gradient(180deg, transparent 0%, rgba(4, 5, 10, 0.55) 100%);
+    }
+
+    .hero-inner {
+      position: relative;
+      z-index: 1;
+      width: min(1160px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 76px 0 88px;
+    }
+
+    .hero-copy {
+      max-width: 680px;
+    }
+
+    .hero-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 18px;
+      color: #d9f7ff;
+      font-size: 14px;
+      font-weight: 760;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      max-width: 720px;
+      font-size: clamp(48px, 7vw, 104px);
+      line-height: 0.92;
+      font-weight: 820;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      max-width: 600px;
+      margin-top: 24px;
+      color: #c4d3ea;
+      font-size: clamp(18px, 2vw, 23px);
+      line-height: 1.55;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 34px;
+    }
+
+    .hero-stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 18px;
+      margin-top: 48px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 680;
+    }
+
+    .hero-stats strong {
+      display: block;
+      margin-bottom: 5px;
+      color: var(--text);
+      font-size: 22px;
+    }
+
+    .section {
+      padding: 92px 0;
+    }
+
+    .section.alt {
+      background: rgba(255, 255, 255, 0.025);
+      border-block: 1px solid rgba(188, 215, 255, 0.09);
+    }
+
+    .container {
+      width: min(1160px, calc(100% - 32px));
+      margin: 0 auto;
+    }
+
+    .section-heading {
+      max-width: 760px;
+      margin-bottom: 36px;
+    }
+
+    h2 {
+      font-size: clamp(34px, 4.4vw, 58px);
+      line-height: 1;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+
+    .section-heading p {
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1.6;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .feature-card {
+      min-height: 226px;
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.045);
+      box-shadow: var(--shadow);
+    }
+
+    .feature-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 8px;
+      margin-bottom: 22px;
+      background: linear-gradient(135deg, var(--cyan), var(--magenta));
+      box-shadow: 0 0 30px rgba(56, 232, 255, 0.16);
+    }
+
+    .feature-card:nth-child(2) .feature-icon {
+      background: linear-gradient(135deg, var(--gold), var(--coral));
+    }
+
+    .feature-card:nth-child(3) .feature-icon {
+      background: linear-gradient(135deg, var(--green), var(--cyan));
+    }
+
+    .feature-card:nth-child(4) .feature-icon {
+      background: conic-gradient(from 45deg, var(--cyan), var(--green), var(--gold), var(--coral), var(--magenta), var(--cyan));
+    }
+
+    .feature-card:nth-child(5) .feature-icon {
+      background: linear-gradient(135deg, #ecf8ff, #7fd7ff 42%, #a8ffde);
+    }
+
+    .feature-card:nth-child(6) .feature-icon {
+      background: linear-gradient(135deg, var(--gold), var(--green));
+    }
+
+    h3 {
+      font-size: 20px;
+      line-height: 1.2;
+      font-weight: 760;
+    }
+
+    .feature-card p,
+    .control-copy p {
+      margin-top: 12px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .showcase {
+      display: grid;
+      grid-template-columns: minmax(0, 0.94fr) minmax(0, 1.06fr);
+      gap: 34px;
+      align-items: center;
+    }
+
+    .preview {
+      position: relative;
+      min-height: 460px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #020308;
+      box-shadow: var(--shadow);
+    }
+
+    #previewCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .control-list {
+      display: grid;
+      gap: 14px;
+    }
+
+    .control-copy {
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .deploy-band {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 24px;
+      align-items: center;
+      padding: 30px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background:
+        linear-gradient(135deg, rgba(56, 232, 255, 0.1), rgba(255, 79, 216, 0.08)),
+        var(--panel-strong);
+      box-shadow: var(--shadow);
+    }
+
+    .site-footer {
+      padding: 34px 0;
+      color: var(--muted);
+      border-top: 1px solid rgba(188, 215, 255, 0.1);
+    }
+
+    .footer-inner {
+      width: min(1160px, calc(100% - 32px));
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      font-size: 14px;
+    }
+
+    @media (max-width: 860px) {
+      .nav-links a:not(.button) {
+        display: none;
+      }
+
+      .hero {
+        min-height: 760px;
+      }
+
+      .feature-grid,
+      .showcase,
+      .deploy-band {
+        grid-template-columns: 1fr;
+      }
+
+      .preview {
+        min-height: 360px;
+      }
+
+      .footer-inner {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+    <symbol id="fractal-brushes-mark" viewBox="0 0 64 64">
+      <defs>
+        <linearGradient id="mark-stroke" x1="9" y1="52" x2="55" y2="12" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#38e8ff"/>
+          <stop offset="0.34" stop-color="#74ff9b"/>
+          <stop offset="0.68" stop-color="#ffd166"/>
+          <stop offset="1" stop-color="#ff4fd8"/>
+        </linearGradient>
+        <radialGradient id="mark-core" cx="32" cy="32" r="18" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#ffffff"/>
+          <stop offset="0.38" stop-color="#bff8ff"/>
+          <stop offset="1" stop-color="#38e8ff" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <circle cx="32" cy="32" r="13" fill="url(#mark-core)" opacity="0.58"/>
+      <path d="M32 5v54M5 32h54M13.8 13.8l36.4 36.4M50.2 13.8 13.8 50.2" fill="none" stroke="url(#mark-stroke)" stroke-width="2.2" stroke-linecap="round" opacity="0.72"/>
+      <path d="M32 10c6 8 6 15.4 0 22-6-6.6-6-14 0-22Zm0 44c-6-8-6-15.4 0-22 6 6.6 6 14 0 22ZM10 32c8-6 15.4-6 22 0-6.6 6-14 6-22 0Zm44 0c-8 6-15.4 6-22 0 6.6-6 14-6 22 0Z" fill="none" stroke="url(#mark-stroke)" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="32" cy="32" r="3.6" fill="#fff"/>
+    </symbol>
+  </svg>
+  <header class="site-header">
+    <nav class="nav" aria-label="Primary navigation">
+      <a class="brand" href="./">
+        <svg class="mark" aria-hidden="true"><use href="#fractal-brushes-mark"></use></svg>
+        <span>Fractal Brushes</span>
+      </a>
+      <div class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#controls">Controls</a>
+        <a href="#deploy">Deploy</a>
+        <a class="button primary" href="./app/">Open app</a>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <canvas id="heroCanvas" aria-hidden="true"></canvas>
+      <div class="hero-inner">
+        <div class="hero-copy">
+          <div class="hero-brand">
+            <svg class="mark-lg" aria-hidden="true"><use href="#fractal-brushes-mark"></use></svg>
+            <span>Fractal Brushes</span>
+          </div>
+          <h1>Draw luminous symmetry with living brushes.</h1>
+          <p class="lead">Fractal Brushes turns pointer movement into mirrored tendrils, elemental filaments, blended color trails, and export-ready artwork. It runs as a static GitHub Pages site with no backend.</p>
+          <div class="hero-actions">
+            <a class="button primary" href="./app/">Launch the canvas</a>
+            <a class="button" href="#features">See features</a>
+          </div>
+          <div class="hero-stats" aria-label="Project highlights">
+            <span><strong>11</strong>Brush profiles</span>
+            <span><strong>16x</strong>Symmetry range</span>
+            <span><strong>4K</strong>PNG exports</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="features">
+      <div class="container">
+        <div class="section-heading">
+          <h2>A polished canvas app, not a static sketch.</h2>
+          <p>The drawing engine stays at the center, now framed around expressive brush families, floating menus, precise color selection, zoom controls, and export presets for finished artwork.</p>
+        </div>
+        <div class="feature-grid">
+          <article class="feature-card">
+            <div class="feature-icon" aria-hidden="true"></div>
+            <h3>Expanded brush set</h3>
+            <p>Fairy, flame, thunder, silk ribbon, comet trail, nebula smoke, crystal filament, water, ember, frost, and plasma each shape motion differently.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon" aria-hidden="true"></div>
+            <h3>Draggable brush menu</h3>
+            <p>Keep the brush picker open beside the canvas, move it where it fits, and switch profile behavior without interrupting the drawing flow.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon" aria-hidden="true"></div>
+            <h3>Circular hue ring</h3>
+            <p>Choose primary and blend colors from a ring picker, toggle blending, or jump quickly with preset chips for repeatable palettes.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon" aria-hidden="true"></div>
+            <h3>Floating color panel</h3>
+            <p>The color menu opens under the main controls by default, drags independently, and stays available while the brush menu remains open.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon" aria-hidden="true"></div>
+            <h3>Bottom-right zoom</h3>
+            <p>Zoom out, reset, zoom in, and read the current zoom percentage from a compact control surface anchored away from the drawing tools.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon" aria-hidden="true"></div>
+            <h3>Artwork exports</h3>
+            <p>Save Current Resolution, 4K 16:9, or 4K Square PNG files with timestamped Fractal Brushes filenames.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt" id="controls">
+      <div class="container showcase">
+        <div class="preview" aria-label="Animated Fractal Brushes preview">
+          <canvas id="previewCanvas" aria-hidden="true"></canvas>
+        </div>
+        <div class="control-list">
+          <div class="section-heading">
+            <h2>Designed for fast experimentation.</h2>
+            <p>Open the app, draw, adjust floating panels, zoom the canvas, and export without accounts or installation.</p>
+          </div>
+          <article class="control-copy">
+            <h3>Main controls stay compact</h3>
+            <p>Logo, undo, redo, export, clear, mirror, brush menu, color menu, and randomize stay grouped in the top-left toolbar.</p>
+          </article>
+          <article class="control-copy">
+            <h3>Panels can stay open</h3>
+            <p>Brush and color menus close independently, so you can tune a palette while comparing luminous and elemental brush behavior.</p>
+          </article>
+          <article class="control-copy">
+            <h3>Static deployment</h3>
+            <p>The landing page and app are plain HTML, CSS, and JavaScript, so GitHub Pages can deploy the repository directly.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="deploy">
+      <div class="container">
+        <div class="deploy-band">
+          <div>
+            <h2>Ready for GitHub Pages.</h2>
+            <p class="lead">The repository includes a Pages workflow. Push to main, enable Pages with GitHub Actions as the source, and the landing page will publish at the root while the drawing app remains available at /app/.</p>
+          </div>
+          <a class="button primary" href="./app/">Open app</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <span>Fractal Brushes - static generative canvas website</span>
+      <a href="./app/">Launch app</a>
+    </div>
+  </footer>
+
+  <script>
+    (() => {
+      function makePreview(canvas, options = {}) {
+        const ctx = canvas.getContext("2d", { alpha: true });
+        const state = {
+          width: 0,
+          height: 0,
+          dpr: 1,
+          cx: 0,
+          cy: 0,
+          particles: [],
+          tick: 0,
+          hue: options.hue || 190,
+          symmetry: options.symmetry || 8,
+          alpha: options.alpha || 0.18
+        };
+
+        const rand = (min, max) => min + Math.random() * (max - min);
+
+        function resize() {
+          state.dpr = Math.min(window.devicePixelRatio || 1, 1.6);
+          const rect = canvas.getBoundingClientRect();
+          state.width = Math.max(1, Math.floor(rect.width * state.dpr));
+          state.height = Math.max(1, Math.floor(rect.height * state.dpr));
+          state.cx = state.width / 2;
+          state.cy = state.height / 2;
+          canvas.width = state.width;
+          canvas.height = state.height;
+        }
+
+        function rotate(x, y, angle) {
+          const dx = x - state.cx;
+          const dy = y - state.cy;
+          const ca = Math.cos(angle);
+          const sa = Math.sin(angle);
+          return [state.cx + dx * ca - dy * sa, state.cy + dx * sa + dy * ca];
+        }
+
+        function spawn() {
+          const angle = state.tick * 0.018 + rand(-0.6, 0.6);
+          const radius = Math.min(state.width, state.height) * (0.18 + Math.sin(state.tick * 0.011) * 0.04);
+          const x = state.cx + Math.cos(angle) * radius;
+          const y = state.cy + Math.sin(angle) * radius;
+          const base = angle + Math.PI / 2 + rand(-0.5, 0.5);
+          for (let i = 0; i < 5; i += 1) {
+            const speed = rand(0.6, 2.2) * state.dpr;
+            state.particles.push({
+              x,
+              y,
+              vx: Math.cos(base + rand(-0.9, 0.9)) * speed,
+              vy: Math.sin(base + rand(-0.9, 0.9)) * speed,
+              life: rand(36, 96),
+              maxLife: rand(70, 120),
+              hue: state.hue + rand(-28, 48),
+              width: rand(0.28, 0.78) * state.dpr
+            });
+          }
+          if (state.particles.length > 900) {
+            state.particles.splice(0, state.particles.length - 900);
+          }
+        }
+
+        function drawSegment(p, x1, y1) {
+          const age = 1 - p.life / p.maxLife;
+          const envelope = Math.sin(Math.PI * Math.max(0, Math.min(1, age)));
+          const alpha = state.alpha * envelope;
+          if (alpha <= 0.001) return;
+          ctx.globalCompositeOperation = "lighter";
+          for (let i = 0; i < state.symmetry; i += 1) {
+            const a = (Math.PI * 2 * i) / state.symmetry;
+            const [x0, y0] = rotate(p.x, p.y, a);
+            const [rx1, ry1] = rotate(x1, y1, a);
+            ctx.lineCap = "butt";
+            ctx.strokeStyle = `hsla(${p.hue}, 100%, 58%, ${alpha * 0.18})`;
+            ctx.lineWidth = p.width * 5;
+            ctx.beginPath();
+            ctx.moveTo(x0, y0);
+            ctx.lineTo(rx1, ry1);
+            ctx.stroke();
+            ctx.strokeStyle = `hsla(${p.hue + 18}, 100%, 78%, ${alpha * 0.62})`;
+            ctx.lineWidth = Math.max(0.5, p.width * 0.9);
+            ctx.beginPath();
+            ctx.moveTo(x0, y0);
+            ctx.lineTo(rx1, ry1);
+            ctx.stroke();
+          }
+        }
+
+        function advanceFrame() {
+          state.tick += 1;
+          if (state.tick % 2 === 0) spawn();
+          ctx.globalCompositeOperation = "source-over";
+          ctx.fillStyle = "rgba(4, 5, 10, 0.032)";
+          ctx.fillRect(0, 0, state.width, state.height);
+          for (let i = state.particles.length - 1; i >= 0; i -= 1) {
+            const p = state.particles[i];
+            const nx = p.x + p.vx;
+            const ny = p.y + p.vy;
+            drawSegment(p, nx, ny);
+            p.x = nx;
+            p.y = ny;
+            p.vx *= 0.972;
+            p.vy *= 0.972;
+            p.vx += rand(-0.12, 0.12) * state.dpr;
+            p.vy += rand(-0.12, 0.12) * state.dpr;
+            p.life -= 1;
+            if (p.life <= 0) state.particles.splice(i, 1);
+          }
+        }
+
+        function step() {
+          advanceFrame();
+          requestAnimationFrame(step);
+        }
+
+        resize();
+        for (let i = 0; i < 150; i += 1) {
+          advanceFrame();
+        }
+        step();
+        window.addEventListener("resize", resize);
+      }
+
+      makePreview(document.getElementById("heroCanvas"), { hue: 190, symmetry: 10, alpha: 0.34 });
+      makePreview(document.getElementById("previewCanvas"), { hue: 300, symmetry: 6, alpha: 0.24 });
+    })();
+  </script>
+</body>
+</html>

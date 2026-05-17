@@ -1,0 +1,1834 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <link rel="icon" href="data:,">
+  <title>Fractal Brushes Canvas</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #04050a;
+      --panel: rgba(9, 13, 26, 0.74);
+      --panel-strong: rgba(14, 20, 39, 0.9);
+      --text: #edf5ff;
+      --muted: #8d9bb2;
+      --line: rgba(180, 205, 255, 0.16);
+      --active: #38e8ff;
+      --active-soft: rgba(56, 232, 255, 0.18);
+      --secondary: #ff4fd8;
+      --shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+      --control: 42px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overscroll-behavior: none;
+      touch-action: none;
+    }
+
+    body::before {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      content: "";
+      opacity: 0.12;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+      background-size: 42px 42px;
+      mask-image: radial-gradient(ellipse at center, #000 0%, rgba(0, 0, 0, 0.72) 42%, transparent 84%);
+    }
+
+    #stage {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      overflow: hidden;
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    canvas {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      transform: translate(-50%, -50%) scale(1);
+      transform-origin: center;
+      will-change: transform;
+    }
+
+    .grain {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      opacity: 0.045;
+      mix-blend-mode: overlay;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    }
+
+    .hint {
+      position: fixed;
+      z-index: 3;
+      left: 22px;
+      bottom: 18px;
+      color: rgba(216, 226, 246, 0.46);
+      font-family: ui-serif, "Iowan Old Style", Baskerville, Georgia, serif;
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      pointer-events: none;
+    }
+
+    .chrome,
+    .panel,
+    .zoom-cluster,
+    .export-menu {
+      position: fixed;
+      z-index: 4;
+      user-select: none;
+    }
+
+    .chrome {
+      left: 18px;
+      top: 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      opacity: 0.64;
+      transition: opacity 180ms ease;
+    }
+
+    .chrome:hover,
+    .chrome:focus-within,
+    .panel:hover,
+    .panel:focus-within,
+    .zoom-cluster:hover,
+    .zoom-cluster:focus-within {
+      opacity: 1;
+    }
+
+    .brand,
+    .toolbar,
+    .panel,
+    .zoom-cluster,
+    .export-menu,
+    .status {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+
+    .brand {
+      height: var(--control);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 184px;
+      padding: 0 12px;
+    }
+
+    .logo {
+      width: 26px;
+      height: 26px;
+      display: block;
+      overflow: visible;
+      flex: 0 0 auto;
+      color: var(--active);
+      filter: drop-shadow(0 0 10px var(--active-soft));
+    }
+
+    .logo .core {
+      fill: #f7fbff;
+    }
+
+    .logo .filament {
+      fill: none;
+      stroke: currentColor;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 2.2;
+    }
+
+    .logo .spark {
+      fill: none;
+      stroke: var(--secondary);
+      stroke-linecap: round;
+      stroke-width: 1.8;
+    }
+
+    .brand-text {
+      display: grid;
+      line-height: 1;
+    }
+
+    .brand-name {
+      font-size: 14px;
+      font-weight: 720;
+      letter-spacing: 0;
+    }
+
+    .brand-sub {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 540;
+    }
+
+    .toolbar,
+    .zoom-cluster {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 5px;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .tool {
+      width: var(--control);
+      height: var(--control);
+      min-width: var(--control);
+      min-height: var(--control);
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(190, 215, 255, 0.16);
+      border-radius: 8px;
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.055);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      cursor: pointer;
+      appearance: none;
+      transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, color 160ms ease, box-shadow 160ms ease;
+    }
+
+    .tool:hover,
+    .tool:focus-visible {
+      border-color: color-mix(in srgb, var(--active) 58%, white 12%);
+      color: #fff;
+      background: var(--active-soft);
+      outline: none;
+      transform: translateY(-1px);
+    }
+
+    .tool:active {
+      transform: translateY(0);
+    }
+
+    .tool[aria-pressed="true"],
+    .tool[aria-expanded="true"] {
+      border-color: color-mix(in srgb, var(--active) 76%, white 10%);
+      background: color-mix(in srgb, var(--active) 18%, transparent);
+      box-shadow: 0 0 22px color-mix(in srgb, var(--active) 26%, transparent);
+    }
+
+    .tool:disabled {
+      cursor: not-allowed;
+      color: rgba(237, 245, 255, 0.34);
+      background: rgba(255, 255, 255, 0.03);
+      transform: none;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    }
+
+    .tool svg {
+      width: 20px;
+      height: 20px;
+      display: block;
+      fill: none;
+      stroke: currentColor;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 1.9;
+    }
+
+    .zoom-cluster {
+      right: 18px;
+      bottom: 18px;
+      opacity: 0.72;
+    }
+
+    .zoom-value {
+      min-width: 56px;
+      padding: 0 8px;
+      color: color-mix(in srgb, var(--active) 76%, white 16%);
+      font-size: 12px;
+      font-weight: 720;
+      text-align: center;
+    }
+
+    .panel {
+      display: grid;
+      gap: 12px;
+      padding: 10px;
+      min-width: 236px;
+      opacity: 0.74;
+    }
+
+    .panel[hidden],
+    .export-menu[hidden],
+    .status[hidden] {
+      display: none;
+    }
+
+    .brush-panel {
+      right: 18px;
+      top: 84px;
+    }
+
+    .color-panel {
+      left: 18px;
+      top: 78px;
+      width: 280px;
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 28px;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    .panel-head:active {
+      cursor: grabbing;
+    }
+
+    .panel-title {
+      color: rgba(237, 245, 255, 0.94);
+      font-size: 12px;
+      font-weight: 760;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .mini {
+      width: 28px;
+      height: 28px;
+      min-width: 28px;
+      min-height: 28px;
+      border-radius: 7px;
+    }
+
+    .mini svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .brush-list {
+      display: grid;
+      gap: 7px;
+    }
+
+    .brush {
+      width: 100%;
+      min-height: 36px;
+      display: grid;
+      grid-template-columns: 24px 1fr;
+      align-items: center;
+      gap: 9px;
+      border: 1px solid rgba(190, 215, 255, 0.14);
+      border-radius: 8px;
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.052);
+      cursor: pointer;
+      appearance: none;
+      text-align: left;
+    }
+
+    .brush:hover,
+    .brush:focus-visible,
+    .brush[aria-pressed="true"] {
+      border-color: color-mix(in srgb, var(--active) 62%, white 10%);
+      background: color-mix(in srgb, var(--active) 12%, transparent);
+      outline: none;
+    }
+
+    .brush-dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 50% 50%, #fff 0 10%, transparent 12%),
+        conic-gradient(from 20deg, var(--dot-a), var(--dot-b), var(--dot-c), var(--dot-a));
+      box-shadow: 0 0 14px color-mix(in srgb, var(--dot-a) 42%, transparent);
+    }
+
+    .brush-name {
+      font-size: 13px;
+      font-weight: 680;
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+    }
+
+    .field-label {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 680;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .slider-row {
+      display: grid;
+      grid-template-columns: 1fr 42px;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .value {
+      min-width: 40px;
+      padding: 3px 7px;
+      border: 1px solid rgba(190, 215, 255, 0.14);
+      border-radius: 8px;
+      color: color-mix(in srgb, var(--active) 76%, white 16%);
+      background: rgba(255, 255, 255, 0.045);
+      font-size: 12px;
+      font-weight: 680;
+      text-align: center;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      height: 24px;
+      margin: 0;
+      accent-color: var(--active);
+      background: transparent;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 4px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0.16), var(--active));
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      width: 16px;
+      height: 16px;
+      margin-top: -6px;
+      border: 2px solid rgba(255, 255, 255, 0.9);
+      border-radius: 50%;
+      background: var(--active);
+      box-shadow: 0 0 18px var(--active-soft);
+      appearance: none;
+    }
+
+    .hue-wrap {
+      display: grid;
+      place-items: center;
+      padding: 5px 0 2px;
+    }
+
+    .hue-ring {
+      position: relative;
+      width: 158px;
+      height: 158px;
+      border: 0;
+      border-radius: 50%;
+      cursor: crosshair;
+      appearance: none;
+      background:
+        radial-gradient(circle at center, rgba(6, 8, 16, 0.98) 0 47%, transparent 48% 100%),
+        conic-gradient(from -90deg, hsl(0 100% 62%), hsl(60 100% 62%), hsl(120 100% 62%), hsl(180 100% 62%), hsl(240 100% 66%), hsl(300 100% 62%), hsl(360 100% 62%));
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18), 0 0 26px rgba(56, 232, 255, 0.12);
+    }
+
+    .hue-ring::before {
+      position: absolute;
+      inset: 33px;
+      border: 1px solid rgba(180, 205, 255, 0.13);
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--target-color) 26%, transparent), transparent 68%),
+        rgba(5, 7, 16, 0.9);
+      content: "";
+    }
+
+    .hue-ring::after {
+      position: absolute;
+      left: calc(50% + cos((var(--ring-hue) - 90) * 1deg) * 62px);
+      top: calc(50% + sin((var(--ring-hue) - 90) * 1deg) * 62px);
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.96);
+      border-radius: 50%;
+      background: hsl(var(--ring-hue) 100% 62%);
+      box-shadow: 0 0 16px hsl(var(--ring-hue) 100% 62% / 0.48);
+      content: "";
+      transform: translate(-50%, -50%);
+    }
+
+    .target-row,
+    .preset-row {
+      display: flex;
+      gap: 7px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .segmented {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      flex: 1 1 150px;
+      gap: 4px;
+      padding: 4px;
+      border: 1px solid rgba(190, 215, 255, 0.14);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.045);
+    }
+
+    .segment {
+      height: 30px;
+      border: 0;
+      border-radius: 6px;
+      color: var(--muted);
+      background: transparent;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      appearance: none;
+    }
+
+    .segment[aria-pressed="true"] {
+      color: #fff;
+      background: color-mix(in srgb, var(--target-color) 24%, transparent);
+    }
+
+    .chip {
+      width: 28px;
+      height: 28px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 50%;
+      background: hsl(var(--chip-hue) 100% 62%);
+      cursor: pointer;
+      appearance: none;
+      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.28), 0 0 14px hsl(var(--chip-hue) 100% 62% / 0.25);
+    }
+
+    .export-menu {
+      left: 282px;
+      top: 70px;
+      width: 216px;
+      display: grid;
+      gap: 7px;
+      padding: 8px;
+    }
+
+    .export-option {
+      min-height: 36px;
+      border: 1px solid rgba(190, 215, 255, 0.14);
+      border-radius: 8px;
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.052);
+      cursor: pointer;
+      text-align: left;
+      font-size: 13px;
+      font-weight: 680;
+      appearance: none;
+    }
+
+    .export-option:hover,
+    .export-option:focus-visible {
+      border-color: color-mix(in srgb, var(--active) 58%, white 12%);
+      background: var(--active-soft);
+      outline: none;
+    }
+
+    .export-option:disabled {
+      cursor: wait;
+      color: rgba(237, 245, 255, 0.5);
+    }
+
+    .status {
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      z-index: 5;
+      max-width: min(440px, calc(100vw - 32px));
+      padding: 10px 12px;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 620;
+      text-align: center;
+      transform: translateX(-50%);
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media (max-width: 880px) {
+      :root {
+        --control: 40px;
+      }
+
+      .chrome {
+        left: 10px;
+        right: 10px;
+        top: 10px;
+        align-items: flex-start;
+        gap: 7px;
+      }
+
+      .brand {
+        min-width: 44px;
+        width: 44px;
+        padding: 0;
+        justify-content: center;
+      }
+
+      .brand-text,
+      .hint {
+        display: none;
+      }
+
+      .toolbar {
+        flex-wrap: wrap;
+      }
+
+      .color-panel {
+        left: 10px;
+        top: 104px;
+        width: min(280px, calc(100vw - 20px));
+      }
+
+      .brush-panel {
+        right: 10px;
+        top: 104px;
+        width: min(264px, calc(100vw - 20px));
+      }
+
+      .export-menu {
+        left: 64px;
+        top: 58px;
+      }
+
+      .zoom-cluster {
+        right: 10px;
+        bottom: 10px;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .toolbar {
+        max-width: calc(100vw - 64px);
+      }
+
+      .tool {
+        width: 38px;
+        height: 38px;
+        min-width: 38px;
+        min-height: 38px;
+      }
+
+      .panel {
+        max-height: min(300px, calc(50vh - 38px));
+        overflow: auto;
+      }
+
+      .export-menu {
+        left: 10px;
+        top: auto;
+        bottom: 70px;
+        width: min(260px, calc(100vw - 20px));
+      }
+
+      .zoom-value {
+        min-width: 48px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="stage" aria-label="Fractal Brushes drawing surface">
+    <canvas id="art" aria-label="Fractal Brushes drawing canvas"></canvas>
+  </div>
+  <div class="grain" aria-hidden="true"></div>
+  <div class="hint" aria-hidden="true">tendril engine &middot; fractal brushes</div>
+
+  <aside class="chrome" aria-label="Canvas controls">
+    <div class="brand" aria-hidden="true">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
+        <path class="filament" d="M16 3.5c0 6.5-6.7 7.7-10.6 12.5C9.3 20.8 16 22 16 28.5"/>
+        <path class="filament" d="M16 3.5c0 6.5 6.7 7.7 10.6 12.5C22.7 20.8 16 22 16 28.5"/>
+        <path class="spark" d="M7.2 10.4c4.4.4 6.5 2.2 8.8 5.6 2.3-3.4 4.4-5.2 8.8-5.6"/>
+        <path class="spark" d="M7.2 21.6c4.4-.4 6.5-2.2 8.8-5.6 2.3 3.4 4.4 5.2 8.8 5.6"/>
+        <circle class="core" cx="16" cy="16" r="2.5"/>
+      </svg>
+      <span class="brand-text">
+        <span class="brand-name">Fractal Brushes</span>
+        <span class="brand-sub">generative canvas</span>
+      </span>
+    </div>
+
+    <div class="toolbar" role="toolbar" aria-label="Main menu">
+      <button class="tool" id="undo" type="button" title="Undo" aria-label="Undo" disabled>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7H4v5"/><path d="M5 12a8 8 0 1 0 2.35-5.65L4 9.7"/></svg>
+      </button>
+      <button class="tool" id="redo" type="button" title="Redo" aria-label="Redo" disabled>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 7h5v5"/><path d="M19 12a8 8 0 1 1-2.35-5.65L20 9.7"/></svg>
+      </button>
+      <button class="tool" id="exportToggle" type="button" title="Export" aria-label="Export" aria-expanded="false" aria-controls="exportMenu">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11"/><path d="m7 9 5 5 5-5"/><path d="M5 19h14"/></svg>
+      </button>
+      <button class="tool" id="clear" type="button" title="Clear" aria-label="Clear">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/></svg>
+      </button>
+      <button class="tool" id="mirror" type="button" title="Mirror" aria-label="Mirror" aria-pressed="true">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16"/><path d="M4 8l6 4-6 4V8Z"/><path d="M20 8l-6 4 6 4V8Z"/></svg>
+      </button>
+      <button class="tool" id="brushToggle" type="button" title="Brush menu" aria-label="Brush menu" aria-expanded="true" aria-controls="brushPanel">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20c4 0 5.5-1.5 6-4"/><path d="M10 16 20 6a2 2 0 0 0-2.8-2.8L7.2 13.2"/><path d="M7 13c2.6.3 3.7 1.4 4 4"/></svg>
+      </button>
+      <button class="tool" id="colorToggle" type="button" title="Color menu" aria-label="Color menu" aria-expanded="true" aria-controls="colorPanel">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 1 0 8 8"/><path d="M12 4a4 4 0 0 1 4 4c0 4-4 4-4 8"/><circle cx="12" cy="12" r="1"/></svg>
+      </button>
+      <button class="tool" id="randomize" type="button" title="Randomize" aria-label="Randomize">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>
+      </button>
+    </div>
+  </aside>
+
+  <div class="export-menu" id="exportMenu" hidden>
+    <button class="export-option" data-export="current" type="button">Current Resolution PNG</button>
+    <button class="export-option" data-export="wide4k" type="button">4K 16:9 PNG</button>
+    <button class="export-option" data-export="square4k" type="button">4K Square PNG</button>
+  </div>
+
+  <aside class="panel brush-panel" id="brushPanel" aria-label="Brush menu">
+    <div class="panel-head" data-drag-handle>
+      <span class="panel-title">Brushes</span>
+      <button class="tool mini" id="closeBrushPanel" type="button" title="Close brushes" aria-label="Close brushes">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+    <div class="brush-list" id="brushList"></div>
+    <div class="field">
+      <span class="field-label">Brush size</span>
+      <div class="slider-row">
+        <input id="size" type="range" min="1" max="18" value="7" aria-label="Brush size">
+        <span class="value" id="sizeValue">7</span>
+      </div>
+    </div>
+    <div class="field">
+      <span class="field-label">Symmetry</span>
+      <div class="slider-row">
+        <input id="symmetry" type="range" min="1" max="16" value="6" aria-label="Symmetry">
+        <span class="value" id="symmetryValue">6</span>
+      </div>
+    </div>
+  </aside>
+
+  <aside class="panel color-panel" id="colorPanel" aria-label="Color menu">
+    <div class="panel-head" data-drag-handle>
+      <span class="panel-title">Color</span>
+      <button class="tool mini" id="closeColorPanel" type="button" title="Close colors" aria-label="Close colors">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+    <div class="hue-wrap">
+      <button id="hueRing" class="hue-ring" type="button" aria-label="Hue ring"></button>
+    </div>
+    <div class="target-row">
+      <div class="segmented" role="group" aria-label="Color target">
+        <button class="segment target" data-target="primary" type="button" aria-pressed="true">Primary</button>
+        <button class="segment target" data-target="blend" type="button" aria-pressed="false">Blend</button>
+      </div>
+      <button class="tool" id="blend" type="button" title="Blend colors" aria-label="Blend colors" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="12" r="5"/><circle cx="15" cy="12" r="5"/><path d="M12 8.8a5 5 0 0 1 0 6.4"/></svg>
+      </button>
+    </div>
+    <div class="field">
+      <span class="field-label">Presets</span>
+      <div class="preset-row" id="presetRow" aria-label="Color presets"></div>
+    </div>
+    <div class="field">
+      <span class="field-label">Primary</span>
+      <div class="slider-row">
+        <input id="hue" type="range" min="0" max="359" value="195" aria-label="Primary hue">
+        <span class="value" id="hueValue">195</span>
+      </div>
+    </div>
+    <div class="field">
+      <span class="field-label">Blend</span>
+      <div class="slider-row">
+        <input id="hue2" type="range" min="0" max="359" value="314" aria-label="Blend hue">
+        <span class="value" id="hue2Value">314</span>
+      </div>
+    </div>
+  </aside>
+
+  <div class="zoom-cluster" aria-label="Zoom controls">
+    <button class="tool" id="zoomOut" type="button" title="Zoom out" aria-label="Zoom out">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M8 11h6"/><path d="m16 16 4 4"/></svg>
+    </button>
+    <button class="tool" id="resetZoom" type="button" title="Reset zoom" aria-label="Reset zoom">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12a7 7 0 1 0 2.05-4.95"/><path d="M5 5v5h5"/></svg>
+    </button>
+    <button class="tool" id="zoomIn" type="button" title="Zoom in" aria-label="Zoom in">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M8 11h6"/><path d="M11 8v6"/><path d="m16 16 4 4"/></svg>
+    </button>
+    <span class="zoom-value" id="zoomValue">100%</span>
+  </div>
+
+  <div class="status" id="status" hidden role="status" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      const stage = document.getElementById("stage");
+      const canvas = document.getElementById("art");
+      const ctx = canvas.getContext("2d", { alpha: false });
+      const root = document.documentElement;
+
+      const ui = {
+        undo: document.getElementById("undo"),
+        redo: document.getElementById("redo"),
+        exportToggle: document.getElementById("exportToggle"),
+        exportMenu: document.getElementById("exportMenu"),
+        exportOptions: Array.from(document.querySelectorAll("[data-export]")),
+        clear: document.getElementById("clear"),
+        mirror: document.getElementById("mirror"),
+        brushToggle: document.getElementById("brushToggle"),
+        colorToggle: document.getElementById("colorToggle"),
+        randomize: document.getElementById("randomize"),
+        brushPanel: document.getElementById("brushPanel"),
+        colorPanel: document.getElementById("colorPanel"),
+        closeBrushPanel: document.getElementById("closeBrushPanel"),
+        closeColorPanel: document.getElementById("closeColorPanel"),
+        brushList: document.getElementById("brushList"),
+        hueRing: document.getElementById("hueRing"),
+        targets: Array.from(document.querySelectorAll(".target")),
+        presetRow: document.getElementById("presetRow"),
+        blend: document.getElementById("blend"),
+        zoomIn: document.getElementById("zoomIn"),
+        zoomOut: document.getElementById("zoomOut"),
+        resetZoom: document.getElementById("resetZoom"),
+        zoomValue: document.getElementById("zoomValue"),
+        hue: document.getElementById("hue"),
+        hueValue: document.getElementById("hueValue"),
+        hue2: document.getElementById("hue2"),
+        hue2Value: document.getElementById("hue2Value"),
+        size: document.getElementById("size"),
+        sizeValue: document.getElementById("sizeValue"),
+        symmetry: document.getElementById("symmetry"),
+        symmetryValue: document.getElementById("symmetryValue"),
+        status: document.getElementById("status")
+      };
+
+      const brushProfiles = {
+        fairy: {
+          name: "Fairy",
+          hues: [292, 188],
+          dot: ["#f8a7ff", "#9ff8ff", "#fff7bf"],
+          count: [3, 5],
+          spread: 1.25,
+          velocity: [0.22, 1.45],
+          life: [58, 128],
+          width: [0.3, 0.72],
+          jitter: 0.24,
+          curl: 0.16,
+          branch: 0.004,
+          drag: 0.972,
+          lift: [0, 0.04],
+          alpha: 0.15,
+          hueShift: [-44, 56],
+          cap: "round",
+          layers: [[4.3, 54, 58, 0.08], [1.45, 22, 70, 0.23], [0.42, -18, 84, 0.54], [0.12, 0, 96, 0.22, "white"]]
+        },
+        flame: {
+          name: "Flame",
+          hues: [28, 348],
+          dot: ["#ffb13d", "#ff4a3d", "#fff3c8"],
+          count: [4, 6],
+          spread: 0.72,
+          velocity: [0.42, 1.9],
+          life: [34, 82],
+          width: [0.62, 1.28],
+          jitter: 0.13,
+          curl: 0.2,
+          branch: 0.006,
+          drag: 0.964,
+          lift: [0.1, 0.65],
+          alpha: 0.18,
+          hueShift: [-14, 24],
+          cap: "round",
+          layers: [[5.2, -10, 42, 0.12], [2.4, 8, 52, 0.24], [0.9, 26, 68, 0.45], [0.22, 0, 96, 0.52, "warm"]]
+        },
+        thunder: {
+          name: "Thunder",
+          hues: [195, 264],
+          dot: ["#38e8ff", "#a77dff", "#ffffff"],
+          count: [2, 4],
+          spread: 0.46,
+          velocity: [0.8, 2.45],
+          life: [30, 68],
+          width: [0.38, 0.9],
+          jitter: 0.34,
+          curl: 0.05,
+          branch: 0.032,
+          drag: 0.956,
+          lift: [0, 0],
+          alpha: 0.2,
+          hueShift: [-18, 24],
+          angular: 0.22,
+          cap: "butt",
+          layers: [[4.6, -24, 52, 0.13], [1.05, 10, 66, 0.44], [0.2, 0, 96, 0.68, "white"]]
+        },
+        silk: {
+          name: "Silk Ribbon",
+          hues: [326, 196],
+          dot: ["#ff6fd8", "#77f5ff", "#ffffff"],
+          count: [4, 7],
+          spread: 0.5,
+          velocity: [0.28, 1.32],
+          life: [92, 162],
+          width: [0.78, 1.42],
+          jitter: 0.08,
+          curl: 0.19,
+          branch: 0.001,
+          drag: 0.981,
+          lift: [-0.03, 0.03],
+          alpha: 0.13,
+          hueShift: [-18, 34],
+          cap: "round",
+          layers: [[5.8, -12, 54, 0.09], [2.9, 14, 66, 0.18], [0.78, 0, 78, 0.42], [0.16, 0, 96, 0.2, "white"]]
+        },
+        comet: {
+          name: "Comet Trail",
+          hues: [205, 44],
+          dot: ["#6de7ff", "#ffd166", "#ffffff"],
+          count: [5, 8],
+          spread: 0.34,
+          velocity: [1.1, 2.85],
+          life: [45, 104],
+          width: [0.44, 1.18],
+          jitter: 0.18,
+          curl: 0.07,
+          branch: 0.012,
+          drag: 0.952,
+          lift: [0, 0.03],
+          alpha: 0.19,
+          hueShift: [-16, 22],
+          cap: "round",
+          layers: [[6.8, -12, 50, 0.1], [2.2, 18, 64, 0.24], [0.58, 0, 86, 0.62], [0.22, 0, 98, 0.72, "white"]]
+        },
+        nebula: {
+          name: "Nebula Smoke",
+          hues: [268, 178],
+          dot: ["#b98bff", "#6ef8d4", "#ff8adf"],
+          count: [3, 6],
+          spread: 1.08,
+          velocity: [0.12, 0.85],
+          life: [118, 210],
+          width: [0.72, 1.62],
+          jitter: 0.15,
+          curl: 0.22,
+          branch: 0.002,
+          drag: 0.988,
+          lift: [-0.05, 0.08],
+          alpha: 0.08,
+          hueShift: [-54, 64],
+          cap: "round",
+          layers: [[8.4, -32, 46, 0.09], [4.2, 18, 60, 0.12], [1.2, 0, 76, 0.23], [0.24, 0, 96, 0.12, "white"]]
+        },
+        crystal: {
+          name: "Crystal Filament",
+          hues: [188, 238],
+          dot: ["#aefcff", "#8da2ff", "#ffffff"],
+          count: [2, 4],
+          spread: 0.38,
+          velocity: [0.72, 2.1],
+          life: [46, 94],
+          width: [0.24, 0.58],
+          jitter: 0.1,
+          curl: 0.02,
+          branch: 0.024,
+          drag: 0.968,
+          lift: [0, 0],
+          alpha: 0.2,
+          hueShift: [-12, 30],
+          angular: 0.52,
+          cap: "butt",
+          layers: [[3.1, -8, 58, 0.09], [0.84, 16, 72, 0.42], [0.18, 0, 98, 0.76, "white"]]
+        },
+        water: {
+          name: "Water",
+          hues: [196, 226],
+          dot: ["#38e8ff", "#386dff", "#d8fbff"],
+          count: [4, 6],
+          spread: 0.66,
+          velocity: [0.34, 1.48],
+          life: [72, 146],
+          width: [0.5, 1.2],
+          jitter: 0.1,
+          curl: 0.24,
+          branch: 0.002,
+          drag: 0.978,
+          lift: [-0.04, 0.04],
+          alpha: 0.14,
+          hueShift: [-28, 18],
+          cap: "round",
+          layers: [[5.4, -22, 48, 0.1], [2.0, 8, 62, 0.25], [0.5, 0, 82, 0.48], [0.15, 0, 98, 0.25, "white"]]
+        },
+        ember: {
+          name: "Ember",
+          hues: [22, 48],
+          dot: ["#ff5b2f", "#ffd166", "#6d1a00"],
+          count: [3, 6],
+          spread: 0.92,
+          velocity: [0.48, 2.05],
+          life: [24, 58],
+          width: [0.28, 0.78],
+          jitter: 0.26,
+          curl: 0.12,
+          branch: 0.018,
+          drag: 0.94,
+          lift: [0.08, 0.42],
+          alpha: 0.22,
+          hueShift: [-10, 34],
+          cap: "round",
+          layers: [[3.8, -14, 40, 0.1], [1.2, 12, 58, 0.32], [0.3, 38, 78, 0.56], [0.12, 0, 96, 0.28, "warm"]]
+        },
+        frost: {
+          name: "Frost",
+          hues: [188, 214],
+          dot: ["#d8fbff", "#77c8ff", "#ffffff"],
+          count: [2, 5],
+          spread: 0.54,
+          velocity: [0.58, 1.86],
+          life: [52, 98],
+          width: [0.28, 0.68],
+          jitter: 0.12,
+          curl: 0.035,
+          branch: 0.03,
+          drag: 0.966,
+          lift: [0, 0],
+          alpha: 0.18,
+          hueShift: [-18, 20],
+          angular: 0.42,
+          cap: "butt",
+          layers: [[3.7, -8, 64, 0.08], [1.0, 10, 78, 0.34], [0.2, 0, 98, 0.78, "white"]]
+        },
+        plasma: {
+          name: "Plasma",
+          hues: [310, 188],
+          dot: ["#ff38d8", "#38e8ff", "#ffffff"],
+          count: [5, 8],
+          spread: 0.86,
+          velocity: [0.62, 2.35],
+          life: [44, 102],
+          width: [0.42, 1.08],
+          jitter: 0.32,
+          curl: 0.28,
+          branch: 0.016,
+          drag: 0.958,
+          lift: [-0.02, 0.02],
+          alpha: 0.21,
+          hueShift: [-38, 42],
+          cap: "round",
+          layers: [[5.7, -30, 48, 0.13], [1.8, 24, 62, 0.35], [0.42, 0, 84, 0.58], [0.16, 0, 98, 0.52, "white"]]
+        }
+      };
+
+      const brushOrder = ["fairy", "flame", "thunder", "silk", "comet", "nebula", "crystal", "water", "ember", "frost", "plasma"];
+      const presets = [195, 138, 41, 8, 314, 258, 188, 22, 326, 214];
+      const exportPresets = {
+        current: { label: "current", width: 0, height: 0 },
+        wide4k: { label: "4k-16-9", width: 3840, height: 2160 },
+        square4k: { label: "4k-square", width: 4096, height: 4096 }
+      };
+
+      const state = {
+        width: 0,
+        height: 0,
+        dpr: 1,
+        cx: 0,
+        cy: 0,
+        brush: "thunder",
+        colorTarget: "primary",
+        hue: 195,
+        hue2: 314,
+        blend: false,
+        size: 7,
+        symmetry: 6,
+        mirror: true,
+        zoom: 1,
+        painting: false,
+        pointerId: null,
+        last: null,
+        tendrils: [],
+        history: [],
+        redo: [],
+        exporting: false,
+        statusTimer: null
+      };
+
+      const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+      const rand = (min, max) => min + Math.random() * (max - min);
+      const activeColor = () => `hsl(${Math.round(state.hue)} 100% 62%)`;
+      const secondaryColor = () => `hsl(${Math.round(state.hue2)} 100% 62%)`;
+      const targetColor = () => state.colorTarget === "primary" ? activeColor() : secondaryColor();
+
+      function createBrushControls() {
+        ui.brushList.innerHTML = "";
+        brushOrder.forEach((id, index) => {
+          const profile = brushProfiles[id];
+          const button = document.createElement("button");
+          button.className = "brush";
+          button.type = "button";
+          button.dataset.brush = id;
+          button.title = `${profile.name} brush`;
+          button.setAttribute("aria-label", `${profile.name} brush`);
+          button.setAttribute("aria-pressed", "false");
+          button.style.setProperty("--dot-a", profile.dot[0]);
+          button.style.setProperty("--dot-b", profile.dot[1]);
+          button.style.setProperty("--dot-c", profile.dot[2]);
+          button.innerHTML = `<span class="brush-dot" aria-hidden="true"></span><span class="brush-name">${index + 1}. ${profile.name}</span>`;
+          button.addEventListener("click", () => setBrush(id));
+          ui.brushList.append(button);
+        });
+      }
+
+      function createPresetControls() {
+        presets.forEach((hue) => {
+          const button = document.createElement("button");
+          button.className = "chip";
+          button.type = "button";
+          button.dataset.hue = String(hue);
+          button.title = `Hue ${hue}`;
+          button.setAttribute("aria-label", `Hue ${hue}`);
+          button.style.setProperty("--chip-hue", hue);
+          button.addEventListener("click", () => setTargetHue(hue));
+          ui.presetRow.append(button);
+        });
+      }
+
+      function updateUi() {
+        root.style.setProperty("--active", activeColor());
+        root.style.setProperty("--active-soft", `hsl(${Math.round(state.hue)} 100% 62% / 0.18)`);
+        root.style.setProperty("--secondary", secondaryColor());
+        root.style.setProperty("--target-color", targetColor());
+        root.style.setProperty("--ring-hue", String(Math.round(state.colorTarget === "primary" ? state.hue : state.hue2)));
+        ui.undo.disabled = state.history.length === 0;
+        ui.redo.disabled = state.redo.length === 0;
+        ui.mirror.setAttribute("aria-pressed", String(state.mirror));
+        ui.blend.setAttribute("aria-pressed", String(state.blend));
+        ui.brushToggle.setAttribute("aria-expanded", String(!ui.brushPanel.hidden));
+        ui.colorToggle.setAttribute("aria-expanded", String(!ui.colorPanel.hidden));
+        ui.exportToggle.setAttribute("aria-expanded", String(!ui.exportMenu.hidden));
+        ui.hue.value = String(Math.round(state.hue));
+        ui.hueValue.textContent = String(Math.round(state.hue));
+        ui.hue2.value = String(Math.round(state.hue2));
+        ui.hue2Value.textContent = String(Math.round(state.hue2));
+        ui.size.value = String(state.size);
+        ui.sizeValue.textContent = String(state.size);
+        ui.symmetry.value = String(state.symmetry);
+        ui.symmetryValue.textContent = String(state.symmetry);
+        ui.zoomValue.textContent = `${Math.round(state.zoom * 100)}%`;
+        Array.from(ui.brushList.querySelectorAll(".brush")).forEach((button) => {
+          button.setAttribute("aria-pressed", String(button.dataset.brush === state.brush));
+        });
+        ui.targets.forEach((button) => {
+          button.setAttribute("aria-pressed", String(button.dataset.target === state.colorTarget));
+        });
+        ui.exportOptions.forEach((button) => {
+          button.disabled = state.exporting;
+        });
+      }
+
+      function applyZoom() {
+        canvas.style.transform = `translate(-50%, -50%) scale(${state.zoom})`;
+        updateUi();
+      }
+
+      function clearSurface(targetCtx = ctx, width = state.width, height = state.height) {
+        targetCtx.globalCompositeOperation = "source-over";
+        const gradient = targetCtx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, Math.max(width, height) * 0.78);
+        gradient.addColorStop(0, "#050713");
+        gradient.addColorStop(0.72, "#04050a");
+        gradient.addColorStop(1, "#020308");
+        targetCtx.fillStyle = gradient;
+        targetCtx.fillRect(0, 0, width, height);
+      }
+
+      function makeSnapshot() {
+        const shot = document.createElement("canvas");
+        shot.width = canvas.width;
+        shot.height = canvas.height;
+        shot.getContext("2d").drawImage(canvas, 0, 0);
+        return shot;
+      }
+
+      function restoreSnapshot(shot) {
+        ctx.globalCompositeOperation = "source-over";
+        ctx.drawImage(shot, 0, 0);
+      }
+
+      function pushHistory() {
+        state.history.push(makeSnapshot());
+        if (state.history.length > 14) {
+          state.history.shift();
+        }
+        state.redo = [];
+        updateUi();
+      }
+
+      function resize() {
+        const previous = canvas.width && canvas.height ? makeSnapshot() : null;
+        const previousWidth = state.width || window.innerWidth;
+        const previousHeight = state.height || window.innerHeight;
+        state.dpr = clamp(window.devicePixelRatio || 1, 1, 2);
+        state.width = Math.floor(window.innerWidth * state.dpr);
+        state.height = Math.floor(window.innerHeight * state.dpr);
+        state.cx = state.width / 2;
+        state.cy = state.height / 2;
+        canvas.width = state.width;
+        canvas.height = state.height;
+        canvas.style.width = `${window.innerWidth}px`;
+        canvas.style.height = `${window.innerHeight}px`;
+        clearSurface();
+        if (previous) {
+          ctx.drawImage(previous, 0, 0, previousWidth, previousHeight, 0, 0, state.width, state.height);
+        }
+        clampAllPanels();
+        applyZoom();
+      }
+
+      function rotateAroundCenter(x, y, angle) {
+        const dx = x - state.cx;
+        const dy = y - state.cy;
+        const ca = Math.cos(angle);
+        const sa = Math.sin(angle);
+        return [state.cx + dx * ca - dy * sa, state.cy + dx * sa + dy * ca];
+      }
+
+      function hsla(hue, saturation, lightness, alpha) {
+        return `hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha})`;
+      }
+
+      function mixHue(from, to, amount) {
+        const delta = ((((to - from) % 360) + 540) % 360) - 180;
+        return (from + delta * amount + 360) % 360;
+      }
+
+      function drawLayer(x0, y0, x1, y1, style, width, cap) {
+        ctx.strokeStyle = style;
+        ctx.lineWidth = width;
+        ctx.lineCap = cap;
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x1, y1);
+        ctx.stroke();
+      }
+
+      function drawBrushSegment(x0, y0, x1, y1, tendril) {
+        const profile = brushProfiles[tendril.brush] || brushProfiles.thunder;
+        const age = 1 - tendril.life / tendril.maxLife;
+        const envelope = Math.sin(Math.PI * clamp(age, 0, 1));
+        const alpha = tendril.alpha * envelope;
+        if (alpha <= 0.001) return;
+
+        const baseWidth = tendril.width * state.dpr;
+        const passes = state.mirror ? 2 : 1;
+        const hue = tendril.blend ? mixHue(tendril.hue, tendril.hue2, age) : tendril.hue;
+        ctx.globalCompositeOperation = "lighter";
+
+        for (let mirrorIndex = 0; mirrorIndex < passes; mirrorIndex += 1) {
+          const sx0 = mirrorIndex === 0 ? x0 : 2 * state.cx - x0;
+          const sx1 = mirrorIndex === 0 ? x1 : 2 * state.cx - x1;
+
+          for (let i = 0; i < state.symmetry; i += 1) {
+            const angle = (Math.PI * 2 * i) / state.symmetry;
+            const [rx0, ry0] = rotateAroundCenter(sx0, y0, angle);
+            const [rx1, ry1] = rotateAroundCenter(sx1, y1, angle);
+
+            profile.layers.forEach(([scale, hueOffset, lightness, layerAlpha, special]) => {
+              const width = Math.max(0.16, baseWidth * scale);
+              let style = hsla(hue + hueOffset, 96, lightness, alpha * layerAlpha);
+              if (special === "white") {
+                style = `rgba(255, 255, 255, ${alpha * layerAlpha})`;
+              } else if (special === "warm") {
+                style = `rgba(255, 246, 219, ${alpha * layerAlpha})`;
+              }
+              drawLayer(rx0, ry0, rx1, ry1, style, width, profile.cap);
+            });
+          }
+        }
+      }
+
+      function quantizeVelocity(tendril, amount) {
+        if (!amount) return;
+        const speed = Math.hypot(tendril.vx, tendril.vy);
+        if (speed < 0.001) return;
+        const angle = Math.atan2(tendril.vy, tendril.vx);
+        const stepAngle = Math.PI * amount;
+        const snapped = Math.round(angle / stepAngle) * stepAngle;
+        tendril.vx = Math.cos(snapped) * speed;
+        tendril.vy = Math.sin(snapped) * speed;
+      }
+
+      function tendrilHue(profile, baseHue = state.hue) {
+        return baseHue + rand(profile.hueShift[0], profile.hueShift[1]);
+      }
+
+      function spawnFan(x, y, dx, dy) {
+        const profile = brushProfiles[state.brush] || brushProfiles.thunder;
+        const speed = Math.hypot(dx, dy);
+        const baseAngle = Math.atan2(dy, dx);
+        const sizeScale = 0.42 + Math.pow(state.size / 6, 1.22);
+        const extraTendrils = Math.floor(clamp((state.size - 5) / 4, 0, 3));
+        const count = Math.floor(rand(profile.count[0], profile.count[1] + 1)) + extraTendrils;
+
+        for (let i = 0; i < count; i += 1) {
+          const angle = baseAngle + rand(-profile.spread, profile.spread);
+          const velocity = rand(profile.velocity[0], profile.velocity[1]) * (0.55 + Math.min(speed * 0.045, 1.6));
+          const life = rand(profile.life[0], profile.life[1]);
+          const lift = rand(profile.lift[0], profile.lift[1]) * state.dpr;
+          const hue = tendrilHue(profile, state.hue);
+          const hue2 = state.blend ? tendrilHue(profile, state.hue2) : hue;
+          state.tendrils.push({
+            x: x * state.dpr,
+            y: y * state.dpr,
+            vx: Math.cos(angle) * velocity * state.dpr,
+            vy: Math.sin(angle) * velocity * state.dpr - lift,
+            life,
+            maxLife: life,
+            hue,
+            hue2,
+            blend: state.blend,
+            width: rand(profile.width[0], profile.width[1]) * sizeScale,
+            jitter: profile.jitter,
+            curl: profile.curl,
+            drag: profile.drag,
+            lift: (profile.lift[0] + profile.lift[1]) * 0.008,
+            alpha: profile.alpha * clamp(0.78 + Math.sqrt(sizeScale) * 0.2, 0.9, 1.28),
+            branch: profile.branch,
+            seed: Math.random() * Math.PI * 2,
+            angular: profile.angular || 0,
+            brush: state.brush
+          });
+        }
+
+        if (state.tendrils.length > 1600) {
+          state.tendrils.splice(0, state.tendrils.length - 1600);
+        }
+      }
+
+      function spawnAlong(x0, y0, x1, y1) {
+        const dx = x1 - x0;
+        const dy = y1 - y0;
+        const distance = Math.hypot(dx, dy);
+        const spacing = clamp(12 - state.size * 0.35, 5.5, 11);
+        const steps = Math.max(1, Math.floor(distance / spacing));
+        for (let i = 1; i <= steps; i += 1) {
+          const t = i / steps;
+          spawnFan(x0 + dx * t, y0 + dy * t, dx / steps, dy / steps);
+        }
+      }
+
+      function branchFrom(tendril, speed) {
+        const profile = brushProfiles[tendril.brush] || brushProfiles.thunder;
+        const splitAngle = Math.atan2(tendril.vy, tendril.vx) + (Math.random() > 0.5 ? 1 : -1) * rand(0.45, profile.angular ? 0.92 : 1.18);
+        const splitLife = tendril.life * rand(0.28, 0.58);
+        state.tendrils.push({
+          x: tendril.x,
+          y: tendril.y,
+          vx: Math.cos(splitAngle) * speed * rand(0.48, 0.92),
+          vy: Math.sin(splitAngle) * speed * rand(0.48, 0.92),
+          life: splitLife,
+          maxLife: splitLife,
+          hue: tendril.hue + rand(-20, 38),
+          hue2: tendril.hue2 + rand(-20, 38),
+          blend: tendril.blend,
+          width: tendril.width * rand(0.42, 0.76),
+          jitter: tendril.jitter * 1.08,
+          curl: tendril.curl,
+          drag: tendril.drag,
+          lift: tendril.lift,
+          alpha: tendril.alpha * 0.74,
+          branch: tendril.branch * 0.18,
+          seed: Math.random() * Math.PI * 2,
+          angular: tendril.angular,
+          brush: tendril.brush
+        });
+      }
+
+      function step() {
+        for (let i = state.tendrils.length - 1; i >= 0; i -= 1) {
+          const tendril = state.tendrils[i];
+          const ox = tendril.x;
+          const oy = tendril.y;
+          const speed = Math.max(0.001, Math.hypot(tendril.vx, tendril.vy));
+          const nx = -tendril.vy / speed;
+          const ny = tendril.vx / speed;
+          const curl = Math.sin((tendril.maxLife - tendril.life) * 0.16 + tendril.seed) * tendril.curl;
+
+          tendril.vx += nx * curl * state.dpr;
+          tendril.vy += ny * curl * state.dpr;
+          tendril.vx += rand(-tendril.jitter, tendril.jitter) * state.dpr;
+          tendril.vy += rand(-tendril.jitter, tendril.jitter) * state.dpr;
+          tendril.vy -= tendril.lift * state.dpr * (1 + tendril.width);
+          quantizeVelocity(tendril, tendril.angular);
+
+          const tx = tendril.x + tendril.vx;
+          const ty = tendril.y + tendril.vy;
+          drawBrushSegment(ox, oy, tx, ty, tendril);
+
+          tendril.x = tx;
+          tendril.y = ty;
+          tendril.vx *= tendril.drag;
+          tendril.vy *= tendril.drag;
+          tendril.life -= 1;
+
+          if (tendril.life > 12 && Math.random() < tendril.branch && state.tendrils.length < 1600) {
+            branchFrom(tendril, speed);
+          }
+
+          if (
+            tendril.life <= 0 ||
+            Math.abs(tendril.vx) + Math.abs(tendril.vy) < 0.015 ||
+            tendril.x < -state.width * 0.1 ||
+            tendril.x > state.width * 1.1 ||
+            tendril.y < -state.height * 0.1 ||
+            tendril.y > state.height * 1.1
+          ) {
+            state.tendrils.splice(i, 1);
+          }
+        }
+
+        requestAnimationFrame(step);
+      }
+
+      function eventPosition(event) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = rect.width / window.innerWidth || state.zoom || 1;
+        const scaleY = rect.height / window.innerHeight || state.zoom || 1;
+        return [
+          (event.clientX - rect.left) / scaleX,
+          (event.clientY - rect.top) / scaleY
+        ];
+      }
+
+      function startPainting(event) {
+        if (event.button !== undefined && event.button !== 0) return;
+        pushHistory();
+        state.painting = true;
+        state.pointerId = event.pointerId ?? "mouse";
+        state.last = eventPosition(event);
+        if (event.pointerId !== undefined && stage.setPointerCapture) {
+          stage.setPointerCapture(event.pointerId);
+        }
+        event.preventDefault();
+      }
+
+      function continuePainting(event) {
+        const pointerId = event.pointerId ?? "mouse";
+        if (!state.painting || pointerId !== state.pointerId || !state.last) return;
+        const point = eventPosition(event);
+        const dx = point[0] - state.last[0];
+        const dy = point[1] - state.last[1];
+        if (dx * dx + dy * dy < 0.45) return;
+        spawnAlong(state.last[0], state.last[1], point[0], point[1]);
+        if (state.brush !== "flame" && !state.blend) {
+          state.hue = (state.hue + 0.34) % 360;
+          root.style.setProperty("--active", activeColor());
+          root.style.setProperty("--active-soft", `hsl(${Math.round(state.hue)} 100% 62% / 0.18)`);
+          root.style.setProperty("--ring-hue", String(Math.round(state.colorTarget === "primary" ? state.hue : state.hue2)));
+          ui.hue.value = String(Math.round(state.hue));
+          ui.hueValue.textContent = String(Math.round(state.hue));
+        }
+        state.last = point;
+        event.preventDefault();
+      }
+
+      function stopPainting(event) {
+        const pointerId = event.pointerId ?? "mouse";
+        if (!state.painting || pointerId !== state.pointerId) return;
+        state.painting = false;
+        state.pointerId = null;
+        state.last = null;
+        updateUi();
+      }
+
+      function setBrush(brush) {
+        const profile = brushProfiles[brush];
+        if (!profile) return;
+        state.brush = brush;
+        state.hue = profile.hues[0];
+        state.hue2 = profile.hues[1];
+        updateUi();
+      }
+
+      function normalizedHue(hue) {
+        return ((Number(hue) % 360) + 360) % 360;
+      }
+
+      function setTargetHue(hue) {
+        if (state.colorTarget === "blend") {
+          state.hue2 = normalizedHue(hue);
+        } else {
+          state.hue = normalizedHue(hue);
+        }
+        updateUi();
+      }
+
+      function setHue(hue) {
+        state.hue = normalizedHue(hue);
+        updateUi();
+      }
+
+      function setHue2(hue) {
+        state.hue2 = normalizedHue(hue);
+        updateUi();
+      }
+
+      function setSize(size) {
+        state.size = clamp(Number(size), 1, 18);
+        updateUi();
+      }
+
+      function setSymmetry(symmetry) {
+        state.symmetry = Number(symmetry);
+        updateUi();
+      }
+
+      function setZoom(zoom) {
+        state.zoom = clamp(Number(zoom), 0.5, 2.2);
+        applyZoom();
+      }
+
+      function stepZoom(delta) {
+        setZoom(Math.round((state.zoom + delta) * 20) / 20);
+      }
+
+      function toggleMirror() {
+        state.mirror = !state.mirror;
+        updateUi();
+      }
+
+      function toggleBlend() {
+        state.blend = !state.blend;
+        updateUi();
+      }
+
+      function undo() {
+        if (state.history.length === 0) return;
+        state.tendrils.length = 0;
+        state.redo.push(makeSnapshot());
+        restoreSnapshot(state.history.pop());
+        updateUi();
+      }
+
+      function redo() {
+        if (state.redo.length === 0) return;
+        state.tendrils.length = 0;
+        state.history.push(makeSnapshot());
+        restoreSnapshot(state.redo.pop());
+        updateUi();
+      }
+
+      function clearArt() {
+        pushHistory();
+        state.tendrils.length = 0;
+        clearSurface();
+        updateUi();
+      }
+
+      function randomize() {
+        state.brush = brushOrder[Math.floor(Math.random() * brushOrder.length)];
+        state.hue = Math.floor(Math.random() * 360);
+        state.hue2 = (state.hue + Math.floor(80 + Math.random() * 190)) % 360;
+        state.blend = Math.random() > 0.28;
+        state.size = Math.floor(3 + Math.random() * 13);
+        state.symmetry = Math.floor(2 + Math.random() * 15);
+        state.mirror = Math.random() > 0.22;
+        updateUi();
+      }
+
+      function togglePanel(panel, toggle, force) {
+        panel.hidden = force === undefined ? !panel.hidden : !force;
+        toggle.setAttribute("aria-expanded", String(!panel.hidden));
+        if (!panel.hidden) clampPanel(panel);
+      }
+
+      function showStatus(message) {
+        window.clearTimeout(state.statusTimer);
+        ui.status.textContent = message;
+        ui.status.hidden = false;
+        state.statusTimer = window.setTimeout(() => {
+          ui.status.hidden = true;
+        }, 2200);
+      }
+
+      function timestamp() {
+        return new Date().toISOString().replace(/[:.]/g, "-");
+      }
+
+      function downloadCanvas(sourceCanvas, label) {
+        const link = document.createElement("a");
+        link.download = `fractal-brushes-${label}-${timestamp()}.png`;
+        link.href = sourceCanvas.toDataURL("image/png");
+        link.click();
+      }
+
+      function exportPngPreset(presetName) {
+        if (state.exporting) return;
+        const preset = exportPresets[presetName];
+        if (!preset) return;
+        state.exporting = true;
+        updateUi();
+        try {
+          if (presetName === "current") {
+            downloadCanvas(canvas, preset.label);
+          } else {
+            const out = document.createElement("canvas");
+            out.width = preset.width;
+            out.height = preset.height;
+            const outCtx = out.getContext("2d", { alpha: false });
+            clearSurface(outCtx, out.width, out.height);
+            const scale = Math.min(out.width / canvas.width, out.height / canvas.height);
+            const drawWidth = canvas.width * scale;
+            const drawHeight = canvas.height * scale;
+            const dx = (out.width - drawWidth) / 2;
+            const dy = (out.height - drawHeight) / 2;
+            outCtx.imageSmoothingEnabled = true;
+            outCtx.imageSmoothingQuality = "high";
+            outCtx.drawImage(canvas, dx, dy, drawWidth, drawHeight);
+            downloadCanvas(out, preset.label);
+          }
+          showStatus("PNG export ready.");
+        } catch (error) {
+          showStatus("Export failed in this browser. Try a smaller preset.");
+        } finally {
+          state.exporting = false;
+          updateUi();
+        }
+      }
+
+      function setHueFromWheel(event) {
+        const rect = ui.hueRing.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        const dx = event.clientX - cx;
+        const dy = event.clientY - cy;
+        const radius = Math.hypot(dx, dy);
+        const outer = rect.width / 2;
+        const inner = outer * 0.48;
+        if (radius < inner || radius > outer) return;
+        const hue = normalizedHue(Math.atan2(dy, dx) * 180 / Math.PI + 90);
+        setTargetHue(hue);
+      }
+
+      function beginHueDrag(event) {
+        setHueFromWheel(event);
+        const pointerId = event.pointerId;
+        ui.hueRing.setPointerCapture(pointerId);
+        const move = (moveEvent) => setHueFromWheel(moveEvent);
+        const up = () => {
+          ui.hueRing.removeEventListener("pointermove", move);
+          ui.hueRing.removeEventListener("pointerup", up);
+          ui.hueRing.removeEventListener("pointercancel", up);
+        };
+        ui.hueRing.addEventListener("pointermove", move);
+        ui.hueRing.addEventListener("pointerup", up);
+        ui.hueRing.addEventListener("pointercancel", up);
+        event.preventDefault();
+      }
+
+      function clampPanel(panel) {
+        const rect = panel.getBoundingClientRect();
+        const margin = 10;
+        const left = clamp(rect.left, margin, Math.max(margin, window.innerWidth - rect.width - margin));
+        const top = clamp(rect.top, margin, Math.max(margin, window.innerHeight - rect.height - margin));
+        panel.style.left = `${left}px`;
+        panel.style.top = `${top}px`;
+        panel.style.right = "auto";
+      }
+
+      function clampAllPanels() {
+        if (window.innerWidth <= 560) {
+          const margin = 10;
+          const chromeRect = document.querySelector(".chrome").getBoundingClientRect();
+          let top = Math.max(104, chromeRect.bottom + margin);
+          [ui.colorPanel, ui.brushPanel].forEach((panel) => {
+            if (panel.hidden) return;
+            panel.style.left = `${margin}px`;
+            panel.style.top = `${top}px`;
+            panel.style.right = "auto";
+            const rect = panel.getBoundingClientRect();
+            top = Math.min(window.innerHeight - margin, rect.bottom + margin);
+          });
+          return;
+        }
+        [ui.brushPanel, ui.colorPanel].forEach((panel) => {
+          if (!panel.hidden) clampPanel(panel);
+        });
+      }
+
+      function makeDraggable(panel) {
+        const handle = panel.querySelector("[data-drag-handle]");
+        let startX = 0;
+        let startY = 0;
+        let panelX = 0;
+        let panelY = 0;
+
+        handle.addEventListener("pointerdown", (event) => {
+          if (event.target.closest("button, input")) return;
+          const rect = panel.getBoundingClientRect();
+          startX = event.clientX;
+          startY = event.clientY;
+          panelX = rect.left;
+          panelY = rect.top;
+          panel.style.left = `${panelX}px`;
+          panel.style.top = `${panelY}px`;
+          panel.style.right = "auto";
+          handle.setPointerCapture(event.pointerId);
+
+          const move = (moveEvent) => {
+            const margin = 10;
+            const nextX = clamp(panelX + moveEvent.clientX - startX, margin, Math.max(margin, window.innerWidth - rect.width - margin));
+            const nextY = clamp(panelY + moveEvent.clientY - startY, margin, Math.max(margin, window.innerHeight - rect.height - margin));
+            panel.style.left = `${nextX}px`;
+            panel.style.top = `${nextY}px`;
+          };
+          const up = () => {
+            handle.removeEventListener("pointermove", move);
+            handle.removeEventListener("pointerup", up);
+            handle.removeEventListener("pointercancel", up);
+          };
+
+          handle.addEventListener("pointermove", move);
+          handle.addEventListener("pointerup", up);
+          handle.addEventListener("pointercancel", up);
+          event.preventDefault();
+        });
+      }
+
+      stage.addEventListener("pointerdown", startPainting);
+      stage.addEventListener("pointermove", continuePainting);
+      window.addEventListener("pointerup", stopPainting);
+      stage.addEventListener("pointercancel", stopPainting);
+      stage.addEventListener("pointerleave", stopPainting);
+
+      ui.undo.addEventListener("click", undo);
+      ui.redo.addEventListener("click", redo);
+      ui.exportToggle.addEventListener("click", () => {
+        ui.exportMenu.hidden = !ui.exportMenu.hidden;
+        updateUi();
+      });
+      ui.exportOptions.forEach((button) => {
+        button.addEventListener("click", () => {
+          exportPngPreset(button.dataset.export);
+          ui.exportMenu.hidden = true;
+          updateUi();
+        });
+      });
+      ui.clear.addEventListener("click", clearArt);
+      ui.mirror.addEventListener("click", toggleMirror);
+      ui.brushToggle.addEventListener("click", () => togglePanel(ui.brushPanel, ui.brushToggle));
+      ui.colorToggle.addEventListener("click", () => togglePanel(ui.colorPanel, ui.colorToggle));
+      ui.closeBrushPanel.addEventListener("click", () => togglePanel(ui.brushPanel, ui.brushToggle, false));
+      ui.closeColorPanel.addEventListener("click", () => togglePanel(ui.colorPanel, ui.colorToggle, false));
+      ui.blend.addEventListener("click", toggleBlend);
+      ui.zoomIn.addEventListener("click", () => stepZoom(0.1));
+      ui.zoomOut.addEventListener("click", () => stepZoom(-0.1));
+      ui.resetZoom.addEventListener("click", () => setZoom(1));
+      ui.randomize.addEventListener("click", randomize);
+      ui.hue.addEventListener("input", (event) => setHue(event.target.value));
+      ui.hue2.addEventListener("input", (event) => setHue2(event.target.value));
+      ui.size.addEventListener("input", (event) => setSize(event.target.value));
+      ui.symmetry.addEventListener("input", (event) => setSymmetry(event.target.value));
+      ui.targets.forEach((button) => {
+        button.addEventListener("click", () => {
+          state.colorTarget = button.dataset.target;
+          updateUi();
+        });
+      });
+      ui.hueRing.addEventListener("pointerdown", beginHueDrag);
+
+      window.addEventListener("keydown", (event) => {
+        const key = event.key.toLowerCase();
+        const tag = document.activeElement && document.activeElement.tagName;
+        if (tag === "INPUT") return;
+        if ((event.metaKey || event.ctrlKey) && key === "z") {
+          event.preventDefault();
+          undo();
+        } else if ((event.metaKey || event.ctrlKey) && (key === "y" || (event.shiftKey && key === "z"))) {
+          event.preventDefault();
+          redo();
+        } else if (/^[1-9]$/.test(key)) {
+          const brush = brushOrder[Number(key) - 1];
+          if (brush) {
+            event.preventDefault();
+            setBrush(brush);
+          }
+        } else if (key === "c") {
+          event.preventDefault();
+          clearArt();
+        } else if (key === "m") {
+          event.preventDefault();
+          toggleMirror();
+        } else if (key === "b") {
+          event.preventDefault();
+          toggleBlend();
+        } else if (key === "=" || key === "+") {
+          event.preventDefault();
+          stepZoom(0.1);
+        } else if (key === "-") {
+          event.preventDefault();
+          stepZoom(-0.1);
+        } else if (key === "0") {
+          event.preventDefault();
+          setZoom(1);
+        } else if (key === "p") {
+          event.preventDefault();
+          exportPngPreset("current");
+        }
+      });
+
+      window.addEventListener("resize", resize);
+      createBrushControls();
+      createPresetControls();
+      makeDraggable(ui.brushPanel);
+      makeDraggable(ui.colorPanel);
+      resize();
+      updateUi();
+      step();
+    })();
+  </script>
+</body>
+</html>
