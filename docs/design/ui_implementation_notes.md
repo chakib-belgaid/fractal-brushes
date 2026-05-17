@@ -53,10 +53,9 @@ Randomize should choose from the full brush list.
 ## Color Panel
 
 - Hue ring is the primary color input.
-- Hue ring shows separate Primary and Blend handles, with the selected target emphasized.
-- Target selector switches between Primary and Blend.
-- Blend toggle controls whether strokes interpolate between hues.
-- Preset chips provide quick color shortcuts.
+- Color mode selector switches between Single and Blend.
+- Single mode uses one hue handle and applies one color to the whole stroke.
+- Blend mode shows two hue handles and strokes interpolate from the first color toward the second.
 - Pointer input on the hue ring should ignore accidental clicks outside the ring band.
 - Drag handles should not interfere with the hue wheel or sliders.
 
@@ -83,7 +82,7 @@ Expose three PNG presets:
 - Landing page renders the SVG logo and has no console errors.
 - App route renders the SVG logo and has no console errors.
 - Brush panel opens and selection updates active state.
-- Color panel opens, hue changes Primary, target switch changes Blend, and dragging works.
+- Color panel opens, Single/Blend mode switches correctly, two ring handles are available in Blend mode, and dragging works.
 - Zoom slider renders bottom-right and updates zoom.
 - Export menu lists Current Resolution, 4K 16:9, and 4K Square.
 - Export code creates PNG download URLs without crashing.

@@ -17,8 +17,8 @@ Fractal Brushes is a browser-native canvas app for making luminous mirrored brus
 - Independent brush and color panels.
 - Bottom-left parameter panel for Brush Size, Expansion, and Symmetry.
 - Brush expansion slider for spread and density control, scaled with brush size for expansion spacing.
-- Circular hue picker with separate Primary and Blend handles.
-- Blend toggle and preset color chips.
+- Circular hue picker with Single and Blend modes.
+- Single mode applies one color; Blend mode interpolates from the first hue handle toward the second hue handle.
 - Luminous brush family: Fairy, Flame, Thunder, Silk Ribbon, Comet Trail, Nebula Smoke, Crystal Filament.
 - Elemental brush family: Water, Ember, Frost, Plasma.
 - Export presets for Current Resolution PNG, 4K 16:9 PNG, and 4K Square PNG.

@@ -108,6 +108,7 @@
     .chrome {
       left: 18px;
       top: 18px;
+      z-index: 6;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -205,6 +206,41 @@
     button,
     input {
       font: inherit;
+    }
+
+    button[data-tooltip] {
+      position: relative;
+    }
+
+    button[data-tooltip]::after {
+      position: absolute;
+      left: 50%;
+      top: calc(100% + 8px);
+      z-index: 60;
+      width: max-content;
+      max-width: 180px;
+      padding: 6px 8px;
+      border: 1px solid rgba(190, 215, 255, 0.18);
+      border-radius: 7px;
+      color: var(--text);
+      background: rgba(7, 10, 20, 0.94);
+      box-shadow: var(--shadow);
+      content: attr(data-tooltip);
+      font-size: 11px;
+      font-weight: 680;
+      line-height: 1.25;
+      opacity: 0;
+      pointer-events: none;
+      text-align: center;
+      transform: translate(-50%, -3px);
+      transition: opacity 140ms ease, transform 140ms ease;
+      white-space: normal;
+    }
+
+    button[data-tooltip]:hover::after,
+    button[data-tooltip]:focus-visible::after {
+      opacity: 1;
+      transform: translate(-50%, 0);
     }
 
     .tool {
@@ -462,6 +498,7 @@
     }
 
     .hue-ring {
+      --handle-radius: 62px;
       position: relative;
       width: 158px;
       height: 158px;
@@ -488,8 +525,8 @@
 
     .hue-handle {
       position: absolute;
-      left: calc(50% + cos((var(--handle-hue) - 90) * 1deg) * 62px);
-      top: calc(50% + sin((var(--handle-hue) - 90) * 1deg) * 62px);
+      left: calc(50% + cos((var(--handle-hue) - 90) * 1deg) * var(--handle-radius));
+      top: calc(50% + sin((var(--handle-hue) - 90) * 1deg) * var(--handle-radius));
       width: 14px;
       height: 14px;
       border: 2px solid rgba(255, 255, 255, 0.96);
@@ -522,8 +559,11 @@
       z-index: 1;
     }
 
-    .target-row,
-    .preset-row {
+    .hue-ring[data-color-mode="single"] .hue-handle.blend {
+      display: none;
+    }
+
+    .target-row {
       display: flex;
       gap: 7px;
       flex-wrap: wrap;
@@ -556,17 +596,6 @@
     .segment[aria-pressed="true"] {
       color: #fff;
       background: color-mix(in srgb, var(--target-color) 24%, transparent);
-    }
-
-    .chip {
-      width: 28px;
-      height: 28px;
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      border-radius: 50%;
-      background: hsl(var(--chip-hue) 100% 62%);
-      cursor: pointer;
-      appearance: none;
-      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.28), 0 0 14px hsl(var(--chip-hue) 100% 62% / 0.25);
     }
 
     .export-menu {
@@ -703,6 +732,16 @@
         overflow: auto;
       }
 
+      .hue-ring {
+        --handle-radius: 54px;
+        width: 138px;
+        height: 138px;
+      }
+
+      .hue-ring::before {
+        inset: 30px;
+      }
+
       .color-panel {
         max-height: 260px;
       }
@@ -836,30 +875,9 @@
       </button>
     </div>
     <div class="target-row">
-      <div class="segmented" role="group" aria-label="Color target">
-        <button class="segment target" data-target="primary" type="button" aria-pressed="true">Primary</button>
-        <button class="segment target" data-target="blend" type="button" aria-pressed="false">Blend</button>
-      </div>
-      <button class="tool" id="blend" type="button" title="Blend colors" aria-label="Blend colors" aria-pressed="false">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="12" r="5"/><circle cx="15" cy="12" r="5"/><path d="M12 8.8a5 5 0 0 1 0 6.4"/></svg>
-      </button>
-    </div>
-    <div class="field">
-      <span class="field-label">Presets</span>
-      <div class="preset-row" id="presetRow" aria-label="Color presets"></div>
-    </div>
-    <div class="field">
-      <span class="field-label">Primary</span>
-      <div class="slider-row">
-        <input id="hue" type="range" min="0" max="359" value="195" aria-label="Primary hue">
-        <span class="value" id="hueValue">195</span>
-      </div>
-    </div>
-    <div class="field">
-      <span class="field-label">Blend</span>
-      <div class="slider-row">
-        <input id="hue2" type="range" min="0" max="359" value="314" aria-label="Blend hue">
-        <span class="value" id="hue2Value">314</span>
+      <div class="segmented" role="group" aria-label="Color mode">
+        <button class="segment mode" data-mode="single" type="button" aria-label="Single color" aria-pressed="true">Single</button>
+        <button class="segment mode" data-mode="blend" type="button" aria-label="Blend colors" aria-pressed="false">Blend</button>
       </div>
     </div>
   </aside>
@@ -895,15 +913,9 @@
         closeColorPanel: document.getElementById("closeColorPanel"),
         brushList: document.getElementById("brushList"),
         hueRing: document.getElementById("hueRing"),
-        targets: Array.from(document.querySelectorAll(".target")),
-        presetRow: document.getElementById("presetRow"),
-        blend: document.getElementById("blend"),
+        modes: Array.from(document.querySelectorAll(".mode")),
         zoom: document.getElementById("zoom"),
         zoomValue: document.getElementById("zoomValue"),
-        hue: document.getElementById("hue"),
-        hueValue: document.getElementById("hueValue"),
-        hue2: document.getElementById("hue2"),
-        hue2Value: document.getElementById("hue2Value"),
         size: document.getElementById("size"),
         sizeValue: document.getElementById("sizeValue"),
         expansion: document.getElementById("expansion"),
@@ -1130,7 +1142,6 @@
       };
 
       const brushOrder = ["fairy", "flame", "thunder", "silk", "comet", "nebula", "crystal", "water", "ember", "frost", "plasma"];
-      const presets = [195, 138, 41, 8, 314, 258, 188, 22, 326, 214];
       const exportPresets = {
         current: { label: "current", width: 0, height: 0 },
         wide4k: { label: "4k-16-9", width: 3840, height: 2160 },
@@ -1145,6 +1156,7 @@
         cy: 0,
         brush: "thunder",
         colorTarget: "primary",
+        colorMode: "single",
         hue: 195,
         hue2: 314,
         blend: false,
@@ -1189,17 +1201,10 @@
         });
       }
 
-      function createPresetControls() {
-        presets.forEach((hue) => {
-          const button = document.createElement("button");
-          button.className = "chip";
-          button.type = "button";
-          button.dataset.hue = String(hue);
-          button.title = `Hue ${hue}`;
-          button.setAttribute("aria-label", `Hue ${hue}`);
-          button.style.setProperty("--chip-hue", hue);
-          button.addEventListener("click", () => setTargetHue(hue));
-          ui.presetRow.append(button);
+      function hydrateTooltips() {
+        document.querySelectorAll("button").forEach((button) => {
+          const label = button.getAttribute("aria-label") || button.title || button.textContent.trim();
+          if (label) button.dataset.tooltip = label;
         });
       }
 
@@ -1211,17 +1216,13 @@
         root.style.setProperty("--primary-hue", String(Math.round(state.hue)));
         root.style.setProperty("--blend-hue", String(Math.round(state.hue2)));
         ui.hueRing.dataset.target = state.colorTarget;
+        ui.hueRing.dataset.colorMode = state.colorMode;
         ui.undo.disabled = state.history.length === 0;
         ui.redo.disabled = state.redo.length === 0;
         ui.mirror.setAttribute("aria-pressed", String(state.mirror));
-        ui.blend.setAttribute("aria-pressed", String(state.blend));
         ui.brushToggle.setAttribute("aria-expanded", String(!ui.brushPanel.hidden));
         ui.colorToggle.setAttribute("aria-expanded", String(!ui.colorPanel.hidden));
         ui.exportToggle.setAttribute("aria-expanded", String(!ui.exportMenu.hidden));
-        ui.hue.value = String(Math.round(state.hue));
-        ui.hueValue.textContent = String(Math.round(state.hue));
-        ui.hue2.value = String(Math.round(state.hue2));
-        ui.hue2Value.textContent = String(Math.round(state.hue2));
         ui.size.value = String(state.size);
         ui.sizeValue.textContent = String(state.size);
         ui.expansion.value = String(Math.round(state.expansion * 100));
@@ -1233,8 +1234,8 @@
         Array.from(ui.brushList.querySelectorAll(".brush")).forEach((button) => {
           button.setAttribute("aria-pressed", String(button.dataset.brush === state.brush));
         });
-        ui.targets.forEach((button) => {
-          button.setAttribute("aria-pressed", String(button.dataset.target === state.colorTarget));
+        ui.modes.forEach((button) => {
+          button.setAttribute("aria-pressed", String(button.dataset.mode === state.colorMode));
         });
         ui.exportOptions.forEach((button) => {
           button.disabled = state.exporting;
@@ -1547,13 +1548,6 @@
         const dy = point[1] - state.last[1];
         if (dx * dx + dy * dy < 0.45) return;
         spawnAlong(state.last[0], state.last[1], point[0], point[1]);
-        if (state.brush !== "flame" && !state.blend) {
-          state.hue = (state.hue + 0.34) % 360;
-          root.style.setProperty("--active", activeColor());
-          root.style.setProperty("--active-soft", `hsl(${Math.round(state.hue)} 100% 62% / 0.18)`);
-          ui.hue.value = String(Math.round(state.hue));
-          ui.hueValue.textContent = String(Math.round(state.hue));
-        }
         state.last = point;
         event.preventDefault();
       }
@@ -1589,13 +1583,12 @@
         updateUi();
       }
 
-      function setHue(hue) {
-        state.hue = normalizedHue(hue);
-        updateUi();
-      }
-
-      function setHue2(hue) {
-        state.hue2 = normalizedHue(hue);
+      function setColorMode(mode) {
+        state.colorMode = mode === "blend" ? "blend" : "single";
+        state.blend = state.colorMode === "blend";
+        if (state.colorMode === "single") {
+          state.colorTarget = "primary";
+        }
         updateUi();
       }
 
@@ -1629,8 +1622,7 @@
       }
 
       function toggleBlend() {
-        state.blend = !state.blend;
-        updateUi();
+        setColorMode(state.colorMode === "blend" ? "single" : "blend");
       }
 
       function undo() {
@@ -1660,7 +1652,9 @@
         state.brush = brushOrder[Math.floor(Math.random() * brushOrder.length)];
         state.hue = Math.floor(Math.random() * 360);
         state.hue2 = (state.hue + Math.floor(80 + Math.random() * 190)) % 360;
-        state.blend = Math.random() > 0.28;
+        state.colorMode = Math.random() > 0.28 ? "blend" : "single";
+        state.colorTarget = "primary";
+        state.blend = state.colorMode === "blend";
         state.size = Math.floor(3 + Math.random() * 13);
         state.expansion = rand(0.55, 1.28);
         state.symmetry = Math.floor(2 + Math.random() * 15);
@@ -1742,7 +1736,24 @@
         setTargetHue(hue);
       }
 
+      function hueDistance(a, b) {
+        return Math.abs(((((a - b) % 360) + 540) % 360) - 180);
+      }
+
+      function chooseColorTargetFromWheel(event) {
+        if (state.colorMode !== "blend") {
+          state.colorTarget = "primary";
+          return;
+        }
+        const rect = ui.hueRing.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        const hue = normalizedHue(Math.atan2(event.clientY - cy, event.clientX - cx) * 180 / Math.PI + 90);
+        state.colorTarget = hueDistance(hue, state.hue2) < hueDistance(hue, state.hue) ? "blend" : "primary";
+      }
+
       function beginHueDrag(event) {
+        chooseColorTargetFromWheel(event);
         setHueFromWheel(event);
         const pointerId = event.pointerId;
         ui.hueRing.setPointerCapture(pointerId);
@@ -1852,19 +1863,15 @@
       ui.colorToggle.addEventListener("click", () => togglePanel(ui.colorPanel, ui.colorToggle));
       ui.closeBrushPanel.addEventListener("click", () => togglePanel(ui.brushPanel, ui.brushToggle, false));
       ui.closeColorPanel.addEventListener("click", () => togglePanel(ui.colorPanel, ui.colorToggle, false));
-      ui.blend.addEventListener("click", toggleBlend);
       ui.zoom.addEventListener("input", (event) => setZoom(Number(event.target.value) / 100));
       ui.zoom.addEventListener("dblclick", () => setZoom(1));
       ui.randomize.addEventListener("click", randomize);
-      ui.hue.addEventListener("input", (event) => setHue(event.target.value));
-      ui.hue2.addEventListener("input", (event) => setHue2(event.target.value));
       ui.size.addEventListener("input", (event) => setSize(event.target.value));
       ui.expansion.addEventListener("input", (event) => setExpansion(Number(event.target.value) / 100));
       ui.symmetry.addEventListener("input", (event) => setSymmetry(event.target.value));
-      ui.targets.forEach((button) => {
+      ui.modes.forEach((button) => {
         button.addEventListener("click", () => {
-          state.colorTarget = button.dataset.target;
-          updateUi();
+          setColorMode(button.dataset.mode);
         });
       });
       ui.hueRing.addEventListener("pointerdown", beginHueDrag);
@@ -1911,7 +1918,7 @@
 
       window.addEventListener("resize", resize);
       createBrushControls();
-      createPresetControls();
+      hydrateTooltips();
       makeDraggable(ui.brushPanel);
       makeDraggable(ui.colorPanel);
       resize();

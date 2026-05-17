@@ -39,7 +39,7 @@ Each brush profile tunes tendril spawn count, spread, speed, lifetime, width, cu
 
 ## Color
 
-The color panel centers on a circular hue picker with two handles: one for Primary and one for Blend. Users can target either color, enable blend mode, and use preset chips as fast shortcuts. When blend is enabled, new strokes interpolate between the selected primary and blend hues.
+The color panel centers on a circular hue picker and a `Single / Blend` switch. Single mode uses one color for the whole stroke. Blend mode shows two handles on the ring and new strokes interpolate from the first color toward the second color over their lifetime.
 
 ## Export Formats
 
