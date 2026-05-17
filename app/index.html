@@ -508,7 +508,7 @@
       appearance: none;
       background:
         radial-gradient(circle at center, rgba(6, 8, 16, 0.98) 0 47%, transparent 48% 100%),
-        conic-gradient(from -90deg, hsl(0 100% 62%), hsl(60 100% 62%), hsl(120 100% 62%), hsl(180 100% 62%), hsl(240 100% 66%), hsl(300 100% 62%), hsl(360 100% 62%));
+        conic-gradient(from 0deg, hsl(0 100% 62%), hsl(60 100% 62%), hsl(120 100% 62%), hsl(180 100% 62%), hsl(240 100% 66%), hsl(300 100% 62%), hsl(360 100% 62%));
       box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18), 0 0 26px rgba(56, 232, 255, 0.12);
     }
 
@@ -1566,8 +1566,6 @@
         const profile = brushProfiles[brush];
         if (!profile) return;
         state.brush = brush;
-        state.hue = profile.hues[0];
-        state.hue2 = profile.hues[1];
         updateUi();
       }
 
