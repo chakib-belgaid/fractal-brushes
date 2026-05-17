@@ -12,6 +12,7 @@ Fractal Brushes should feel like a focused creative instrument: dark canvas, lum
 - Zoom control sits at the bottom-right as a slider with current percentage. Double-click resets to 100%.
 - Brush panel opens on the right side.
 - Color panel opens under the main toolbar by default.
+- Brush parameters sit in a fixed bottom-left panel.
 - Export panel opens from the main toolbar and contains only export presets.
 - Brush and color panels are independent so users can keep either open while drawing.
 
@@ -40,7 +41,7 @@ Represent brushes declaratively where possible. Each profile may tune:
 - Glow layering
 - Color bias
 
-Brush size, expansion, and symmetry stay in the brush panel. Expansion controls stroke spread, density, lifetime, and velocity scaling for the active brush.
+Brush size, expansion, and symmetry stay in the bottom-left parameter panel. Expansion controls stroke spread, density, lifetime, and velocity scaling for the active brush. Brush size also scales expansion distance so larger brushes create wider-spaced expansion fans.
 
 Brush families:
 

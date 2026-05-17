@@ -87,7 +87,7 @@
       position: fixed;
       z-index: 3;
       left: 22px;
-      bottom: 18px;
+      bottom: 254px;
       color: rgba(216, 226, 246, 0.46);
       font-family: ui-serif, "Iowan Old Style", Baskerville, Georgia, serif;
       font-size: 11px;
@@ -306,6 +306,16 @@
       left: 18px;
       top: 78px;
       width: 280px;
+    }
+
+    .params-panel {
+      left: 18px;
+      bottom: 18px;
+      width: 280px;
+    }
+
+    .params-panel .panel-head {
+      cursor: default;
     }
 
     .panel-head {
@@ -659,6 +669,12 @@
         width: min(264px, calc(100vw - 20px));
       }
 
+      .params-panel {
+        left: 10px;
+        bottom: 62px;
+        width: min(270px, calc(100vw - 20px));
+      }
+
       .export-menu {
         left: 64px;
         top: 58px;
@@ -684,7 +700,19 @@
       }
 
       .panel {
-        max-height: min(300px, calc(50vh - 38px));
+        overflow: auto;
+      }
+
+      .color-panel {
+        max-height: 260px;
+      }
+
+      .brush-panel {
+        max-height: 170px;
+      }
+
+      .params-panel {
+        max-height: 216px;
         overflow: auto;
       }
 
@@ -757,14 +785,10 @@
     <button class="export-option" data-export="square4k" type="button">4K Square PNG</button>
   </div>
 
-  <aside class="panel brush-panel" id="brushPanel" aria-label="Brush menu">
-    <div class="panel-head" data-drag-handle>
-      <span class="panel-title">Brushes</span>
-      <button class="tool mini" id="closeBrushPanel" type="button" title="Close brushes" aria-label="Close brushes">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-      </button>
+  <aside class="panel params-panel" id="paramsPanel" aria-label="Brush parameters">
+    <div class="panel-head">
+      <span class="panel-title">Parameters</span>
     </div>
-    <div class="brush-list" id="brushList"></div>
     <div class="field">
       <span class="field-label">Brush size</span>
       <div class="slider-row">
@@ -786,6 +810,16 @@
         <span class="value" id="symmetryValue">6</span>
       </div>
     </div>
+  </aside>
+
+  <aside class="panel brush-panel" id="brushPanel" aria-label="Brush menu">
+    <div class="panel-head" data-drag-handle>
+      <span class="panel-title">Brushes</span>
+      <button class="tool mini" id="closeBrushPanel" type="button" title="Close brushes" aria-label="Close brushes">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+    <div class="brush-list" id="brushList"></div>
   </aside>
 
   <aside class="panel color-panel" id="colorPanel" aria-label="Color menu">
@@ -1348,11 +1382,13 @@
         const baseAngle = Math.atan2(dy, dx);
         const sizeScale = 0.42 + Math.pow(state.size / 6, 1.22);
         const expansionScale = clamp(state.expansion, 0.35, 1.6);
-        const spreadScale = 0.45 + expansionScale * 0.85;
+        const sizeExpansionScale = 0.78 + Math.sqrt(state.size / 7) * 0.28;
+        const coupledExpansion = expansionScale * sizeExpansionScale;
+        const spreadScale = 0.45 + coupledExpansion * 0.85;
         const densityScale = 0.55 + expansionScale * 0.45;
-        const lifeScale = 0.74 + expansionScale * 0.34;
-        const velocityScale = 0.82 + expansionScale * 0.28;
-        const widthScale = 0.86 + expansionScale * 0.18;
+        const lifeScale = 0.74 + coupledExpansion * 0.34;
+        const velocityScale = 0.82 + coupledExpansion * 0.28;
+        const widthScale = 0.86 + coupledExpansion * 0.18;
         const extraTendrils = Math.floor(clamp((state.size - 5) / 4, 0, 3) * densityScale);
         const count = Math.max(1, Math.floor(rand(profile.count[0], profile.count[1] + 1) * densityScale) + extraTendrils);
 
@@ -1396,7 +1432,9 @@
         const dx = x1 - x0;
         const dy = y1 - y0;
         const distance = Math.hypot(dx, dy);
-        const spacing = clamp((12 - state.size * 0.35) / (0.75 + state.expansion * 0.35), 5.5, 13);
+        const sizeDistanceScale = 0.78 + Math.sqrt(state.size / 7) * 0.36;
+        const expansionDistanceScale = 0.82 + state.expansion * 0.32;
+        const spacing = clamp(7.2 * sizeDistanceScale * expansionDistanceScale, 5.5, 20);
         const steps = Math.max(1, Math.floor(distance / spacing));
         for (let i = 1; i <= steps; i += 1) {
           const t = i / steps;

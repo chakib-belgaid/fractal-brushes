@@ -25,7 +25,7 @@ Then visit the local server URL and open `/app/` for the drawing experience.
 - Use the main toolbar for undo, redo, export, clear, mirror, brush menu, color menu, and random brush selection.
 - Use the bottom-right zoom slider to adjust zoom and inspect the current zoom percentage. Double-click the slider to reset to 100%.
 - Open the brush and color panels independently. Panels are intended to be draggable and clamped within the viewport.
-- Use Brush Expansion to control how far and how densely the active brush spreads.
+- Use the bottom-left parameter panel for Brush Size, Expansion, and Symmetry. Brush Size and Expansion scale together: larger brushes also increase the spacing between expansion fans.
 - Keyboard shortcuts for core drawing actions should remain available when supported by the app.
 
 ## Brush Modes
