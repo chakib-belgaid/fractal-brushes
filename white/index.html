@@ -678,11 +678,11 @@
     </a>
 
     <nav class="tabs" aria-label="Ink modes">
-      <button class="tab" data-tab-brush="paper" type="button" aria-pressed="false">Paper</button>
       <button class="tab" data-tab-brush="ink" type="button" aria-pressed="true">Ink</button>
       <button class="tab" data-tab-brush="nib" type="button" aria-pressed="false">Nib</button>
       <button class="tab" data-tab-brush="wash" type="button" aria-pressed="false">Wash</button>
       <button class="tab" data-tab-brush="scatter" type="button" aria-pressed="false">Scatter</button>
+      <button class="tab" data-tab-brush="dry" type="button" aria-pressed="false">Dry</button>
     </nav>
 
     <div class="actions">
@@ -991,8 +991,7 @@
           button.setAttribute("aria-pressed", String(button.dataset.brush === state.brush));
         });
         ui.tabs.forEach((button) => {
-          const target = button.dataset.tabBrush === "paper" ? "ink" : button.dataset.tabBrush;
-          button.setAttribute("aria-pressed", String(target === state.brush));
+          button.setAttribute("aria-pressed", String(button.dataset.tabBrush === state.brush));
         });
         ui.edgeButtons.forEach((button) => {
           button.setAttribute("aria-pressed", String(button.dataset.edge === state.edge));
@@ -1096,8 +1095,12 @@
       }
 
       function restoreSnapshot(shot) {
+        if (!shot) return;
         ctx.globalCompositeOperation = "source-over";
-        ctx.drawImage(shot, 0, 0);
+        drawPaper();
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(shot, 0, 0, shot.width, shot.height, 0, 0, state.width, state.height);
       }
 
       function pushHistory() {
@@ -1109,8 +1112,6 @@
 
       function resize() {
         const previous = canvas.width && canvas.height ? makeSnapshot() : null;
-        const previousWidth = state.width || stage.clientWidth || window.innerWidth;
-        const previousHeight = state.height || stage.clientHeight || window.innerHeight;
         state.dpr = clamp(window.devicePixelRatio || 1, 1, 2);
         state.width = Math.max(1, Math.floor(stage.clientWidth * state.dpr));
         state.height = Math.max(1, Math.floor(stage.clientHeight * state.dpr));
@@ -1118,10 +1119,8 @@
         state.cy = state.height / 2;
         canvas.width = state.width;
         canvas.height = state.height;
-        drawPaper();
-        if (previous) {
-          ctx.drawImage(previous, 0, 0, previousWidth, previousHeight, 0, 0, state.width, state.height);
-        }
+        if (previous) restoreSnapshot(previous);
+        else drawPaper();
         applyResponsiveMode();
         updateUi();
       }
@@ -1824,7 +1823,7 @@
         button.addEventListener("click", () => setEdge(button.dataset.edge));
       });
       ui.tabs.forEach((button) => {
-        button.addEventListener("click", () => setBrush(button.dataset.tabBrush === "paper" ? "ink" : button.dataset.tabBrush));
+        button.addEventListener("click", () => setBrush(button.dataset.tabBrush));
       });
 
       window.addEventListener("keydown", (event) => {
