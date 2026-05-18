@@ -10,9 +10,11 @@ Fractal Brushes currently uses code-native visual assets only. No external image
 
 | Asset | Location | Type | Source | License / Notes |
 | --- | --- | --- | --- | --- |
-| Fractal Brushes logo | `index.html`, `app/index.html` | Inline SVG | Project-authored code-native artwork | Covered by repository MIT License |
+| Fractal Brushes logo | `index.html`, `app/index.html`, `white/index.html` | Inline SVG | Project-authored code-native artwork | Covered by repository MIT License |
 | Canvas brush output | Runtime canvas | Generated drawing output | Created by end users in browser | User-created output, not bundled in repository |
-| UI icons / marks | `index.html`, `app/index.html` | HTML/CSS/SVG/code glyphs where present | Project-authored implementation | Covered by repository MIT License |
+| UI icons / marks | `index.html`, `app/index.html`, `white/index.html` | HTML/CSS/SVG/code glyphs where present | Project-authored implementation | Covered by repository MIT License |
+| Fractal Brushes Ink paper texture | `white/index.html` | CSS gradients, canvas guide lines, and inline SVG data texture | Project-authored code-native artwork | Covered by repository MIT License |
+| Fractal Brushes Ink brush simulation | `white/index.html` | Runtime canvas stamps, bristle masks, blooms, dry gaps, and splatter | Project-authored code-native algorithm | Covered by repository MIT License |
 
 ## Third-Party Runtime Dependencies
 
