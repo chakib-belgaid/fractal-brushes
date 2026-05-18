@@ -1176,6 +1176,102 @@
         ctx.restore();
       }
 
+      function offsetPoint(point, angle, distance) {
+        const normal = angle + Math.PI / 2;
+        return {
+          x: point.x + Math.cos(normal) * distance,
+          y: point.y + Math.sin(normal) * distance
+        };
+      }
+
+      function drawLinePass(from, to, width, alpha, shade, cap = "round", blur = 0) {
+        if (alpha <= 0.002 || width <= 0) return;
+        ctx.save();
+        ctx.globalCompositeOperation = "multiply";
+        ctx.filter = blur > 0.3 ? `blur(${blur}px)` : "none";
+        ctx.strokeStyle = inkColor(alpha, shade);
+        ctx.lineWidth = width;
+        ctx.lineCap = cap;
+        ctx.lineJoin = "round";
+        ctx.beginPath();
+        ctx.moveTo(from.x, from.y);
+        ctx.lineTo(to.x, to.y);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function segmentInkAlpha(profile, point, pressure) {
+        const absorb = paperAbsorbency(point.x, point.y);
+        const load = state.stroke ? state.stroke.reservoir : 1;
+        return profile.opacity * state.density * clamp(pressure, 0.18, 1) * load * (0.84 + absorb * 0.28);
+      }
+
+      function drawContinuousInkSegment(from, to, angle, pressure, speed) {
+        const profile = brushProfiles.ink;
+        const mid = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
+        const load = state.stroke ? state.stroke.reservoir : 1;
+        const size = state.size * state.dpr * profile.sizeScale;
+        const alpha = segmentInkAlpha(profile, mid, pressure);
+        const width = size * (0.34 + pressure * 0.28) * (1.05 - clamp(speed, 0, 1.7) * 0.1);
+        const edgeWave = state.edge === "wave" ? Math.sin((state.stroke?.stamps || 0) * 0.65 + state.paperSeed) * width * 0.06 : 0;
+
+        if (state.water > 0.18) {
+          drawLinePass(from, to, width * (1.22 + state.water * 0.52), alpha * (0.07 + state.water * 0.12), 34, "round", width * (0.025 + state.water * 0.035));
+        }
+        drawLinePass(from, to, width * (0.82 + edgeWave / Math.max(1, width)), alpha * 0.58, 10, "round");
+        drawLinePass(from, to, width * 0.28, alpha * (0.56 + (1 - speed) * 0.12), 7, "round");
+
+        const mask = state.stroke?.mask || makeBrushMask(profile, size, state.paperSeed);
+        mask.bristles.forEach((bristle, index) => {
+          if (index % 2 && hashUnit(index, state.stroke?.stamps || 0, mask.seed) < 0.36) return;
+          const laneOffset = clamp(bristle.offset * 0.34 + edgeWave, -width * 0.48, width * 0.48);
+          const laneFrom = offsetPoint(from, angle, laneOffset);
+          const laneTo = offsetPoint(to, angle, laneOffset + (hashUnit(index, 61, mask.seed) - 0.5) * width * 0.08);
+          const absorb = paperAbsorbency(laneTo.x, laneTo.y);
+          if (state.edge === "dry" && hashUnit(index, state.stroke?.stamps || 0, mask.seed) > absorb + 0.52) return;
+          const laneWidth = Math.max(0.5 * state.dpr, bristle.width * (1.8 + pressure * 1.4));
+          drawLinePass(laneFrom, laneTo, laneWidth, alpha * bristle.opacity * (0.22 + load * 0.18), 12, "butt");
+        });
+
+        if (state.edge !== "soft") drawSplatter(to.x, to.y, angle, pressure, speed, load);
+      }
+
+      function drawContinuousWashSegment(from, to, angle, pressure, speed) {
+        const profile = brushProfiles.wash;
+        const mid = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
+        const load = state.stroke ? state.stroke.reservoir : 1;
+        const size = state.size * state.dpr * profile.sizeScale;
+        const alpha = segmentInkAlpha(profile, mid, pressure);
+        const width = size * (0.74 + state.water * 0.56 + pressure * 0.16);
+        const blur = width * (0.035 + state.water * 0.04);
+
+        drawLinePass(from, to, width * 1.24, alpha * (0.16 + state.water * 0.12), 44, "round", blur);
+        drawLinePass(from, to, width * 0.78, alpha * 0.2, 34, "round", blur * 0.55);
+        drawLinePass(from, to, width * 0.2, alpha * 0.14, 22, "round");
+
+        const edgeAlpha = alpha * (0.12 + state.water * 0.16);
+        [-1, 1].forEach((side) => {
+          const offset = side * width * (0.38 + state.water * 0.08);
+          const edgeFrom = offsetPoint(from, angle, offset);
+          const edgeTo = offsetPoint(to, angle, offset + Math.sin((state.stroke?.stamps || 0) * 0.5 + side) * width * 0.025);
+          drawLinePass(edgeFrom, edgeTo, Math.max(0.8 * state.dpr, width * 0.045), edgeAlpha, 18, "round", blur * 0.24);
+        });
+
+        const mask = state.stroke?.mask || makeBrushMask(profile, size, state.paperSeed);
+        mask.bristles.forEach((bristle, index) => {
+          if (index % 3 === 0) return;
+          const laneOffset = clamp(bristle.offset * 0.48, -width * 0.46, width * 0.46);
+          const laneFrom = offsetPoint(from, angle, laneOffset);
+          const laneTo = offsetPoint(to, angle, laneOffset + (hashUnit(index, 71, mask.seed) - 0.5) * width * 0.1);
+          const absorb = paperAbsorbency(laneTo.x, laneTo.y);
+          const skip = state.edge === "dry" ? 0.26 : 0.08;
+          if (hashUnit(index, state.stroke?.stamps || 0, mask.seed) < skip * (1 - absorb)) return;
+          drawLinePass(laneFrom, laneTo, Math.max(0.65 * state.dpr, bristle.width * 2.1), alpha * bristle.opacity * 0.1 * load, 38, "round", blur * 0.18);
+        });
+
+        if (state.edge !== "soft") drawSplatter(to.x, to.y, angle, pressure, speed, load * 0.55);
+      }
+
       function drawBloom(x, y, radius, alpha, edgeAlpha = alpha * 0.34) {
         const blur = clamp(radius * (0.06 + state.water * 0.06), 0, 18 * state.dpr);
         ctx.save();
@@ -1374,8 +1470,14 @@
         if (alpha <= 0.006) return;
 
         if (profile.kind === "wash") {
-          drawBloom(x, y, baseSize * (0.62 + state.water * 0.7), alpha * (0.22 + state.water * 0.26), alpha * 0.14);
-          stampRoundBrush(x, y, angle, baseSize, alpha, pressure, speed, load);
+          const half = baseSize * 0.18;
+          drawContinuousWashSegment(
+            { x: x - Math.cos(angle) * half, y: y - Math.sin(angle) * half },
+            { x: x + Math.cos(angle) * half, y: y + Math.sin(angle) * half },
+            angle,
+            pressure,
+            speed
+          );
           return;
         }
 
@@ -1395,11 +1497,14 @@
           return;
         }
 
-        if (speed < 0.22 || state.water > 0.48) {
-          drawBloom(x, y, baseSize * (0.34 + state.water * 0.28), alpha * (0.06 + state.water * 0.08), alpha * 0.06);
-        }
-        stampRoundBrush(x, y, angle, baseSize, alpha, pressure, speed, load);
-        if (state.edge !== "soft") drawSplatter(x, y, angle, pressure, speed, load);
+        const half = baseSize * 0.14;
+        drawContinuousInkSegment(
+          { x: x - Math.cos(angle) * half, y: y - Math.sin(angle) * half },
+          { x: x + Math.cos(angle) * half, y: y + Math.sin(angle) * half },
+          angle,
+          pressure,
+          speed
+        );
       }
 
       function drainStroke(profile, pressure) {
@@ -1428,6 +1533,33 @@
         drainStroke(profile, pressure);
       }
 
+      function strokeSymmetrySegment(from, to, angle, pressure, speed) {
+        const profile = brushProfiles[state.brush] || brushProfiles.ink;
+        const rotations = Math.max(1, Math.round(state.symmetry));
+        const passes = state.mirror ? 2 : 1;
+
+        for (let mirrorIndex = 0; mirrorIndex < passes; mirrorIndex += 1) {
+          const startX = mirrorIndex === 0 ? from.x : 2 * state.cx - from.x;
+          const endX = mirrorIndex === 0 ? to.x : 2 * state.cx - to.x;
+          for (let i = 0; i < rotations; i += 1) {
+            const rotation = (Math.PI * 2 * i) / rotations;
+            const [x0, y0] = rotateAroundCenter(startX, from.y, rotation);
+            const [x1, y1] = rotateAroundCenter(endX, to.y, rotation);
+            const segmentAngle = Math.atan2(y1 - y0, x1 - x0);
+            const segmentFrom = { x: x0, y: y0 };
+            const segmentTo = { x: x1, y: y1 };
+
+            if (profile.kind === "wash") {
+              drawContinuousWashSegment(segmentFrom, segmentTo, segmentAngle, pressure, speed);
+            } else {
+              drawContinuousInkSegment(segmentFrom, segmentTo, segmentAngle, pressure, speed);
+            }
+          }
+        }
+
+        drainStroke(profile, pressure);
+      }
+
       function sampleStrokeSegment(from, to) {
         if (!state.stroke) return;
         const profile = brushProfiles[state.brush] || brushProfiles.ink;
@@ -1442,6 +1574,24 @@
         state.stroke.angle = lerpAngle(state.stroke.angle, rawAngle, state.stroke.stamps < 2 ? 1 : 0.38);
         const estimatedPressure = clamp((to.pressure || 0.52) + (0.28 - speed * 0.12), 0.18, 1);
         const spacing = clamp(state.size * state.dpr * profile.spacing * (profile.kind === "wash" ? 0.92 : 1), 2.2 * state.dpr, 18 * state.dpr);
+        if (profile.kind === "ink" || profile.kind === "wash") {
+          const pressure = clamp((from.pressure + estimatedPressure) / 2, 0.18, 1);
+          const segmentCount = Math.max(1, Math.floor(distance / spacing));
+          for (let i = 0; i < segmentCount; i += 1) {
+            const t0 = i / segmentCount;
+            const t1 = (i + 1) / segmentCount;
+            strokeSymmetrySegment(
+              { x: from.x + dx * t0, y: from.y + dy * t0 },
+              { x: from.x + dx * t1, y: from.y + dy * t1 },
+              state.stroke.angle,
+              pressure,
+              speed
+            );
+          }
+          state.stroke.spacingCarry = (state.stroke.spacingCarry + distance) % spacing;
+          return;
+        }
+
         let offset = spacing - state.stroke.spacingCarry;
 
         while (offset <= distance) {
@@ -1489,7 +1639,9 @@
           mask: makeBrushMask(profile, brushSize, seed)
         };
         state.last = point;
-        stampSymmetry(point, 0, point.pressure, 0.04);
+        if (profile.kind !== "ink" && profile.kind !== "wash") {
+          stampSymmetry(point, 0, point.pressure, 0.04);
+        }
         if (event.pointerId !== undefined && stage.setPointerCapture) {
           stage.setPointerCapture(event.pointerId);
         }
@@ -1509,7 +1661,8 @@
       function endStroke(event) {
         const pointerId = event.pointerId ?? "mouse";
         if (!state.painting || pointerId !== state.pointerId) return;
-        if (state.stroke?.last) {
+        const profile = brushProfiles[state.stroke?.brush] || brushProfiles.ink;
+        if (state.stroke?.last && profile.kind !== "ink" && profile.kind !== "wash") {
           stampSymmetry(state.stroke.last, state.stroke.angle, state.stroke.last.pressure, 0.04);
         }
         state.painting = false;
