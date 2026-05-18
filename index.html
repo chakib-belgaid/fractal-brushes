@@ -4,23 +4,31 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" href="data:,">
-  <title>Fractal Brushes - Generative Symmetry Drawing</title>
-  <meta name="description" content="Fractal Brushes is a browser-based generative canvas for drawing luminous mirrored tendrils with expanded brush families, draggable color controls, a zoom slider, brush expansion, and 4K PNG export presets.">
+  <title>Fractal Brushes | Generative Symmetry Drawing</title>
+  <meta name="description" content="Fractal Brushes is a browser-native generative canvas for drawing mirrored luminous brush art with blend colors, floating controls, zoom, and PNG export presets up to 4K.">
   <style>
     :root {
       color-scheme: dark;
-      --bg: #04050a;
-      --panel: rgba(9, 13, 26, 0.68);
-      --panel-strong: rgba(13, 19, 37, 0.88);
-      --line: rgba(188, 215, 255, 0.16);
-      --text: #eef5ff;
-      --muted: #97a7bd;
-      --cyan: #38e8ff;
-      --magenta: #ff4fd8;
-      --coral: #ff735c;
-      --green: #74ff9b;
-      --gold: #ffd166;
-      --shadow: 0 24px 80px rgba(0, 0, 0, 0.52);
+      --bg: oklch(8% 0.035 265);
+      --bg-deep: oklch(5.5% 0.026 265);
+      --surface: oklch(14% 0.04 255 / 0.76);
+      --surface-strong: oklch(18% 0.045 255 / 0.9);
+      --line: oklch(78% 0.08 230 / 0.18);
+      --line-strong: oklch(82% 0.11 220 / 0.32);
+      --text: oklch(96% 0.016 235);
+      --muted: oklch(74% 0.045 245);
+      --quiet: oklch(56% 0.045 245);
+      --cyan: oklch(84% 0.18 205);
+      --violet: oklch(70% 0.22 315);
+      --ember: oklch(76% 0.19 45);
+      --green: oklch(82% 0.16 155);
+      --gold: oklch(86% 0.15 85);
+      --focus: oklch(84% 0.18 205 / 0.58);
+      --shadow: 0 24px 90px oklch(2% 0.02 260 / 0.58);
+      --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+      --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+      --max: 1180px;
+      --gutter: 24px;
     }
 
     * {
@@ -29,16 +37,32 @@
 
     html {
       scroll-behavior: smooth;
+      background: var(--bg-deep);
     }
 
     body {
       margin: 0;
-      background:
-        radial-gradient(circle at 70% 12%, rgba(255, 79, 216, 0.16), transparent 30%),
-        radial-gradient(circle at 14% 22%, rgba(56, 232, 255, 0.18), transparent 34%),
-        linear-gradient(135deg, #07101b, #04050a 48%, #020308);
       color: var(--text);
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 78% 2%, oklch(68% 0.2 315 / 0.2), transparent 28rem),
+        radial-gradient(circle at 4% 28%, oklch(80% 0.18 200 / 0.16), transparent 26rem),
+        linear-gradient(145deg, oklch(10% 0.04 250), var(--bg-deep) 48%, oklch(6% 0.025 280));
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      text-rendering: optimizeLegibility;
+    }
+
+    body::before {
+      position: fixed;
+      inset: 0;
+      z-index: -2;
+      pointer-events: none;
+      content: "";
+      opacity: 0.18;
+      background-image:
+        linear-gradient(oklch(96% 0.02 235 / 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, oklch(96% 0.02 235 / 0.04) 1px, transparent 1px);
+      background-size: 44px 44px;
+      mask-image: radial-gradient(ellipse at center, rgb(8 11 18) 0%, rgb(8 11 18 / 0.72) 38%, transparent 78%);
     }
 
     a {
@@ -46,129 +70,10 @@
       text-decoration: none;
     }
 
-    .site-header {
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      border-bottom: 1px solid rgba(188, 215, 255, 0.1);
-      background: rgba(4, 5, 10, 0.68);
-      backdrop-filter: blur(18px);
-      -webkit-backdrop-filter: blur(18px);
-    }
-
-    .nav {
-      width: min(1160px, calc(100% - 32px));
-      min-height: 68px;
-      margin: 0 auto;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 24px;
-    }
-
-    .brand {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      font-weight: 780;
-    }
-
-    .mark {
-      width: 34px;
-      height: 34px;
-      flex: 0 0 auto;
-      color: var(--cyan);
-      filter: drop-shadow(0 0 18px rgba(56, 232, 255, 0.32));
-    }
-
-    .mark-lg {
-      width: 74px;
-      height: 74px;
-      color: var(--cyan);
-      filter:
-        drop-shadow(0 0 18px rgba(56, 232, 255, 0.36))
-        drop-shadow(0 0 30px rgba(255, 209, 102, 0.18));
-    }
-
-    .nav-links {
-      display: flex;
-      align-items: center;
-      gap: 18px;
-      color: var(--muted);
-      font-size: 14px;
-      font-weight: 620;
-    }
-
-    .button {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      min-height: 42px;
-      padding: 0 16px;
-      border: 1px solid rgba(188, 215, 255, 0.2);
+    a:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 3px;
       border-radius: 8px;
-      background: rgba(255, 255, 255, 0.055);
-      color: var(--text);
-      font-size: 14px;
-      font-weight: 720;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-    }
-
-    .button.primary {
-      border-color: color-mix(in srgb, var(--cyan) 60%, white 12%);
-      background: color-mix(in srgb, var(--cyan) 20%, transparent);
-      box-shadow: 0 0 34px rgba(56, 232, 255, 0.18);
-    }
-
-    .hero {
-      position: relative;
-      min-height: calc(100vh - 68px);
-      display: grid;
-      align-items: center;
-      overflow: hidden;
-    }
-
-    #heroCanvas {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      opacity: 0.9;
-    }
-
-    .hero::after {
-      position: absolute;
-      inset: 0;
-      content: "";
-      pointer-events: none;
-      background:
-        linear-gradient(90deg, rgba(4, 5, 10, 0.88) 0%, rgba(4, 5, 10, 0.62) 42%, rgba(4, 5, 10, 0.18) 100%),
-        linear-gradient(180deg, transparent 0%, rgba(4, 5, 10, 0.55) 100%);
-    }
-
-    .hero-inner {
-      position: relative;
-      z-index: 1;
-      width: min(1160px, calc(100% - 32px));
-      margin: 0 auto;
-      padding: 76px 0 88px;
-    }
-
-    .hero-copy {
-      max-width: 680px;
-    }
-
-    .hero-brand {
-      display: inline-flex;
-      align-items: center;
-      gap: 14px;
-      margin-bottom: 18px;
-      color: #d9f7ff;
-      font-size: 14px;
-      font-weight: 760;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
     }
 
     h1,
@@ -178,19 +83,207 @@
       margin: 0;
     }
 
+    .skip-link {
+      position: fixed;
+      left: 16px;
+      top: 16px;
+      z-index: 100;
+      padding: 10px 12px;
+      border-radius: 8px;
+      color: var(--bg-deep);
+      background: var(--text);
+      font-size: 14px;
+      font-weight: 760;
+      transform: translateY(-160%);
+      transition: transform 160ms var(--ease-out);
+    }
+
+    .skip-link:focus {
+      transform: translateY(0);
+      outline: 3px solid var(--focus);
+      outline-offset: 3px;
+    }
+
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      border-bottom: 1px solid oklch(78% 0.08 230 / 0.12);
+      background: oklch(7% 0.03 265 / 0.74);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+
+    .nav {
+      width: min(var(--max), calc(100% - var(--gutter) * 2));
+      min-height: 68px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .brand {
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text);
+      font-size: 15px;
+      font-weight: 780;
+    }
+
+    .mark {
+      width: 34px;
+      height: 34px;
+      flex: 0 0 auto;
+      color: var(--cyan);
+      filter: drop-shadow(0 0 18px oklch(84% 0.18 205 / 0.34));
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 640;
+    }
+
+    .nav-links a:not(.button) {
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 10px;
+      border-radius: 8px;
+      transition: color 160ms var(--ease-out), background 160ms var(--ease-out);
+    }
+
+    .button {
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      padding: 0 16px;
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      color: var(--text);
+      background: oklch(18% 0.045 250 / 0.72);
+      box-shadow: inset 0 1px 0 oklch(100% 0 0 / 0.06);
+      font-size: 14px;
+      font-weight: 760;
+      line-height: 1;
+      transition:
+        transform 160ms var(--ease-out),
+        border-color 160ms var(--ease-out),
+        background 160ms var(--ease-out),
+        box-shadow 160ms var(--ease-out);
+    }
+
+    .button svg {
+      width: 17px;
+      height: 17px;
+      flex: 0 0 auto;
+      fill: none;
+      stroke: currentColor;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 2;
+    }
+
+    .button.primary {
+      border-color: oklch(84% 0.18 205 / 0.62);
+      color: oklch(98% 0.012 220);
+      background:
+        linear-gradient(135deg, oklch(84% 0.18 205 / 0.22), oklch(70% 0.22 315 / 0.16)),
+        oklch(17% 0.05 250 / 0.78);
+      box-shadow:
+        0 0 34px oklch(84% 0.18 205 / 0.16),
+        inset 0 1px 0 oklch(100% 0 0 / 0.08);
+    }
+
+    .button:focus-visible,
+    .nav-links a:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 3px;
+    }
+
+    .button:active {
+      transform: scale(0.97);
+    }
+
+    .hero {
+      position: relative;
+      min-height: calc(100dvh - 132px);
+      overflow: hidden;
+      display: grid;
+      align-items: center;
+      border-bottom: 1px solid oklch(78% 0.08 230 / 0.1);
+    }
+
+    #heroCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0.96;
+    }
+
+    .hero::after {
+      position: absolute;
+      inset: 0;
+      content: "";
+      pointer-events: none;
+      background:
+        linear-gradient(90deg, oklch(6% 0.03 265 / 0.92) 0%, oklch(7% 0.03 265 / 0.66) 45%, oklch(7% 0.03 265 / 0.14) 100%),
+        linear-gradient(180deg, oklch(6% 0.03 265 / 0.34), oklch(6% 0.03 265 / 0.72));
+    }
+
+    .hero-inner {
+      position: relative;
+      z-index: 1;
+      width: min(var(--max), calc(100% - var(--gutter) * 2));
+      margin: 0 auto;
+      padding: 76px 0 70px;
+      display: grid;
+      grid-template-columns: minmax(0, 0.94fr) minmax(280px, 0.46fr);
+      gap: 46px;
+      align-items: end;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: oklch(85% 0.1 210);
+      font-size: 13px;
+      font-weight: 760;
+    }
+
+    .pulse {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background: var(--cyan);
+      box-shadow: 0 0 20px oklch(84% 0.18 205 / 0.8);
+    }
+
     h1 {
-      max-width: 720px;
-      font-size: clamp(48px, 7vw, 104px);
-      line-height: 0.92;
-      font-weight: 820;
+      max-width: 780px;
+      margin-top: 22px;
+      font-size: 5.9rem;
+      line-height: 0.9;
+      font-weight: 860;
       letter-spacing: 0;
     }
 
-    .lead {
-      max-width: 600px;
-      margin-top: 24px;
-      color: #c4d3ea;
-      font-size: clamp(18px, 2vw, 23px);
+    .hero-kicker {
+      max-width: 670px;
+      margin-top: 22px;
+      color: oklch(84% 0.038 240);
+      font-size: 1.35rem;
       line-height: 1.55;
     }
 
@@ -198,150 +291,402 @@
       display: flex;
       flex-wrap: wrap;
       gap: 12px;
-      margin-top: 34px;
+      margin-top: 32px;
     }
 
-    .hero-stats {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 18px;
-      margin-top: 48px;
+    .hero-spec {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1px;
+      min-width: 0;
+      border: 1px solid oklch(78% 0.08 230 / 0.14);
+      border-radius: 8px;
+      overflow: hidden;
+      background: oklch(78% 0.08 230 / 0.11);
+      box-shadow: var(--shadow);
+    }
+
+    .hero-spec span {
+      --swatch: radial-gradient(circle, var(--cyan), transparent 68%);
+      display: grid;
+      grid-template-columns: 44px 1fr;
+      gap: 5px 12px;
+      align-items: center;
+      min-height: 88px;
+      padding: 14px;
+      background: oklch(10% 0.034 260 / 0.78);
       color: var(--muted);
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 680;
     }
 
-    .hero-stats strong {
-      display: block;
-      margin-bottom: 5px;
+    .hero-spec span::before {
+      width: 42px;
+      height: 42px;
+      grid-row: 1 / span 2;
+      border: 1px solid oklch(96% 0.02 230 / 0.16);
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 50% 50%, oklch(99% 0.006 220) 0 8%, transparent 10%),
+        var(--swatch);
+      box-shadow: 0 0 26px oklch(84% 0.18 205 / 0.2);
+      content: "";
+    }
+
+    .hero-spec strong {
       color: var(--text);
-      font-size: 22px;
+      font-size: 1rem;
+      line-height: 1.1;
+      font-weight: 820;
     }
 
     .section {
       padding: 92px 0;
     }
 
+    .section.tight {
+      padding-top: 70px;
+    }
+
     .section.alt {
-      background: rgba(255, 255, 255, 0.025);
-      border-block: 1px solid rgba(188, 215, 255, 0.09);
+      border-block: 1px solid oklch(78% 0.08 230 / 0.1);
+      background: oklch(12% 0.032 260 / 0.52);
     }
 
     .container {
-      width: min(1160px, calc(100% - 32px));
+      width: min(var(--max), calc(100% - var(--gutter) * 2));
       margin: 0 auto;
     }
 
-    .section-heading {
-      max-width: 760px;
-      margin-bottom: 36px;
+    .section-lede {
+      max-width: 800px;
     }
 
-    h2 {
-      font-size: clamp(34px, 4.4vw, 58px);
-      line-height: 1;
-      font-weight: 800;
+    .section-lede h2 {
+      font-size: 3.45rem;
+      line-height: 0.98;
+      font-weight: 830;
       letter-spacing: 0;
     }
 
-    .section-heading p {
+    .section-lede p {
+      max-width: 700px;
       margin-top: 16px;
       color: var(--muted);
-      font-size: 18px;
-      line-height: 1.6;
+      font-size: 1.08rem;
+      line-height: 1.65;
     }
 
-    .feature-grid {
+    .instrument {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 16px;
-    }
-
-    .feature-card {
-      min-height: 226px;
-      padding: 24px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.045);
-      box-shadow: var(--shadow);
-    }
-
-    .feature-icon {
-      width: 42px;
-      height: 42px;
-      border-radius: 8px;
-      margin-bottom: 22px;
-      background: linear-gradient(135deg, var(--cyan), var(--magenta));
-      box-shadow: 0 0 30px rgba(56, 232, 255, 0.16);
-    }
-
-    .feature-card:nth-child(2) .feature-icon {
-      background: linear-gradient(135deg, var(--gold), var(--coral));
-    }
-
-    .feature-card:nth-child(3) .feature-icon {
-      background: linear-gradient(135deg, var(--green), var(--cyan));
-    }
-
-    .feature-card:nth-child(4) .feature-icon {
-      background: conic-gradient(from 45deg, var(--cyan), var(--green), var(--gold), var(--coral), var(--magenta), var(--cyan));
-    }
-
-    .feature-card:nth-child(5) .feature-icon {
-      background: linear-gradient(135deg, #ecf8ff, #7fd7ff 42%, #a8ffde);
-    }
-
-    .feature-card:nth-child(6) .feature-icon {
-      background: linear-gradient(135deg, var(--gold), var(--green));
-    }
-
-    h3 {
-      font-size: 20px;
-      line-height: 1.2;
-      font-weight: 760;
-    }
-
-    .feature-card p,
-    .control-copy p {
-      margin-top: 12px;
-      color: var(--muted);
-      line-height: 1.55;
-    }
-
-    .showcase {
-      display: grid;
-      grid-template-columns: minmax(0, 0.94fr) minmax(0, 1.06fr);
-      gap: 34px;
-      align-items: center;
+      grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
+      gap: 32px;
+      align-items: stretch;
+      margin-top: 38px;
     }
 
     .preview {
       position: relative;
-      min-height: 460px;
+      min-height: 520px;
+      overflow: hidden;
       border: 1px solid var(--line);
       border-radius: 8px;
-      overflow: hidden;
-      background: #020308;
+      background: var(--bg-deep);
       box-shadow: var(--shadow);
+    }
+
+    .preview::before {
+      position: absolute;
+      inset: -8%;
+      content: "";
+      pointer-events: none;
+      opacity: 0.76;
+      background:
+        radial-gradient(circle at 50% 50%, oklch(99% 0.006 220 / 0.95) 0 0.8%, transparent 1.6%),
+        repeating-conic-gradient(from 20deg at 50% 50%, transparent 0 12deg, oklch(84% 0.18 205 / 0.18) 13deg 15deg, transparent 16deg 45deg),
+        conic-gradient(from 40deg at 50% 50%, transparent, oklch(84% 0.18 205 / 0.32), transparent 18%, oklch(70% 0.22 315 / 0.28), transparent 40%, oklch(82% 0.16 155 / 0.22), transparent 68%, oklch(86% 0.15 85 / 0.2), transparent);
+      filter: drop-shadow(0 0 24px oklch(84% 0.18 205 / 0.28));
+      mask-image: radial-gradient(circle at center, rgb(8 11 18) 0%, rgb(8 11 18 / 0.82) 34%, transparent 70%);
     }
 
     #previewCanvas {
       position: absolute;
       inset: 0;
+      z-index: 1;
       width: 100%;
       height: 100%;
     }
 
-    .control-list {
-      display: grid;
-      gap: 14px;
+    .preview-label {
+      position: absolute;
+      left: 16px;
+      bottom: 16px;
+      z-index: 2;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      color: oklch(88% 0.08 220);
+      font-size: 12px;
+      font-weight: 720;
     }
 
-    .control-copy {
-      padding: 20px;
+    .preview-label span {
+      padding: 8px 10px;
+      border: 1px solid oklch(78% 0.08 230 / 0.16);
+      border-radius: 999px;
+      background: oklch(7% 0.03 265 / 0.68);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    .control-stack {
+      display: grid;
+      align-content: center;
+      gap: 12px;
+    }
+
+    .control-row {
+      display: grid;
+      grid-template-columns: 70px 1fr;
+      gap: 18px;
+      align-items: start;
+      padding: 20px 0;
+      border-top: 1px solid oklch(78% 0.08 230 / 0.14);
+    }
+
+    .control-row:last-child {
+      border-bottom: 1px solid oklch(78% 0.08 230 / 0.14);
+    }
+
+    .control-row code {
+      color: var(--cyan);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 13px;
+      font-weight: 760;
+    }
+
+    .control-row h3 {
+      font-size: 1.18rem;
+      line-height: 1.22;
+      font-weight: 780;
+    }
+
+    .control-row p {
+      margin-top: 8px;
+      color: var(--muted);
+      line-height: 1.58;
+    }
+
+    .feature-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1px;
+      margin-top: 38px;
+      border: 1px solid oklch(78% 0.08 230 / 0.14);
+      border-radius: 8px;
+      overflow: hidden;
+      background: oklch(78% 0.08 230 / 0.1);
+    }
+
+    .feature-strip article {
+      min-height: 206px;
+      padding: 24px;
+      background:
+        linear-gradient(135deg, var(--accent), transparent 62%),
+        oklch(11% 0.034 260 / 0.82);
+    }
+
+    .feature-strip article:nth-child(1) {
+      --accent: oklch(84% 0.18 205 / 0.16);
+    }
+
+    .feature-strip article:nth-child(2) {
+      --accent: oklch(70% 0.22 315 / 0.16);
+    }
+
+    .feature-strip article:nth-child(3) {
+      --accent: oklch(82% 0.16 155 / 0.15);
+    }
+
+    .feature-strip article:nth-child(4) {
+      --accent: oklch(86% 0.15 85 / 0.16);
+    }
+
+    .feature-strip article:first-child {
+      grid-column: span 2;
+    }
+
+    .feature-strip article:nth-child(4) {
+      grid-column: span 4;
+      min-height: 164px;
+    }
+
+    .feature-strip h3 {
+      max-width: 12ch;
+      font-size: 1.22rem;
+      line-height: 1.18;
+      font-weight: 800;
+    }
+
+    .feature-strip p {
+      margin-top: 16px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .workflow {
+      display: grid;
+      grid-template-columns: minmax(260px, 0.65fr) minmax(0, 1fr);
+      gap: 42px;
+      align-items: start;
+    }
+
+    .workflow-list {
+      display: grid;
+      gap: 0;
+      border-top: 1px solid oklch(78% 0.08 230 / 0.16);
+    }
+
+    .workflow-step {
+      display: grid;
+      grid-template-columns: 52px 1fr;
+      gap: 18px;
+      padding: 22px 0;
+      border-bottom: 1px solid oklch(78% 0.08 230 / 0.16);
+    }
+
+    .step-number {
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      border: 1px solid oklch(78% 0.08 230 / 0.24);
+      border-radius: 50%;
+      color: var(--cyan);
+      background: oklch(15% 0.04 250 / 0.7);
+      font-size: 13px;
+      font-weight: 820;
+    }
+
+    .workflow-step h3 {
+      font-size: 1.22rem;
+      line-height: 1.22;
+    }
+
+    .workflow-step p {
+      margin-top: 8px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .device-panel {
+      position: relative;
+      min-height: 420px;
+      overflow: hidden;
       border: 1px solid var(--line);
       border-radius: 8px;
-      background: rgba(255, 255, 255, 0.04);
+      background:
+        radial-gradient(circle at 74% 26%, oklch(70% 0.22 315 / 0.22), transparent 12rem),
+        radial-gradient(circle at 16% 80%, oklch(84% 0.18 205 / 0.18), transparent 14rem),
+        oklch(9% 0.034 265);
+      box-shadow: var(--shadow);
+    }
+
+    .device-panel::before {
+      position: absolute;
+      inset: 20px;
+      z-index: 2;
+      border: 1px solid oklch(78% 0.08 230 / 0.18);
+      border-radius: 8px;
+      content: "";
+    }
+
+    .device-panel::after {
+      position: absolute;
+      left: 38px;
+      bottom: 174px;
+      z-index: 3;
+      padding: 7px 9px;
+      border: 1px solid oklch(78% 0.08 230 / 0.16);
+      border-radius: 999px;
+      color: oklch(89% 0.09 205);
+      background: oklch(7% 0.03 265 / 0.7);
+      box-shadow: 0 0 22px oklch(84% 0.18 205 / 0.14);
+      font-size: 12px;
+      font-weight: 780;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    .device-canvas {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .device-toolbar {
+      position: absolute;
+      left: 38px;
+      right: 38px;
+      top: 38px;
+      z-index: 4;
+      display: flex;
+      gap: 7px;
+      padding: 7px;
+      border: 1px solid oklch(78% 0.08 230 / 0.2);
+      border-radius: 8px;
+      background: oklch(9% 0.034 260 / 0.82);
+    }
+
+    .device-tool {
+      width: 34px;
+      height: 34px;
+      border: 1px solid oklch(78% 0.08 230 / 0.18);
+      border-radius: 8px;
+      background: oklch(96% 0.02 230 / 0.06);
+    }
+
+    .device-tool:nth-child(3) {
+      background: oklch(84% 0.18 205 / 0.26);
+      box-shadow: 0 0 24px oklch(84% 0.18 205 / 0.22);
+    }
+
+    .device-sheet {
+      position: absolute;
+      left: 38px;
+      right: 38px;
+      bottom: 38px;
+      z-index: 4;
+      padding: 18px;
+      border: 1px solid oklch(78% 0.08 230 / 0.18);
+      border-radius: 8px;
+      background: oklch(10% 0.034 260 / 0.88);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+
+    .sheet-line {
+      height: 9px;
+      margin-bottom: 12px;
+      border-radius: 999px;
+      background: oklch(96% 0.02 230 / 0.12);
+    }
+
+    .sheet-line:nth-child(1) {
+      width: 46%;
+      background: var(--cyan);
+    }
+
+    .sheet-line:nth-child(2) {
+      width: 76%;
+    }
+
+    .sheet-line:nth-child(3) {
+      width: 62%;
+      margin-bottom: 0;
     }
 
     .deploy-band {
@@ -349,199 +694,504 @@
       grid-template-columns: minmax(0, 1fr) auto;
       gap: 24px;
       align-items: center;
-      padding: 30px;
+      padding: 34px;
       border: 1px solid var(--line);
       border-radius: 8px;
       background:
-        linear-gradient(135deg, rgba(56, 232, 255, 0.1), rgba(255, 79, 216, 0.08)),
-        var(--panel-strong);
+        linear-gradient(135deg, oklch(84% 0.18 205 / 0.13), oklch(70% 0.22 315 / 0.1)),
+        var(--surface-strong);
       box-shadow: var(--shadow);
+    }
+
+    .deploy-band h2 {
+      font-size: 2.5rem;
+      line-height: 1;
+      font-weight: 830;
+    }
+
+    .deploy-band p {
+      max-width: 730px;
+      margin-top: 12px;
+      color: var(--muted);
+      line-height: 1.62;
     }
 
     .site-footer {
       padding: 34px 0;
-      color: var(--muted);
-      border-top: 1px solid rgba(188, 215, 255, 0.1);
+      border-top: 1px solid oklch(78% 0.08 230 / 0.12);
+      color: var(--quiet);
     }
 
     .footer-inner {
-      width: min(1160px, calc(100% - 32px));
+      width: min(var(--max), calc(100% - var(--gutter) * 2));
       margin: 0 auto;
       display: flex;
       justify-content: space-between;
-      gap: 20px;
+      gap: 18px;
       font-size: 14px;
+      line-height: 1.5;
     }
 
-    @media (max-width: 860px) {
-      .nav-links a:not(.button) {
+    .creator-card {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      color: var(--muted);
+    }
+
+    .creator-card strong {
+      display: block;
+      color: var(--text);
+      font-size: 15px;
+      line-height: 1.2;
+    }
+
+    .creator-label {
+      display: block;
+      margin-bottom: 3px;
+      color: var(--quiet);
+      font-size: 12px;
+      font-weight: 720;
+    }
+
+    .creator-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .creator-links a {
+      min-height: 34px;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 10px;
+      border: 1px solid oklch(78% 0.08 230 / 0.16);
+      border-radius: 8px;
+      color: oklch(86% 0.09 205);
+      background: oklch(12% 0.032 260 / 0.62);
+      font-size: 13px;
+      font-weight: 760;
+      transition: transform 160ms var(--ease-out), border-color 160ms var(--ease-out), background 160ms var(--ease-out);
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .button:hover,
+      .nav-links a:not(.button):hover,
+      .creator-links a:hover {
+        color: var(--text);
+        background: oklch(96% 0.02 230 / 0.07);
+      }
+
+      .button:hover,
+      .creator-links a:hover {
+        transform: translateY(-1px);
+      }
+    }
+
+    @media (max-width: 980px) {
+      :root {
+        --gutter: 18px;
+      }
+
+      .hero-inner,
+      .instrument,
+      .workflow {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-inner {
+        gap: 34px;
+        align-items: start;
+      }
+
+      h1 {
+        font-size: 4.45rem;
+      }
+
+      .hero-spec {
+        max-width: 620px;
+      }
+
+      .feature-strip {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .feature-strip article:nth-child(4) {
+        grid-column: span 2;
+      }
+    }
+
+    @media (max-width: 1120px) and (min-width: 981px) {
+      h1 {
+        font-size: 5rem;
+      }
+
+      .hero-inner {
+        grid-template-columns: minmax(0, 1fr) minmax(260px, 0.5fr);
+        gap: 34px;
+      }
+    }
+
+    @media (max-width: 680px) {
+      .nav {
+        min-height: 0;
+        padding: 10px 0;
+        align-items: flex-start;
+        flex-wrap: wrap;
+      }
+
+      .nav-links {
+        width: 100%;
+        overflow-x: auto;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .nav-links::-webkit-scrollbar {
         display: none;
       }
 
-      .hero {
-        min-height: 760px;
+      .nav-links a:not(.button) {
+        display: inline-flex;
       }
 
-      .feature-grid,
-      .showcase,
+      .brand {
+        width: 100%;
+        font-size: 14px;
+      }
+
+      .hero {
+        min-height: calc(100dvh - 112px);
+      }
+
+      .hero-inner {
+        padding: 56px 0 48px;
+      }
+
+      h1 {
+        font-size: 3.35rem;
+        line-height: 0.94;
+      }
+
+      .hero-kicker {
+        font-size: 1.06rem;
+      }
+
+      .hero-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+      }
+
+      .hero-actions .button,
+      .deploy-band .button {
+        width: 100%;
+      }
+
+      .hero-spec,
+      .feature-strip,
       .deploy-band {
         grid-template-columns: 1fr;
       }
 
-      .preview {
+      .feature-strip article:first-child {
+        grid-column: auto;
+      }
+
+      .feature-strip article:nth-child(4) {
+        grid-column: auto;
+        min-height: 206px;
+      }
+
+      .hero-spec span {
+        min-height: 68px;
+      }
+
+      .section {
+        padding: 64px 0;
+      }
+
+      .section-lede h2,
+      .deploy-band h2 {
+        font-size: 2.35rem;
+      }
+
+      .preview,
+      .device-panel {
         min-height: 360px;
+      }
+
+      .control-row {
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+
+      .workflow-step {
+        grid-template-columns: 42px 1fr;
+        gap: 12px;
+      }
+
+      .deploy-band {
+        padding: 22px;
       }
 
       .footer-inner {
         flex-direction: column;
       }
+
+      .creator-card {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .creator-links {
+        justify-content: flex-start;
+      }
+    }
+
+    @media (max-width: 380px) {
+      h1 {
+        font-size: 2.95rem;
+      }
+
+      .section-lede h2,
+      .deploy-band h2 {
+        font-size: 2.05rem;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 1ms !important;
+        animation-duration: 1ms !important;
+        animation-iteration-count: 1 !important;
+      }
     }
   </style>
 </head>
 <body>
+  <a class="skip-link" href="#main">Skip to content</a>
   <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
     <symbol id="fractal-brushes-mark" viewBox="0 0 64 64">
       <defs>
         <linearGradient id="mark-stroke" x1="9" y1="52" x2="55" y2="12" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stop-color="#38e8ff"/>
-          <stop offset="0.34" stop-color="#74ff9b"/>
-          <stop offset="0.68" stop-color="#ffd166"/>
-          <stop offset="1" stop-color="#ff4fd8"/>
+          <stop offset="0" stop-color="oklch(84% 0.18 205)"/>
+          <stop offset="0.34" stop-color="oklch(82% 0.16 155)"/>
+          <stop offset="0.68" stop-color="oklch(86% 0.15 85)"/>
+          <stop offset="1" stop-color="oklch(70% 0.22 315)"/>
         </linearGradient>
         <radialGradient id="mark-core" cx="32" cy="32" r="18" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stop-color="#ffffff"/>
-          <stop offset="0.38" stop-color="#bff8ff"/>
-          <stop offset="1" stop-color="#38e8ff" stop-opacity="0"/>
+          <stop offset="0" stop-color="oklch(99% 0.006 220)"/>
+          <stop offset="0.38" stop-color="oklch(91% 0.09 205)"/>
+          <stop offset="1" stop-color="oklch(84% 0.18 205)" stop-opacity="0"/>
         </radialGradient>
       </defs>
-      <circle cx="32" cy="32" r="13" fill="url(#mark-core)" opacity="0.58"/>
+      <circle cx="32" cy="32" r="13" fill="url(#mark-core)" opacity="0.62"/>
       <path d="M32 5v54M5 32h54M13.8 13.8l36.4 36.4M50.2 13.8 13.8 50.2" fill="none" stroke="url(#mark-stroke)" stroke-width="2.2" stroke-linecap="round" opacity="0.72"/>
       <path d="M32 10c6 8 6 15.4 0 22-6-6.6-6-14 0-22Zm0 44c-6-8-6-15.4 0-22 6 6.6 6 14 0 22ZM10 32c8-6 15.4-6 22 0-6.6 6-14 6-22 0Zm44 0c-8 6-15.4 6-22 0 6.6-6 14-6 22 0Z" fill="none" stroke="url(#mark-stroke)" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
-      <circle cx="32" cy="32" r="3.6" fill="#fff"/>
+      <circle cx="32" cy="32" r="3.6" fill="oklch(99% 0.006 220)"/>
     </symbol>
   </svg>
+
   <header class="site-header">
     <nav class="nav" aria-label="Primary navigation">
-      <a class="brand" href="./">
+      <a class="brand" href="./" aria-label="Fractal Brushes home">
         <svg class="mark" aria-hidden="true"><use href="#fractal-brushes-mark"></use></svg>
         <span>Fractal Brushes</span>
       </a>
       <div class="nav-links">
-        <a href="#features">Features</a>
-        <a href="#controls">Controls</a>
-        <a href="#deploy">Deploy</a>
-        <a class="button primary" href="./app/">Open app</a>
+        <a href="#instrument">Instrument</a>
+        <a href="#workflow">Workflow</a>
+        <a class="button primary" href="./app/">
+          Open app
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+        </a>
       </div>
     </nav>
   </header>
 
-  <main>
-    <section class="hero">
+  <main id="main">
+    <section class="hero" aria-label="Fractal Brushes introduction">
       <canvas id="heroCanvas" aria-hidden="true"></canvas>
       <div class="hero-inner">
-        <div class="hero-copy">
-          <div class="hero-brand">
-            <svg class="mark-lg" aria-hidden="true"><use href="#fractal-brushes-mark"></use></svg>
-            <span>Fractal Brushes</span>
-          </div>
-          <h1>Draw luminous symmetry with living brushes.</h1>
-          <p class="lead">Fractal Brushes turns pointer movement into mirrored tendrils, elemental filaments, blended color trails, and export-ready artwork. It runs as a static GitHub Pages site with no backend.</p>
+        <div>
+          <div class="eyebrow"><span class="pulse" aria-hidden="true"></span>Browser-native generative canvas</div>
+          <h1>Fractal Brushes</h1>
+          <p class="hero-kicker">Draw mirrored filaments, tune luminous brush behavior, blend hue trails, zoom into the canvas, and export finished PNG artwork without accounts, installs, or a build step.</p>
           <div class="hero-actions">
-            <a class="button primary" href="./app/">Launch the canvas</a>
-            <a class="button" href="#features">See features</a>
+            <a class="button primary" href="./app/">
+              Launch the canvas
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+            </a>
+            <a class="button" href="#instrument">
+              See the instrument
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
+            </a>
           </div>
-          <div class="hero-stats" aria-label="Project highlights">
-            <span><strong>11</strong>Brush profiles</span>
-            <span><strong>16x</strong>Symmetry range</span>
-            <span><strong>4K</strong>PNG exports</span>
-          </div>
+        </div>
+        <div class="hero-spec" aria-label="Brush capability samples">
+          <span style="--swatch: conic-gradient(from 30deg, var(--cyan), var(--violet), oklch(99% 0.006 220), var(--cyan));"><strong>Thunder</strong>Angular mirrored strokes</span>
+          <span style="--swatch: conic-gradient(from 80deg, var(--ember), var(--gold), oklch(99% 0.006 220), var(--ember));"><strong>Flame</strong>Short bright tendrils</span>
+          <span style="--swatch: conic-gradient(from 120deg, var(--green), var(--cyan), var(--violet), var(--green));"><strong>Blend</strong>Dual-hue trails</span>
         </div>
       </div>
     </section>
 
-    <section class="section" id="features">
+    <section class="section tight" id="instrument">
       <div class="container">
-        <div class="section-heading">
-          <h2>A polished canvas app, not a static sketch.</h2>
-          <p>The drawing engine stays at the center, now framed around expressive brush families, floating menus, precise color selection, brush expansion, a zoom slider, and export presets for finished artwork.</p>
+        <div class="section-lede">
+          <h2>A canvas tool with visible craft.</h2>
+          <p>The interface stays quiet around the drawing surface. The personality comes from responsive particles, tight controls, and exports that preserve the dark luminous finish.</p>
         </div>
-        <div class="feature-grid">
-          <article class="feature-card">
-            <div class="feature-icon" aria-hidden="true"></div>
-            <h3>Expanded brush set</h3>
-            <p>Fairy, flame, thunder, silk ribbon, comet trail, nebula smoke, crystal filament, water, ember, frost, and plasma each shape motion differently, with bottom-left parameters for size, expansion spacing, and symmetry.</p>
+
+        <div class="instrument">
+          <div class="preview" aria-label="Animated Fractal Brushes preview">
+            <canvas id="previewCanvas" aria-hidden="true"></canvas>
+            <div class="preview-label" aria-hidden="true">
+              <span>live tendrils</span>
+              <span>mirrored motion</span>
+              <span>blend color</span>
+            </div>
+          </div>
+          <div class="control-stack" aria-label="App capabilities">
+            <article class="control-row">
+              <code>01</code>
+              <div>
+                <h3>Brush families behave differently.</h3>
+                <p>Fairy, flame, thunder, silk ribbon, comet trail, nebula smoke, crystal filament, water, ember, frost, and plasma each tune spread, drag, curl, branching, width, and glow.</p>
+              </div>
+            </article>
+            <article class="control-row">
+              <code>02</code>
+              <div>
+                <h3>Color control stays close to the work.</h3>
+                <p>The circular hue picker switches between single color and dual-handle blend mode, so strokes can stay precise or drift through a second hue.</p>
+              </div>
+            </article>
+            <article class="control-row">
+              <code>03</code>
+              <div>
+                <h3>Exports are ready for real output.</h3>
+                <p>Save the current canvas, 4K wide, or 4K square PNGs from a static page. No backend renderer is required.</p>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <div class="feature-strip">
+          <article>
+            <h3>Floating panels</h3>
+            <p>Brush and color menus can stay open independently on desktop and collapse into focused drawers on mobile.</p>
           </article>
-          <article class="feature-card">
-            <div class="feature-icon" aria-hidden="true"></div>
-            <h3>Draggable brush menu</h3>
-            <p>Keep the brush picker open beside the canvas, move it where it fits, and switch profile behavior without interrupting the drawing flow.</p>
+          <article>
+            <h3>Expansion control</h3>
+            <p>Size and expansion work together, changing tendril density, spacing, velocity, and lifetime.</p>
           </article>
-          <article class="feature-card">
-            <div class="feature-icon" aria-hidden="true"></div>
-            <h3>Circular hue ring</h3>
-            <p>Switch between single-color strokes and two-color blends from a minimal ring picker. Blend mode shows both color handles and shifts gradually from the first color to the second.</p>
+          <article>
+            <h3>Mirror toggle</h3>
+            <p>Symmetry and mirror controls can produce radial specimens or looser bilateral strokes.</p>
           </article>
-          <article class="feature-card">
-            <div class="feature-icon" aria-hidden="true"></div>
-            <h3>Floating color panel</h3>
-            <p>The color menu opens under the main controls by default, drags independently, and stays available while the brush menu remains open.</p>
-          </article>
-          <article class="feature-card">
-            <div class="feature-icon" aria-hidden="true"></div>
-            <h3>Bottom-right zoom</h3>
-            <p>Use the bottom-right slider to set zoom precisely and read the current zoom percentage from a compact control surface anchored away from the drawing tools.</p>
-          </article>
-          <article class="feature-card">
-            <div class="feature-icon" aria-hidden="true"></div>
-            <h3>Artwork exports</h3>
-            <p>Save Current Resolution, 4K 16:9, or 4K Square PNG files with timestamped Fractal Brushes filenames.</p>
+          <article>
+            <h3>Zoom slider</h3>
+            <p>A bottom-right zoom cluster keeps inspection and drawing scale separate from brush selection.</p>
           </article>
         </div>
       </div>
     </section>
 
-    <section class="section alt" id="controls">
-      <div class="container showcase">
-        <div class="preview" aria-label="Animated Fractal Brushes preview">
-          <canvas id="previewCanvas" aria-hidden="true"></canvas>
+    <section class="section alt" id="workflow">
+      <div class="container workflow">
+        <div class="section-lede">
+          <h2>Fast on a desktop. Usable on a phone.</h2>
+          <p>The app is built as plain HTML, CSS, and JavaScript for GitHub Pages, but the controls are shaped like a real creative instrument.</p>
         </div>
-        <div class="control-list">
-          <div class="section-heading">
-            <h2>Designed for fast experimentation.</h2>
-            <p>Open the app, draw, adjust floating panels, zoom the canvas, and export without accounts or installation.</p>
-          </div>
-          <article class="control-copy">
-            <h3>Main controls stay compact</h3>
-            <p>Logo, undo, redo, export, clear, mirror, brush menu, color menu, and randomize stay grouped in the top-left toolbar.</p>
+        <div class="workflow-list">
+          <article class="workflow-step">
+            <span class="step-number">1</span>
+            <div>
+              <h3>Open the canvas and draw.</h3>
+              <p>Pointer, mouse, and touch input feed the same tendril engine. The canvas remains the first surface.</p>
+            </div>
           </article>
-          <article class="control-copy">
-            <h3>Panels can stay open</h3>
-            <p>Brush and color menus close independently, so you can tune a palette while comparing luminous and elemental brush behavior.</p>
+          <article class="workflow-step">
+            <span class="step-number">2</span>
+            <div>
+              <h3>Tune brush, hue, expansion, and symmetry.</h3>
+              <p>Compact menus keep the work visible while giving enough control to make each pass feel intentional.</p>
+            </div>
           </article>
-          <article class="control-copy">
-            <h3>Static deployment</h3>
-            <p>The landing page and app are plain HTML, CSS, and JavaScript, so GitHub Pages can deploy the repository directly.</p>
+          <article class="workflow-step">
+            <span class="step-number">3</span>
+            <div>
+              <h3>Export a PNG from the browser.</h3>
+              <p>Current resolution, 4K wide, and 4K square presets generate timestamped files directly from the canvas.</p>
+            </div>
           </article>
         </div>
       </div>
     </section>
 
-    <section class="section" id="deploy">
-      <div class="container">
-        <div class="deploy-band">
-          <div>
-            <h2>Ready for GitHub Pages.</h2>
-            <p class="lead">The repository includes a Pages workflow. Push to main, enable Pages with GitHub Actions as the source, and the landing page will publish at the root while the drawing app remains available at /app/.</p>
+    <section class="section">
+      <div class="container instrument">
+        <div class="device-panel" aria-hidden="true">
+          <canvas id="deviceCanvas" class="device-canvas"></canvas>
+          <div class="device-toolbar">
+            <span class="device-tool"></span>
+            <span class="device-tool"></span>
+            <span class="device-tool"></span>
+            <span class="device-tool"></span>
+            <span class="device-tool"></span>
           </div>
-          <a class="button primary" href="./app/">Open app</a>
+          <div class="device-sheet">
+            <div class="sheet-line"></div>
+            <div class="sheet-line"></div>
+            <div class="sheet-line"></div>
+          </div>
+        </div>
+        <div class="control-stack">
+          <article class="control-row">
+            <code>mobile</code>
+            <div>
+              <h3>Controls become single-purpose drawers.</h3>
+              <p>On smaller screens, opening brush, color, parameters, or export controls closes the other drawer so the canvas stays reachable.</p>
+            </div>
+          </article>
+          <article class="control-row">
+            <code>desktop</code>
+            <div>
+              <h3>Panels stay draggable.</h3>
+              <p>On larger screens, brush, color, and parameter panels remain independent and can be placed where the current artwork leaves room.</p>
+            </div>
+          </article>
+          <article class="control-row">
+            <code>static</code>
+            <div>
+              <h3>The whole package stays dependency-free.</h3>
+              <p>The routes are still root <code>/</code> and <code>/app/</code>, ready for GitHub Pages with no bundler or remote service.</p>
+            </div>
+          </article>
         </div>
       </div>
     </section>
+
   </main>
 
   <footer class="site-footer">
     <div class="footer-inner">
-      <span>Fractal Brushes - static generative canvas website</span>
+      <div class="creator-card">
+        <div>
+          <span class="creator-label">Created by</span>
+          <strong>Chakib Belgaid</strong>
+        </div>
+        <nav class="creator-links" aria-label="Chakib Belgaid profiles">
+          <a href="https://twitter.com/chakibmed" target="_blank" rel="noopener noreferrer">Twitter</a>
+          <a href="https://www.linkedin.com/in/chakib-belgaid" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+          <a href="https://github.com/chakib-belgaid" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </nav>
+      </div>
       <a href="./app/">Launch app</a>
     </div>
   </footer>
@@ -550,6 +1200,7 @@
     (() => {
       function makePreview(canvas, options = {}) {
         const ctx = canvas.getContext("2d", { alpha: true });
+        const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         const state = {
           width: 0,
           height: 0,
@@ -586,25 +1237,26 @@
 
         function spawn() {
           const angle = state.tick * 0.018 + rand(-0.6, 0.6);
-          const radius = Math.min(state.width, state.height) * (0.18 + Math.sin(state.tick * 0.011) * 0.04);
+          const radius = Math.min(state.width, state.height) * (0.17 + Math.sin(state.tick * 0.011) * 0.05);
           const x = state.cx + Math.cos(angle) * radius;
           const y = state.cy + Math.sin(angle) * radius;
           const base = angle + Math.PI / 2 + rand(-0.5, 0.5);
           for (let i = 0; i < 5; i += 1) {
             const speed = rand(0.6, 2.2) * state.dpr;
+            const life = rand(54, 118);
             state.particles.push({
               x,
               y,
               vx: Math.cos(base + rand(-0.9, 0.9)) * speed,
               vy: Math.sin(base + rand(-0.9, 0.9)) * speed,
-              life: rand(36, 96),
-              maxLife: rand(70, 120),
-              hue: state.hue + rand(-28, 48),
-              width: rand(0.28, 0.78) * state.dpr
+              life,
+              maxLife: life,
+              hue: state.hue + rand(-32, 38),
+              width: rand(0.28, 0.58) * state.dpr
             });
           }
-          if (state.particles.length > 900) {
-            state.particles.splice(0, state.particles.length - 900);
+          if (state.particles.length > 960) {
+            state.particles.splice(0, state.particles.length - 960);
           }
         }
 
@@ -620,7 +1272,7 @@
             const [rx1, ry1] = rotate(x1, y1, a);
             ctx.lineCap = "butt";
             ctx.strokeStyle = `hsla(${p.hue}, 100%, 58%, ${alpha * 0.18})`;
-            ctx.lineWidth = p.width * 5;
+            ctx.lineWidth = p.width * 5.4;
             ctx.beginPath();
             ctx.moveTo(x0, y0);
             ctx.lineTo(rx1, ry1);
@@ -638,7 +1290,7 @@
           state.tick += 1;
           if (state.tick % 2 === 0) spawn();
           ctx.globalCompositeOperation = "source-over";
-          ctx.fillStyle = "rgba(4, 5, 10, 0.032)";
+          ctx.fillStyle = "rgba(5, 7, 16, 0.032)";
           ctx.fillRect(0, 0, state.width, state.height);
           for (let i = state.particles.length - 1; i >= 0; i -= 1) {
             const p = state.particles[i];
@@ -657,20 +1309,420 @@
         }
 
         function step() {
+          animationFrame = 0;
+          if (!inView || document.hidden) return;
           advanceFrame();
-          requestAnimationFrame(step);
+          animationFrame = requestAnimationFrame(step);
+        }
+
+        let animationFrame = 0;
+        let inView = true;
+        function syncMotion() {
+          if (reduceMotion) return;
+          if (inView && !document.hidden && !animationFrame) {
+            animationFrame = requestAnimationFrame(step);
+          } else if ((!inView || document.hidden) && animationFrame) {
+            cancelAnimationFrame(animationFrame);
+            animationFrame = 0;
+          }
         }
 
         resize();
-        for (let i = 0; i < 150; i += 1) {
+        for (let i = 0; i < 170; i += 1) {
           advanceFrame();
         }
-        step();
+        if (!reduceMotion && "IntersectionObserver" in window) {
+          const observer = new IntersectionObserver((entries) => {
+            inView = entries[0].isIntersecting;
+            syncMotion();
+          }, { threshold: 0.08 });
+          observer.observe(canvas);
+          document.addEventListener("visibilitychange", syncMotion);
+          syncMotion();
+        } else if (!reduceMotion) {
+          syncMotion();
+        }
         window.addEventListener("resize", resize);
       }
 
-      makePreview(document.getElementById("heroCanvas"), { hue: 190, symmetry: 10, alpha: 0.34 });
-      makePreview(document.getElementById("previewCanvas"), { hue: 300, symmetry: 6, alpha: 0.24 });
+      function makeBrushSpecimen(canvas) {
+        const ctx = canvas.getContext("2d", { alpha: true });
+        const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        const brushProfiles = {
+          thunder: {
+            hues: [195, 264],
+            count: [2, 4],
+            spread: 0.46,
+            velocity: [0.8, 2.45],
+            life: [30, 68],
+            width: [0.38, 0.9],
+            jitter: 0.34,
+            curl: 0.05,
+            branch: 0.032,
+            drag: 0.956,
+            lift: [0, 0],
+            alpha: 0.2,
+            hueShift: [-18, 24],
+            angular: 0.22,
+            cap: "butt",
+            layers: [[4.6, -24, 52, 0.13], [1.05, 10, 66, 0.44], [0.2, 0, 96, 0.68, "white"]]
+          },
+          crystal: {
+            hues: [188, 238],
+            count: [2, 4],
+            spread: 0.38,
+            velocity: [0.72, 2.1],
+            life: [46, 94],
+            width: [0.24, 0.58],
+            jitter: 0.1,
+            curl: 0.02,
+            branch: 0.024,
+            drag: 0.968,
+            lift: [0, 0],
+            alpha: 0.2,
+            hueShift: [-12, 30],
+            angular: 0.52,
+            cap: "butt",
+            layers: [[3.1, -8, 58, 0.09], [0.84, 16, 72, 0.42], [0.18, 0, 98, 0.76, "white"]]
+          }
+        };
+        const state = {
+          width: 0,
+          height: 0,
+          dpr: 1,
+          cx: 0,
+          cy: 0,
+          tick: 0,
+          size: 1,
+          expansion: 0.35,
+          symmetry: 8,
+          mirror: true,
+          tendrils: [],
+          previous: null,
+          rng: null
+        };
+
+        function mulberry32(seed) {
+          return () => {
+            let value = seed += 0x6D2B79F5;
+            value = Math.imul(value ^ value >>> 15, value | 1);
+            value ^= value + Math.imul(value ^ value >>> 7, value | 61);
+            return ((value ^ value >>> 14) >>> 0) / 4294967296;
+          };
+        }
+
+        const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+        const rand = (min, max) => min + state.rng() * (max - min);
+
+        function resize() {
+          state.dpr = Math.min(window.devicePixelRatio || 1, 1.6);
+          const rect = canvas.getBoundingClientRect();
+          state.width = Math.max(1, Math.floor(rect.width * state.dpr));
+          state.height = Math.max(1, Math.floor(rect.height * state.dpr));
+          state.cx = state.width * 0.5;
+          state.cy = state.height * 0.47;
+          canvas.width = state.width;
+          canvas.height = state.height;
+          resetSpecimen();
+        }
+
+        function clearFrame(alpha = 0.026) {
+          const gradient = ctx.createRadialGradient(state.cx, state.cy, 0, state.cx, state.cy, Math.max(state.width, state.height) * 0.62);
+          gradient.addColorStop(0, `rgba(8, 18, 31, ${alpha})`);
+          gradient.addColorStop(0.52, `rgba(4, 6, 16, ${alpha})`);
+          gradient.addColorStop(1, `rgba(3, 4, 10, ${alpha})`);
+          ctx.globalCompositeOperation = "source-over";
+          ctx.fillStyle = gradient;
+          ctx.fillRect(0, 0, state.width, state.height);
+        }
+
+        function resetSpecimen() {
+          state.rng = mulberry32(0xC0FFEE);
+          state.tick = 0;
+          state.previous = null;
+          state.tendrils = [];
+          clearFrame(1);
+          for (let i = 0; i < 260; i += 1) {
+            advanceFrame();
+          }
+        }
+
+        function rotateAroundCenter(x, y, angle) {
+          const dx = x - state.cx;
+          const dy = y - state.cy;
+          const ca = Math.cos(angle);
+          const sa = Math.sin(angle);
+          return [state.cx + dx * ca - dy * sa, state.cy + dx * sa + dy * ca];
+        }
+
+        function hsla(hue, saturation, lightness, alpha) {
+          return `hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha})`;
+        }
+
+        function drawLayer(x0, y0, x1, y1, style, width, cap) {
+          ctx.strokeStyle = style;
+          ctx.lineWidth = width;
+          ctx.lineCap = cap;
+          ctx.beginPath();
+          ctx.moveTo(x0, y0);
+          ctx.lineTo(x1, y1);
+          ctx.stroke();
+        }
+
+        function drawBrushSegment(x0, y0, x1, y1, tendril) {
+          const profile = brushProfiles[tendril.brush] || brushProfiles.thunder;
+          const age = 1 - tendril.life / tendril.maxLife;
+          const envelope = Math.sin(Math.PI * clamp(age, 0, 1));
+          const alpha = tendril.alpha * envelope;
+          if (alpha <= 0.001) return;
+
+          const baseWidth = tendril.width * state.dpr;
+          const passes = state.mirror ? 2 : 1;
+          ctx.globalCompositeOperation = "lighter";
+
+          for (let mirrorIndex = 0; mirrorIndex < passes; mirrorIndex += 1) {
+            const sx0 = mirrorIndex === 0 ? x0 : 2 * state.cx - x0;
+            const sx1 = mirrorIndex === 0 ? x1 : 2 * state.cx - x1;
+
+            for (let i = 0; i < state.symmetry; i += 1) {
+              const angle = (Math.PI * 2 * i) / state.symmetry;
+              const [rx0, ry0] = rotateAroundCenter(sx0, y0, angle);
+              const [rx1, ry1] = rotateAroundCenter(sx1, y1, angle);
+
+              profile.layers.forEach(([scale, hueOffset, lightness, layerAlpha, special]) => {
+                const width = Math.max(0.14, baseWidth * scale);
+                let style = hsla(tendril.hue + hueOffset, 96, lightness, alpha * layerAlpha);
+                if (special === "white") {
+                  style = `rgba(255, 255, 255, ${alpha * layerAlpha})`;
+                }
+                drawLayer(rx0, ry0, rx1, ry1, style, width, profile.cap);
+              });
+            }
+          }
+        }
+
+        function quantizeVelocity(tendril, amount) {
+          if (!amount) return;
+          const speed = Math.hypot(tendril.vx, tendril.vy);
+          if (speed < 0.001) return;
+          const angle = Math.atan2(tendril.vy, tendril.vx);
+          const stepAngle = Math.PI * amount;
+          const snapped = Math.round(angle / stepAngle) * stepAngle;
+          tendril.vx = Math.cos(snapped) * speed;
+          tendril.vy = Math.sin(snapped) * speed;
+        }
+
+        function tendrilHue(profile) {
+          const baseHue = profile.hues[Math.floor(rand(0, profile.hues.length))] || profile.hues[0];
+          return baseHue + rand(profile.hueShift[0], profile.hueShift[1]);
+        }
+
+        function spawnFan(x, y, dx, dy, brush) {
+          const profile = brushProfiles[brush] || brushProfiles.thunder;
+          const speed = Math.hypot(dx, dy);
+          const baseAngle = Math.atan2(dy, dx);
+          const sizeScale = 0.42 + Math.pow(state.size / 6, 1.22);
+          const expansionScale = clamp(state.expansion, 0.35, 1.6);
+          const sizeExpansionScale = 0.78 + Math.sqrt(state.size / 7) * 0.28;
+          const coupledExpansion = expansionScale * sizeExpansionScale;
+          const spreadScale = 0.45 + coupledExpansion * 0.85;
+          const densityScale = 0.55 + expansionScale * 0.45;
+          const lifeScale = 0.74 + coupledExpansion * 0.34;
+          const velocityScale = 0.82 + coupledExpansion * 0.28;
+          const widthScale = 0.86 + coupledExpansion * 0.18;
+          const count = Math.max(1, Math.floor(rand(profile.count[0], profile.count[1] + 1) * densityScale));
+
+          for (let i = 0; i < count; i += 1) {
+            const angle = baseAngle + rand(-profile.spread, profile.spread) * spreadScale;
+            const velocity = rand(profile.velocity[0], profile.velocity[1]) * velocityScale * (0.6 + Math.min(speed * 0.05, 1.35));
+            const life = rand(profile.life[0], profile.life[1]) * lifeScale;
+            const lift = rand(profile.lift[0], profile.lift[1]) * state.dpr;
+            state.tendrils.push({
+              x: x * state.dpr,
+              y: y * state.dpr,
+              vx: Math.cos(angle) * velocity * state.dpr,
+              vy: Math.sin(angle) * velocity * state.dpr - lift,
+              life,
+              maxLife: life,
+              hue: tendrilHue(profile),
+              width: rand(profile.width[0], profile.width[1]) * sizeScale * widthScale,
+              jitter: profile.jitter,
+              curl: profile.curl,
+              drag: profile.drag,
+              lift: (profile.lift[0] + profile.lift[1]) * 0.008,
+              alpha: profile.alpha * clamp(0.78 + Math.sqrt(sizeScale) * 0.2, 0.9, 1.28) * 1.24,
+              branch: profile.branch,
+              seed: rand(0, Math.PI * 2),
+              angular: profile.angular || 0,
+              brush
+            });
+          }
+
+          const maxTendrils = Math.round(1600 * (0.72 + expansionScale * 0.34));
+          if (state.tendrils.length > maxTendrils) {
+            state.tendrils.splice(0, state.tendrils.length - maxTendrils);
+          }
+        }
+
+        function spawnAlong(x0, y0, x1, y1, brush) {
+          const dx = x1 - x0;
+          const dy = y1 - y0;
+          const distance = Math.hypot(dx, dy);
+          const sizeDistanceScale = 0.78 + Math.sqrt(state.size / 7) * 0.36;
+          const expansionDistanceScale = 0.82 + state.expansion * 0.32;
+          const spacing = clamp(7.2 * sizeDistanceScale * expansionDistanceScale, 5.5, 20);
+          const steps = Math.max(1, Math.floor(distance / spacing));
+          for (let i = 1; i <= steps; i += 1) {
+            const t = i / steps;
+            spawnFan(x0 + dx * t, y0 + dy * t, dx / steps, dy / steps, brush);
+          }
+        }
+
+        function emitBrushPath() {
+          const width = state.width / state.dpr;
+          const height = state.height / state.dpr;
+          const centerX = state.cx / state.dpr;
+          const centerY = state.cy / state.dpr;
+          const radius = Math.min(width, height) * (0.205 + Math.sin(state.tick * 0.018) * 0.018);
+          const angle = state.tick * 0.021;
+          const x = centerX + Math.cos(angle) * radius + Math.sin(state.tick * 0.047) * 5.5;
+          const y = centerY + Math.sin(angle * 1.04) * radius * 0.76;
+          const brush = Math.floor(state.tick / 46) % 2 === 0 ? "thunder" : "crystal";
+          if (!state.previous) {
+            state.previous = { x, y };
+            return;
+          }
+          spawnAlong(state.previous.x, state.previous.y, x, y, brush);
+          state.previous = { x, y };
+        }
+
+        function branchFrom(tendril, speed) {
+          const profile = brushProfiles[tendril.brush] || brushProfiles.thunder;
+          const splitAngle = Math.atan2(tendril.vy, tendril.vx) + (state.rng() > 0.5 ? 1 : -1) * rand(0.45, profile.angular ? 0.92 : 1.18);
+          const splitLife = tendril.life * rand(0.28, 0.58);
+          state.tendrils.push({
+            x: tendril.x,
+            y: tendril.y,
+            vx: Math.cos(splitAngle) * speed * rand(0.48, 0.92),
+            vy: Math.sin(splitAngle) * speed * rand(0.48, 0.92),
+            life: splitLife,
+            maxLife: splitLife,
+            hue: tendril.hue + rand(-20, 38),
+            width: tendril.width * rand(0.42, 0.76),
+            jitter: tendril.jitter * 1.08,
+            curl: tendril.curl,
+            drag: tendril.drag,
+            lift: tendril.lift,
+            alpha: tendril.alpha * 0.74,
+            branch: tendril.branch * 0.18,
+            seed: rand(0, Math.PI * 2),
+            angular: tendril.angular,
+            brush: tendril.brush
+          });
+        }
+
+        function drawCenterVoid() {
+          const voidGradient = ctx.createRadialGradient(state.cx, state.cy, 0, state.cx, state.cy, 32 * state.dpr);
+          voidGradient.addColorStop(0, "rgba(3, 4, 10, 0.68)");
+          voidGradient.addColorStop(0.72, "rgba(3, 4, 10, 0.22)");
+          voidGradient.addColorStop(1, "rgba(3, 4, 10, 0)");
+          ctx.globalCompositeOperation = "source-over";
+          ctx.fillStyle = voidGradient;
+          ctx.beginPath();
+          ctx.arc(state.cx, state.cy, 32 * state.dpr, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        function advanceFrame() {
+          state.tick += 1;
+          clearFrame();
+          emitBrushPath();
+
+          for (let i = state.tendrils.length - 1; i >= 0; i -= 1) {
+            const tendril = state.tendrils[i];
+            const ox = tendril.x;
+            const oy = tendril.y;
+            const speed = Math.max(0.001, Math.hypot(tendril.vx, tendril.vy));
+            const nx = -tendril.vy / speed;
+            const ny = tendril.vx / speed;
+            const curl = Math.sin((tendril.maxLife - tendril.life) * 0.16 + tendril.seed) * tendril.curl;
+
+            tendril.vx += nx * curl * state.dpr;
+            tendril.vy += ny * curl * state.dpr;
+            tendril.vx += rand(-tendril.jitter, tendril.jitter) * state.dpr;
+            tendril.vy += rand(-tendril.jitter, tendril.jitter) * state.dpr;
+            tendril.vy -= tendril.lift * state.dpr * (1 + tendril.width);
+            quantizeVelocity(tendril, tendril.angular);
+
+            const tx = tendril.x + tendril.vx;
+            const ty = tendril.y + tendril.vy;
+            drawBrushSegment(ox, oy, tx, ty, tendril);
+
+            tendril.x = tx;
+            tendril.y = ty;
+            tendril.vx *= tendril.drag;
+            tendril.vy *= tendril.drag;
+            tendril.life -= 1;
+
+            const maxTendrils = Math.round(1600 * (0.72 + state.expansion * 0.34));
+            if (tendril.life > 12 && state.rng() < tendril.branch && state.tendrils.length < maxTendrils) {
+              branchFrom(tendril, speed);
+            }
+
+            if (
+              tendril.life <= 0 ||
+              Math.abs(tendril.vx) + Math.abs(tendril.vy) < 0.015 ||
+              tendril.x < -state.width * 0.1 ||
+              tendril.x > state.width * 1.1 ||
+              tendril.y < -state.height * 0.1 ||
+              tendril.y > state.height * 1.1
+            ) {
+              state.tendrils.splice(i, 1);
+            }
+          }
+          drawCenterVoid();
+        }
+
+        function step() {
+          animationFrame = 0;
+          if (!inView || document.hidden) return;
+          advanceFrame();
+          animationFrame = requestAnimationFrame(step);
+        }
+
+        let animationFrame = 0;
+        let inView = true;
+        function syncMotion() {
+          if (reduceMotion) return;
+          if (inView && !document.hidden && !animationFrame) {
+            animationFrame = requestAnimationFrame(step);
+          } else if ((!inView || document.hidden) && animationFrame) {
+            cancelAnimationFrame(animationFrame);
+            animationFrame = 0;
+          }
+        }
+
+        resize();
+
+        if (!reduceMotion && "IntersectionObserver" in window) {
+          const observer = new IntersectionObserver((entries) => {
+            inView = entries[0].isIntersecting;
+            syncMotion();
+          }, { threshold: 0.08 });
+          observer.observe(canvas);
+          document.addEventListener("visibilitychange", syncMotion);
+          syncMotion();
+        } else if (!reduceMotion) {
+          syncMotion();
+        }
+        window.addEventListener("resize", () => {
+          resize();
+        });
+      }
+
+      makePreview(document.getElementById("heroCanvas"), { hue: 190, symmetry: 10, alpha: 0.36 });
+      makePreview(document.getElementById("previewCanvas"), { hue: 300, symmetry: 7, alpha: 0.26 });
+      makeBrushSpecimen(document.getElementById("deviceCanvas"));
     })();
   </script>
 </body>
