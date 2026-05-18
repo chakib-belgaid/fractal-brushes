@@ -595,9 +595,36 @@
     .device-panel::before {
       position: absolute;
       inset: 20px;
+      z-index: 2;
       border: 1px solid oklch(78% 0.08 230 / 0.18);
       border-radius: 8px;
       content: "";
+    }
+
+    .device-panel::after {
+      position: absolute;
+      left: 38px;
+      bottom: 174px;
+      z-index: 3;
+      padding: 7px 9px;
+      border: 1px solid oklch(78% 0.08 230 / 0.16);
+      border-radius: 999px;
+      color: oklch(89% 0.09 205);
+      background: oklch(7% 0.03 265 / 0.7);
+      box-shadow: 0 0 22px oklch(84% 0.18 205 / 0.14);
+      font-size: 12px;
+      font-weight: 780;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    .device-canvas {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      width: 100%;
+      height: 100%;
+      display: block;
     }
 
     .device-toolbar {
@@ -605,6 +632,7 @@
       left: 38px;
       right: 38px;
       top: 38px;
+      z-index: 4;
       display: flex;
       gap: 7px;
       padding: 7px;
@@ -631,6 +659,7 @@
       left: 38px;
       right: 38px;
       bottom: 38px;
+      z-index: 4;
       padding: 18px;
       border: 1px solid oklch(78% 0.08 230 / 0.18);
       border-radius: 8px;
@@ -703,14 +732,59 @@
       line-height: 1.5;
     }
 
+    .creator-card {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      color: var(--muted);
+    }
+
+    .creator-card strong {
+      display: block;
+      color: var(--text);
+      font-size: 15px;
+      line-height: 1.2;
+    }
+
+    .creator-label {
+      display: block;
+      margin-bottom: 3px;
+      color: var(--quiet);
+      font-size: 12px;
+      font-weight: 720;
+    }
+
+    .creator-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .creator-links a {
+      min-height: 34px;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 10px;
+      border: 1px solid oklch(78% 0.08 230 / 0.16);
+      border-radius: 8px;
+      color: oklch(86% 0.09 205);
+      background: oklch(12% 0.032 260 / 0.62);
+      font-size: 13px;
+      font-weight: 760;
+      transition: transform 160ms var(--ease-out), border-color 160ms var(--ease-out), background 160ms var(--ease-out);
+    }
+
     @media (hover: hover) and (pointer: fine) {
       .button:hover,
-      .nav-links a:not(.button):hover {
+      .nav-links a:not(.button):hover,
+      .creator-links a:hover {
         color: var(--text);
         background: oklch(96% 0.02 230 / 0.07);
       }
 
-      .button:hover {
+      .button:hover,
+      .creator-links a:hover {
         transform: translateY(-1px);
       }
     }
@@ -864,6 +938,15 @@
       .footer-inner {
         flex-direction: column;
       }
+
+      .creator-card {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .creator-links {
+        justify-content: flex-start;
+      }
     }
 
     @media (max-width: 380px) {
@@ -922,7 +1005,6 @@
       <div class="nav-links">
         <a href="#instrument">Instrument</a>
         <a href="#workflow">Workflow</a>
-        <a href="#deploy">Deploy</a>
         <a class="button primary" href="./app/">
           Open app
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
@@ -1055,6 +1137,7 @@
     <section class="section">
       <div class="container instrument">
         <div class="device-panel" aria-hidden="true">
+          <canvas id="deviceCanvas" class="device-canvas"></canvas>
           <div class="device-toolbar">
             <span class="device-tool"></span>
             <span class="device-tool"></span>
@@ -1073,14 +1156,14 @@
             <code>mobile</code>
             <div>
               <h3>Controls become single-purpose drawers.</h3>
-              <p>On smaller screens, opening brush, color, or export controls closes the other drawer so the canvas and bottom parameters are not buried.</p>
+              <p>On smaller screens, opening brush, color, parameters, or export controls closes the other drawer so the canvas stays reachable.</p>
             </div>
           </article>
           <article class="control-row">
             <code>desktop</code>
             <div>
               <h3>Panels stay draggable.</h3>
-              <p>On larger screens, brush and color panels remain independent and can be placed where the current artwork leaves room.</p>
+              <p>On larger screens, brush, color, and parameter panels remain independent and can be placed where the current artwork leaves room.</p>
             </div>
           </article>
           <article class="control-row">
@@ -1094,25 +1177,21 @@
       </div>
     </section>
 
-    <section class="section tight" id="deploy">
-      <div class="container">
-        <div class="deploy-band">
-          <div>
-            <h2>Ready for GitHub Pages.</h2>
-            <p>Serve the repository root as static files. The landing page stays at <code>/</code>, and the interactive drawing app stays at <code>/app/</code>.</p>
-          </div>
-          <a class="button primary" href="./app/">
-            Open app
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
-          </a>
-        </div>
-      </div>
-    </section>
   </main>
 
   <footer class="site-footer">
     <div class="footer-inner">
-      <span>Fractal Brushes, static generative canvas website</span>
+      <div class="creator-card">
+        <div>
+          <span class="creator-label">Created by</span>
+          <strong>Chakib Belgaid</strong>
+        </div>
+        <nav class="creator-links" aria-label="Chakib Belgaid profiles">
+          <a href="https://twitter.com/chakibmed" target="_blank" rel="noopener noreferrer">Twitter</a>
+          <a href="https://www.linkedin.com/in/chakib-belgaid" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+          <a href="https://github.com/chakib-belgaid" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </nav>
+      </div>
       <a href="./app/">Launch app</a>
     </div>
   </footer>
@@ -1266,8 +1345,384 @@
         window.addEventListener("resize", resize);
       }
 
+      function makeBrushSpecimen(canvas) {
+        const ctx = canvas.getContext("2d", { alpha: true });
+        const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        const brushProfiles = {
+          thunder: {
+            hues: [195, 264],
+            count: [2, 4],
+            spread: 0.46,
+            velocity: [0.8, 2.45],
+            life: [30, 68],
+            width: [0.38, 0.9],
+            jitter: 0.34,
+            curl: 0.05,
+            branch: 0.032,
+            drag: 0.956,
+            lift: [0, 0],
+            alpha: 0.2,
+            hueShift: [-18, 24],
+            angular: 0.22,
+            cap: "butt",
+            layers: [[4.6, -24, 52, 0.13], [1.05, 10, 66, 0.44], [0.2, 0, 96, 0.68, "white"]]
+          },
+          crystal: {
+            hues: [188, 238],
+            count: [2, 4],
+            spread: 0.38,
+            velocity: [0.72, 2.1],
+            life: [46, 94],
+            width: [0.24, 0.58],
+            jitter: 0.1,
+            curl: 0.02,
+            branch: 0.024,
+            drag: 0.968,
+            lift: [0, 0],
+            alpha: 0.2,
+            hueShift: [-12, 30],
+            angular: 0.52,
+            cap: "butt",
+            layers: [[3.1, -8, 58, 0.09], [0.84, 16, 72, 0.42], [0.18, 0, 98, 0.76, "white"]]
+          }
+        };
+        const state = {
+          width: 0,
+          height: 0,
+          dpr: 1,
+          cx: 0,
+          cy: 0,
+          tick: 0,
+          size: 1,
+          expansion: 0.35,
+          symmetry: 8,
+          mirror: true,
+          tendrils: [],
+          previous: null,
+          rng: null
+        };
+
+        function mulberry32(seed) {
+          return () => {
+            let value = seed += 0x6D2B79F5;
+            value = Math.imul(value ^ value >>> 15, value | 1);
+            value ^= value + Math.imul(value ^ value >>> 7, value | 61);
+            return ((value ^ value >>> 14) >>> 0) / 4294967296;
+          };
+        }
+
+        const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+        const rand = (min, max) => min + state.rng() * (max - min);
+
+        function resize() {
+          state.dpr = Math.min(window.devicePixelRatio || 1, 1.6);
+          const rect = canvas.getBoundingClientRect();
+          state.width = Math.max(1, Math.floor(rect.width * state.dpr));
+          state.height = Math.max(1, Math.floor(rect.height * state.dpr));
+          state.cx = state.width * 0.5;
+          state.cy = state.height * 0.47;
+          canvas.width = state.width;
+          canvas.height = state.height;
+          resetSpecimen();
+        }
+
+        function clearFrame(alpha = 0.026) {
+          const gradient = ctx.createRadialGradient(state.cx, state.cy, 0, state.cx, state.cy, Math.max(state.width, state.height) * 0.62);
+          gradient.addColorStop(0, `rgba(8, 18, 31, ${alpha})`);
+          gradient.addColorStop(0.52, `rgba(4, 6, 16, ${alpha})`);
+          gradient.addColorStop(1, `rgba(3, 4, 10, ${alpha})`);
+          ctx.globalCompositeOperation = "source-over";
+          ctx.fillStyle = gradient;
+          ctx.fillRect(0, 0, state.width, state.height);
+        }
+
+        function resetSpecimen() {
+          state.rng = mulberry32(0xC0FFEE);
+          state.tick = 0;
+          state.previous = null;
+          state.tendrils = [];
+          clearFrame(1);
+          for (let i = 0; i < 260; i += 1) {
+            advanceFrame();
+          }
+        }
+
+        function rotateAroundCenter(x, y, angle) {
+          const dx = x - state.cx;
+          const dy = y - state.cy;
+          const ca = Math.cos(angle);
+          const sa = Math.sin(angle);
+          return [state.cx + dx * ca - dy * sa, state.cy + dx * sa + dy * ca];
+        }
+
+        function hsla(hue, saturation, lightness, alpha) {
+          return `hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha})`;
+        }
+
+        function drawLayer(x0, y0, x1, y1, style, width, cap) {
+          ctx.strokeStyle = style;
+          ctx.lineWidth = width;
+          ctx.lineCap = cap;
+          ctx.beginPath();
+          ctx.moveTo(x0, y0);
+          ctx.lineTo(x1, y1);
+          ctx.stroke();
+        }
+
+        function drawBrushSegment(x0, y0, x1, y1, tendril) {
+          const profile = brushProfiles[tendril.brush] || brushProfiles.thunder;
+          const age = 1 - tendril.life / tendril.maxLife;
+          const envelope = Math.sin(Math.PI * clamp(age, 0, 1));
+          const alpha = tendril.alpha * envelope;
+          if (alpha <= 0.001) return;
+
+          const baseWidth = tendril.width * state.dpr;
+          const passes = state.mirror ? 2 : 1;
+          ctx.globalCompositeOperation = "lighter";
+
+          for (let mirrorIndex = 0; mirrorIndex < passes; mirrorIndex += 1) {
+            const sx0 = mirrorIndex === 0 ? x0 : 2 * state.cx - x0;
+            const sx1 = mirrorIndex === 0 ? x1 : 2 * state.cx - x1;
+
+            for (let i = 0; i < state.symmetry; i += 1) {
+              const angle = (Math.PI * 2 * i) / state.symmetry;
+              const [rx0, ry0] = rotateAroundCenter(sx0, y0, angle);
+              const [rx1, ry1] = rotateAroundCenter(sx1, y1, angle);
+
+              profile.layers.forEach(([scale, hueOffset, lightness, layerAlpha, special]) => {
+                const width = Math.max(0.14, baseWidth * scale);
+                let style = hsla(tendril.hue + hueOffset, 96, lightness, alpha * layerAlpha);
+                if (special === "white") {
+                  style = `rgba(255, 255, 255, ${alpha * layerAlpha})`;
+                }
+                drawLayer(rx0, ry0, rx1, ry1, style, width, profile.cap);
+              });
+            }
+          }
+        }
+
+        function quantizeVelocity(tendril, amount) {
+          if (!amount) return;
+          const speed = Math.hypot(tendril.vx, tendril.vy);
+          if (speed < 0.001) return;
+          const angle = Math.atan2(tendril.vy, tendril.vx);
+          const stepAngle = Math.PI * amount;
+          const snapped = Math.round(angle / stepAngle) * stepAngle;
+          tendril.vx = Math.cos(snapped) * speed;
+          tendril.vy = Math.sin(snapped) * speed;
+        }
+
+        function tendrilHue(profile) {
+          const baseHue = profile.hues[Math.floor(rand(0, profile.hues.length))] || profile.hues[0];
+          return baseHue + rand(profile.hueShift[0], profile.hueShift[1]);
+        }
+
+        function spawnFan(x, y, dx, dy, brush) {
+          const profile = brushProfiles[brush] || brushProfiles.thunder;
+          const speed = Math.hypot(dx, dy);
+          const baseAngle = Math.atan2(dy, dx);
+          const sizeScale = 0.42 + Math.pow(state.size / 6, 1.22);
+          const expansionScale = clamp(state.expansion, 0.35, 1.6);
+          const sizeExpansionScale = 0.78 + Math.sqrt(state.size / 7) * 0.28;
+          const coupledExpansion = expansionScale * sizeExpansionScale;
+          const spreadScale = 0.45 + coupledExpansion * 0.85;
+          const densityScale = 0.55 + expansionScale * 0.45;
+          const lifeScale = 0.74 + coupledExpansion * 0.34;
+          const velocityScale = 0.82 + coupledExpansion * 0.28;
+          const widthScale = 0.86 + coupledExpansion * 0.18;
+          const count = Math.max(1, Math.floor(rand(profile.count[0], profile.count[1] + 1) * densityScale));
+
+          for (let i = 0; i < count; i += 1) {
+            const angle = baseAngle + rand(-profile.spread, profile.spread) * spreadScale;
+            const velocity = rand(profile.velocity[0], profile.velocity[1]) * velocityScale * (0.6 + Math.min(speed * 0.05, 1.35));
+            const life = rand(profile.life[0], profile.life[1]) * lifeScale;
+            const lift = rand(profile.lift[0], profile.lift[1]) * state.dpr;
+            state.tendrils.push({
+              x: x * state.dpr,
+              y: y * state.dpr,
+              vx: Math.cos(angle) * velocity * state.dpr,
+              vy: Math.sin(angle) * velocity * state.dpr - lift,
+              life,
+              maxLife: life,
+              hue: tendrilHue(profile),
+              width: rand(profile.width[0], profile.width[1]) * sizeScale * widthScale,
+              jitter: profile.jitter,
+              curl: profile.curl,
+              drag: profile.drag,
+              lift: (profile.lift[0] + profile.lift[1]) * 0.008,
+              alpha: profile.alpha * clamp(0.78 + Math.sqrt(sizeScale) * 0.2, 0.9, 1.28) * 1.24,
+              branch: profile.branch,
+              seed: rand(0, Math.PI * 2),
+              angular: profile.angular || 0,
+              brush
+            });
+          }
+
+          const maxTendrils = Math.round(1600 * (0.72 + expansionScale * 0.34));
+          if (state.tendrils.length > maxTendrils) {
+            state.tendrils.splice(0, state.tendrils.length - maxTendrils);
+          }
+        }
+
+        function spawnAlong(x0, y0, x1, y1, brush) {
+          const dx = x1 - x0;
+          const dy = y1 - y0;
+          const distance = Math.hypot(dx, dy);
+          const sizeDistanceScale = 0.78 + Math.sqrt(state.size / 7) * 0.36;
+          const expansionDistanceScale = 0.82 + state.expansion * 0.32;
+          const spacing = clamp(7.2 * sizeDistanceScale * expansionDistanceScale, 5.5, 20);
+          const steps = Math.max(1, Math.floor(distance / spacing));
+          for (let i = 1; i <= steps; i += 1) {
+            const t = i / steps;
+            spawnFan(x0 + dx * t, y0 + dy * t, dx / steps, dy / steps, brush);
+          }
+        }
+
+        function emitBrushPath() {
+          const width = state.width / state.dpr;
+          const height = state.height / state.dpr;
+          const centerX = state.cx / state.dpr;
+          const centerY = state.cy / state.dpr;
+          const radius = Math.min(width, height) * (0.205 + Math.sin(state.tick * 0.018) * 0.018);
+          const angle = state.tick * 0.021;
+          const x = centerX + Math.cos(angle) * radius + Math.sin(state.tick * 0.047) * 5.5;
+          const y = centerY + Math.sin(angle * 1.04) * radius * 0.76;
+          const brush = Math.floor(state.tick / 46) % 2 === 0 ? "thunder" : "crystal";
+          if (!state.previous) {
+            state.previous = { x, y };
+            return;
+          }
+          spawnAlong(state.previous.x, state.previous.y, x, y, brush);
+          state.previous = { x, y };
+        }
+
+        function branchFrom(tendril, speed) {
+          const profile = brushProfiles[tendril.brush] || brushProfiles.thunder;
+          const splitAngle = Math.atan2(tendril.vy, tendril.vx) + (state.rng() > 0.5 ? 1 : -1) * rand(0.45, profile.angular ? 0.92 : 1.18);
+          const splitLife = tendril.life * rand(0.28, 0.58);
+          state.tendrils.push({
+            x: tendril.x,
+            y: tendril.y,
+            vx: Math.cos(splitAngle) * speed * rand(0.48, 0.92),
+            vy: Math.sin(splitAngle) * speed * rand(0.48, 0.92),
+            life: splitLife,
+            maxLife: splitLife,
+            hue: tendril.hue + rand(-20, 38),
+            width: tendril.width * rand(0.42, 0.76),
+            jitter: tendril.jitter * 1.08,
+            curl: tendril.curl,
+            drag: tendril.drag,
+            lift: tendril.lift,
+            alpha: tendril.alpha * 0.74,
+            branch: tendril.branch * 0.18,
+            seed: rand(0, Math.PI * 2),
+            angular: tendril.angular,
+            brush: tendril.brush
+          });
+        }
+
+        function drawCenterVoid() {
+          const voidGradient = ctx.createRadialGradient(state.cx, state.cy, 0, state.cx, state.cy, 32 * state.dpr);
+          voidGradient.addColorStop(0, "rgba(3, 4, 10, 0.68)");
+          voidGradient.addColorStop(0.72, "rgba(3, 4, 10, 0.22)");
+          voidGradient.addColorStop(1, "rgba(3, 4, 10, 0)");
+          ctx.globalCompositeOperation = "source-over";
+          ctx.fillStyle = voidGradient;
+          ctx.beginPath();
+          ctx.arc(state.cx, state.cy, 32 * state.dpr, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        function advanceFrame() {
+          state.tick += 1;
+          clearFrame();
+          emitBrushPath();
+
+          for (let i = state.tendrils.length - 1; i >= 0; i -= 1) {
+            const tendril = state.tendrils[i];
+            const ox = tendril.x;
+            const oy = tendril.y;
+            const speed = Math.max(0.001, Math.hypot(tendril.vx, tendril.vy));
+            const nx = -tendril.vy / speed;
+            const ny = tendril.vx / speed;
+            const curl = Math.sin((tendril.maxLife - tendril.life) * 0.16 + tendril.seed) * tendril.curl;
+
+            tendril.vx += nx * curl * state.dpr;
+            tendril.vy += ny * curl * state.dpr;
+            tendril.vx += rand(-tendril.jitter, tendril.jitter) * state.dpr;
+            tendril.vy += rand(-tendril.jitter, tendril.jitter) * state.dpr;
+            tendril.vy -= tendril.lift * state.dpr * (1 + tendril.width);
+            quantizeVelocity(tendril, tendril.angular);
+
+            const tx = tendril.x + tendril.vx;
+            const ty = tendril.y + tendril.vy;
+            drawBrushSegment(ox, oy, tx, ty, tendril);
+
+            tendril.x = tx;
+            tendril.y = ty;
+            tendril.vx *= tendril.drag;
+            tendril.vy *= tendril.drag;
+            tendril.life -= 1;
+
+            const maxTendrils = Math.round(1600 * (0.72 + state.expansion * 0.34));
+            if (tendril.life > 12 && state.rng() < tendril.branch && state.tendrils.length < maxTendrils) {
+              branchFrom(tendril, speed);
+            }
+
+            if (
+              tendril.life <= 0 ||
+              Math.abs(tendril.vx) + Math.abs(tendril.vy) < 0.015 ||
+              tendril.x < -state.width * 0.1 ||
+              tendril.x > state.width * 1.1 ||
+              tendril.y < -state.height * 0.1 ||
+              tendril.y > state.height * 1.1
+            ) {
+              state.tendrils.splice(i, 1);
+            }
+          }
+          drawCenterVoid();
+        }
+
+        function step() {
+          animationFrame = 0;
+          if (!inView || document.hidden) return;
+          advanceFrame();
+          animationFrame = requestAnimationFrame(step);
+        }
+
+        let animationFrame = 0;
+        let inView = true;
+        function syncMotion() {
+          if (reduceMotion) return;
+          if (inView && !document.hidden && !animationFrame) {
+            animationFrame = requestAnimationFrame(step);
+          } else if ((!inView || document.hidden) && animationFrame) {
+            cancelAnimationFrame(animationFrame);
+            animationFrame = 0;
+          }
+        }
+
+        resize();
+
+        if (!reduceMotion && "IntersectionObserver" in window) {
+          const observer = new IntersectionObserver((entries) => {
+            inView = entries[0].isIntersecting;
+            syncMotion();
+          }, { threshold: 0.08 });
+          observer.observe(canvas);
+          document.addEventListener("visibilitychange", syncMotion);
+          syncMotion();
+        } else if (!reduceMotion) {
+          syncMotion();
+        }
+        window.addEventListener("resize", () => {
+          resize();
+        });
+      }
+
       makePreview(document.getElementById("heroCanvas"), { hue: 190, symmetry: 10, alpha: 0.36 });
       makePreview(document.getElementById("previewCanvas"), { hue: 300, symmetry: 7, alpha: 0.26 });
+      makeBrushSpecimen(document.getElementById("deviceCanvas"));
     })();
   </script>
 </body>
