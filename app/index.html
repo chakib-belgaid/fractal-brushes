@@ -803,6 +803,7 @@
     @media (max-width: 560px) {
       :root {
         --control: 44px;
+        --mobile-dock-height: 148px;
       }
 
       button[data-tooltip]::after {
@@ -810,7 +811,13 @@
       }
 
       .chrome {
+        left: 10px;
+        right: 10px;
+        top: auto;
+        bottom: calc(10px + env(safe-area-inset-bottom));
         display: block;
+        z-index: 12;
+        opacity: 1;
       }
 
       .brand {
@@ -818,16 +825,134 @@
       }
 
       .toolbar {
+        position: relative;
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 6px;
         max-width: none;
-        gap: 5px;
-        padding: 4px;
+        padding: 8px;
+        overflow: hidden;
+        border-radius: 8px;
+        background:
+          linear-gradient(135deg, oklch(84% 0.18 205 / 0.1), transparent 34%),
+          var(--panel-strong);
+        box-shadow:
+          0 -16px 42px oklch(2% 0.02 260 / 0.42),
+          inset 0 1px 0 oklch(100% 0 0 / 0.08);
+        touch-action: manipulation;
       }
 
-      .tool {
-        width: var(--control);
-        height: var(--control);
-        min-width: var(--control);
-        min-height: var(--control);
+      .toolbar::before {
+        position: absolute;
+        left: 13px;
+        right: 13px;
+        top: 6px;
+        height: 1px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, transparent, var(--active), var(--secondary), transparent);
+        content: "";
+        opacity: 0.52;
+      }
+
+      .toolbar .tool {
+        width: 100%;
+        height: 58px;
+        min-width: 0;
+        min-height: 58px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        justify-content: center;
+        border-radius: 8px;
+        background: oklch(18% 0.045 255 / 0.72);
+        transform: translateZ(0);
+      }
+
+      .toolbar .tool svg {
+        width: 18px;
+        height: 18px;
+      }
+
+      .toolbar .tool[data-tooltip]::after {
+        position: static;
+        display: block;
+        width: 100%;
+        max-width: 100%;
+        padding: 0;
+        overflow: hidden;
+        border: 0;
+        color: color-mix(in srgb, var(--text) 74%, var(--muted));
+        background: transparent;
+        box-shadow: none;
+        content: attr(data-mobile-label);
+        font-size: 9px;
+        font-weight: 740;
+        letter-spacing: 0.02em;
+        line-height: 1;
+        opacity: 1;
+        text-overflow: ellipsis;
+        transform: none;
+        white-space: nowrap;
+      }
+
+      .toolbar .tool:active {
+        transform: translateZ(0) scale(0.97);
+      }
+
+      .toolbar .tool:disabled {
+        color: rgba(237, 245, 255, 0.34);
+        background: oklch(15% 0.035 255 / 0.62);
+        box-shadow: inset 0 1px 0 oklch(100% 0 0 / 0.03);
+      }
+
+      .toolbar .tool[aria-pressed="true"],
+      .toolbar .tool[aria-expanded="true"] {
+        border-color: color-mix(in srgb, var(--active) 72%, white 10%);
+        background:
+          radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--active) 24%, transparent), transparent 72%),
+          oklch(20% 0.052 255 / 0.82);
+        box-shadow: inset 0 1px 0 oklch(100% 0 0 / 0.08);
+      }
+
+      .toolbar .tool[aria-pressed="true"]::after,
+      .toolbar .tool[aria-expanded="true"]::after {
+        color: color-mix(in srgb, var(--active) 66%, white 22%);
+      }
+
+      .toolbar #brushToggle {
+        order: 1;
+      }
+
+      .toolbar #colorToggle {
+        order: 2;
+      }
+
+      .toolbar #paramsToggle {
+        order: 3;
+      }
+
+      .toolbar #undo {
+        order: 4;
+      }
+
+      .toolbar #redo {
+        order: 5;
+      }
+
+      .toolbar #exportToggle {
+        order: 6;
+      }
+
+      .toolbar #mirror {
+        order: 7;
+      }
+
+      .toolbar #clear {
+        order: 8;
+      }
+
+      .toolbar #randomize {
+        order: 9;
       }
 
       .panel {
@@ -835,12 +960,14 @@
         opacity: 0.96;
       }
 
-      .aux-drawer-open .params-panel {
-        display: none;
+      .aux-drawer-open .zoom-cluster {
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(8px);
       }
 
       .chrome::after {
-        height: 52px;
+        display: none;
       }
 
       .mini {
@@ -861,35 +988,29 @@
       }
 
       .color-panel,
-      .brush-panel {
-        left: 10px;
-        right: 10px;
-        top: calc(72px + env(safe-area-inset-top));
-        width: auto;
-        overflow: auto;
-      }
-
-      .color-panel {
-        align-content: start;
-        bottom: auto;
-        max-height: calc(100dvh - 340px - env(safe-area-inset-bottom));
-      }
-
-      .brush-panel {
-        align-content: start;
-        bottom: calc(268px + env(safe-area-inset-bottom));
-        max-height: none;
-      }
-
+      .brush-panel,
       .params-panel {
         left: 10px;
         right: 10px;
-        bottom: calc(62px + env(safe-area-inset-bottom));
+        top: auto;
+        bottom: calc(var(--mobile-dock-height) + 20px + env(safe-area-inset-bottom));
         width: auto;
-        max-height: none;
+        align-content: start;
+        max-height: calc(100dvh - var(--mobile-dock-height) - 52px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+        overflow: auto;
+        overscroll-behavior: contain;
+        border-radius: 8px;
+        background:
+          radial-gradient(circle at 14% 0%, color-mix(in srgb, var(--active) 14%, transparent), transparent 42%),
+          var(--panel-strong);
+        box-shadow:
+          0 -18px 54px oklch(2% 0.02 260 / 0.48),
+          inset 0 1px 0 oklch(100% 0 0 / 0.08);
+      }
+
+      .params-panel {
         gap: 9px;
         padding: 9px 10px 10px;
-        overflow: visible;
       }
 
       .params-panel .panel-head {
@@ -919,9 +1040,16 @@
       .export-menu {
         left: 10px;
         right: 10px;
-        top: calc(72px + env(safe-area-inset-top));
-        bottom: auto;
+        top: auto;
+        bottom: calc(var(--mobile-dock-height) + 20px + env(safe-area-inset-bottom));
         width: auto;
+        border-radius: 8px;
+        background:
+          radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--active) 16%, transparent), transparent 42%),
+          var(--panel-strong);
+        box-shadow:
+          0 -18px 54px oklch(2% 0.02 260 / 0.48),
+          inset 0 1px 0 oklch(100% 0 0 / 0.08);
       }
 
       .brush,
@@ -936,13 +1064,19 @@
       .zoom-cluster {
         left: 10px;
         right: 10px;
-        bottom: calc(10px + env(safe-area-inset-bottom));
+        bottom: calc(var(--mobile-dock-height) + 18px + env(safe-area-inset-bottom));
         width: auto;
         grid-template-columns: minmax(0, 1fr) 60px;
+        opacity: 0.94;
+        transition: opacity 160ms var(--ease-out), transform 160ms var(--ease-out);
       }
 
       .zoom-value {
         min-width: 48px;
+      }
+
+      .status {
+        bottom: calc(var(--mobile-dock-height) + 18px + env(safe-area-inset-bottom));
       }
     }
 
@@ -979,31 +1113,31 @@
     </div>
 
     <div class="toolbar" role="toolbar" aria-label="Main menu">
-      <button class="tool" id="undo" type="button" title="Undo" aria-label="Undo" disabled>
+      <button class="tool" id="undo" type="button" title="Undo" aria-label="Undo" data-mobile-label="Undo" disabled>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7H4v5"/><path d="M5 12a8 8 0 1 0 2.35-5.65L4 9.7"/></svg>
       </button>
-      <button class="tool" id="redo" type="button" title="Redo" aria-label="Redo" disabled>
+      <button class="tool" id="redo" type="button" title="Redo" aria-label="Redo" data-mobile-label="Redo" disabled>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 7h5v5"/><path d="M19 12a8 8 0 1 1-2.35-5.65L20 9.7"/></svg>
       </button>
-      <button class="tool" id="exportToggle" type="button" title="Export" aria-label="Export" aria-expanded="false" aria-controls="exportMenu">
+      <button class="tool" id="exportToggle" type="button" title="Export" aria-label="Export" data-mobile-label="Export" aria-expanded="false" aria-controls="exportMenu">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11"/><path d="m7 9 5 5 5-5"/><path d="M5 19h14"/></svg>
       </button>
-      <button class="tool" id="clear" type="button" title="Clear" aria-label="Clear">
+      <button class="tool" id="clear" type="button" title="Clear" aria-label="Clear" data-mobile-label="Clear">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/></svg>
       </button>
-      <button class="tool" id="mirror" type="button" title="Mirror" aria-label="Mirror" aria-pressed="true">
+      <button class="tool" id="mirror" type="button" title="Mirror" aria-label="Mirror" data-mobile-label="Mirror" aria-pressed="true">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16"/><path d="M4 8l6 4-6 4V8Z"/><path d="M20 8l-6 4 6 4V8Z"/></svg>
       </button>
-      <button class="tool" id="brushToggle" type="button" title="Brush menu" aria-label="Brush menu" aria-expanded="true" aria-controls="brushPanel">
+      <button class="tool" id="brushToggle" type="button" title="Brush menu" aria-label="Brush menu" data-mobile-label="Brush" aria-expanded="true" aria-controls="brushPanel">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20c4 0 5.5-1.5 6-4"/><path d="M10 16 20 6a2 2 0 0 0-2.8-2.8L7.2 13.2"/><path d="M7 13c2.6.3 3.7 1.4 4 4"/></svg>
       </button>
-      <button class="tool" id="colorToggle" type="button" title="Color menu" aria-label="Color menu" aria-expanded="true" aria-controls="colorPanel">
+      <button class="tool" id="colorToggle" type="button" title="Color menu" aria-label="Color menu" data-mobile-label="Color" aria-expanded="true" aria-controls="colorPanel">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 1 0 8 8"/><path d="M12 4a4 4 0 0 1 4 4c0 4-4 4-4 8"/><circle cx="12" cy="12" r="1"/></svg>
       </button>
-      <button class="tool" id="paramsToggle" type="button" title="Parameters" aria-label="Parameters" aria-expanded="true" aria-controls="paramsPanel">
+      <button class="tool" id="paramsToggle" type="button" title="Parameters" aria-label="Parameters" data-mobile-label="Tune" aria-expanded="true" aria-controls="paramsPanel">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10"/><path d="M18 7h2"/><circle cx="16" cy="7" r="2"/><path d="M4 17h2"/><path d="M10 17h10"/><circle cx="8" cy="17" r="2"/></svg>
       </button>
-      <button class="tool" id="randomize" type="button" title="Randomize" aria-label="Randomize">
+      <button class="tool" id="randomize" type="button" title="Randomize" aria-label="Randomize" data-mobile-label="Random">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>
       </button>
     </div>
