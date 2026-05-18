@@ -2,23 +2,26 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" href="data:,">
   <title>Fractal Brushes Canvas</title>
   <style>
     :root {
       color-scheme: dark;
-      --bg: #04050a;
-      --panel: rgba(9, 13, 26, 0.74);
-      --panel-strong: rgba(14, 20, 39, 0.9);
-      --text: #edf5ff;
-      --muted: #8d9bb2;
-      --line: rgba(180, 205, 255, 0.16);
-      --active: #38e8ff;
-      --active-soft: rgba(56, 232, 255, 0.18);
-      --secondary: #ff4fd8;
-      --shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
-      --control: 42px;
+      --bg: oklch(7% 0.033 265);
+      --panel: oklch(13% 0.04 255 / 0.78);
+      --panel-strong: oklch(17% 0.045 255 / 0.92);
+      --text: oklch(96% 0.016 235);
+      --muted: oklch(69% 0.042 245);
+      --line: oklch(78% 0.08 230 / 0.16);
+      --active: oklch(84% 0.18 205);
+      --active-soft: oklch(84% 0.18 205 / 0.18);
+      --secondary: oklch(70% 0.22 315);
+      --focus: oklch(84% 0.18 205 / 0.58);
+      --shadow: 0 18px 48px oklch(2% 0.02 260 / 0.46);
+      --control: 44px;
+      --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+      --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
     }
 
     * {
@@ -33,9 +36,9 @@
       overflow: hidden;
       background: var(--bg);
       color: var(--text);
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       overscroll-behavior: none;
-      touch-action: none;
+      touch-action: manipulation;
     }
 
     body::before {
@@ -49,7 +52,7 @@
         linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
         linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
       background-size: 42px 42px;
-      mask-image: radial-gradient(ellipse at center, #000 0%, rgba(0, 0, 0, 0.72) 42%, transparent 84%);
+      mask-image: radial-gradient(ellipse at center, rgb(8 11 18) 0%, rgb(8 11 18 / 0.72) 42%, transparent 84%);
     }
 
     #stage {
@@ -112,15 +115,16 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      opacity: 0.64;
-      transition: opacity 180ms ease;
+      opacity: 0.72;
+      transition: opacity 180ms var(--ease-out);
     }
 
-    .chrome:hover,
+    .chrome::after {
+      display: none;
+    }
+
     .chrome:focus-within,
-    .panel:hover,
     .panel:focus-within,
-    .zoom-cluster:hover,
     .zoom-cluster:focus-within {
       opacity: 1;
     }
@@ -205,6 +209,7 @@
 
     button,
     input {
+      color: inherit;
       font: inherit;
     }
 
@@ -233,7 +238,7 @@
       pointer-events: none;
       text-align: center;
       transform: translate(-50%, -3px);
-      transition: opacity 140ms ease, transform 140ms ease;
+      transition: opacity 140ms var(--ease-out), transform 140ms var(--ease-out);
       white-space: normal;
     }
 
@@ -256,21 +261,21 @@
       background: rgba(255, 255, 255, 0.055);
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
       cursor: pointer;
+      touch-action: manipulation;
       appearance: none;
-      transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, color 160ms ease, box-shadow 160ms ease;
+      transition: transform 160ms var(--ease-out), border-color 160ms var(--ease-out), background 160ms var(--ease-out), color 160ms var(--ease-out), box-shadow 160ms var(--ease-out);
     }
 
-    .tool:hover,
     .tool:focus-visible {
       border-color: color-mix(in srgb, var(--active) 58%, white 12%);
-      color: #fff;
+      color: oklch(99% 0.006 220);
       background: var(--active-soft);
-      outline: none;
-      transform: translateY(-1px);
+      outline: 3px solid var(--focus);
+      outline-offset: 2px;
     }
 
     .tool:active {
-      transform: translateY(0);
+      transform: scale(0.97);
     }
 
     .tool[aria-pressed="true"],
@@ -325,6 +330,7 @@
       padding: 10px;
       min-width: 236px;
       opacity: 0.74;
+      touch-action: pan-y;
     }
 
     .panel[hidden],
@@ -350,10 +356,6 @@
       width: 280px;
     }
 
-    .params-panel .panel-head {
-      cursor: default;
-    }
-
     .panel-head {
       display: flex;
       align-items: center;
@@ -377,10 +379,10 @@
     }
 
     .mini {
-      width: 28px;
-      height: 28px;
-      min-width: 28px;
-      min-height: 28px;
+      width: 44px;
+      height: 44px;
+      min-width: 44px;
+      min-height: 44px;
       border-radius: 7px;
     }
 
@@ -401,16 +403,18 @@
       grid-template-columns: 24px 1fr;
       align-items: center;
       gap: 9px;
+      padding: 0 10px;
       border: 1px solid rgba(190, 215, 255, 0.14);
       border-radius: 8px;
       color: var(--text);
       background: rgba(255, 255, 255, 0.052);
       cursor: pointer;
+      touch-action: manipulation;
       appearance: none;
       text-align: left;
+      transition: transform 150ms var(--ease-out), border-color 150ms var(--ease-out), background 150ms var(--ease-out);
     }
 
-    .brush:hover,
     .brush:focus-visible,
     .brush[aria-pressed="true"] {
       border-color: color-mix(in srgb, var(--active) 62%, white 10%);
@@ -418,12 +422,21 @@
       outline: none;
     }
 
+    .brush:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 2px;
+    }
+
+    .brush:active {
+      transform: scale(0.985);
+    }
+
     .brush-dot {
       width: 18px;
       height: 18px;
       border-radius: 50%;
       background:
-        radial-gradient(circle at 50% 50%, #fff 0 10%, transparent 12%),
+        radial-gradient(circle at 50% 50%, oklch(99% 0.006 220) 0 10%, transparent 12%),
         conic-gradient(from 20deg, var(--dot-a), var(--dot-b), var(--dot-c), var(--dot-a));
       box-shadow: 0 0 14px color-mix(in srgb, var(--dot-a) 42%, transparent);
     }
@@ -467,11 +480,12 @@
 
     input[type="range"] {
       width: 100%;
-      height: 24px;
+      height: 28px;
       margin: 0;
       accent-color: var(--active);
       background: transparent;
       cursor: pointer;
+      touch-action: manipulation;
     }
 
     input[type="range"]::-webkit-slider-runnable-track {
@@ -505,6 +519,7 @@
       border: 0;
       border-radius: 50%;
       cursor: crosshair;
+      touch-action: none;
       appearance: none;
       background:
         radial-gradient(circle at center, rgba(6, 8, 16, 0.98) 0 47%, transparent 48% 100%),
@@ -535,7 +550,7 @@
       box-shadow: 0 0 16px hsl(var(--handle-hue) 100% 62% / 0.48);
       pointer-events: none;
       transform: translate(-50%, -50%);
-      transition: width 120ms ease, height 120ms ease, opacity 120ms ease;
+      transition: width 120ms var(--ease-out), height 120ms var(--ease-out), opacity 120ms var(--ease-out);
     }
 
     .hue-handle.primary {
@@ -581,6 +596,10 @@
       background: rgba(255, 255, 255, 0.045);
     }
 
+    .target-switch[data-color-mode="single"] {
+      display: none;
+    }
+
     .segment {
       height: 30px;
       border: 0;
@@ -591,11 +610,21 @@
       font-size: 12px;
       font-weight: 700;
       appearance: none;
+      transition: transform 150ms var(--ease-out), background 150ms var(--ease-out), color 150ms var(--ease-out);
     }
 
     .segment[aria-pressed="true"] {
-      color: #fff;
+      color: oklch(99% 0.006 220);
       background: color-mix(in srgb, var(--target-color) 24%, transparent);
+    }
+
+    .segment:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 2px;
+    }
+
+    .segment:active {
+      transform: scale(0.97);
     }
 
     .export-menu {
@@ -615,17 +644,23 @@
       color: var(--text);
       background: rgba(255, 255, 255, 0.052);
       cursor: pointer;
+      touch-action: manipulation;
       text-align: left;
       font-size: 13px;
       font-weight: 680;
       appearance: none;
+      transition: transform 150ms var(--ease-out), border-color 150ms var(--ease-out), background 150ms var(--ease-out);
     }
 
-    .export-option:hover,
     .export-option:focus-visible {
       border-color: color-mix(in srgb, var(--active) 58%, white 12%);
       background: var(--active-soft);
-      outline: none;
+      outline: 3px solid var(--focus);
+      outline-offset: 2px;
+    }
+
+    .export-option:active {
+      transform: scale(0.985);
     }
 
     .export-option:disabled {
@@ -647,6 +682,28 @@
       transform: translateX(-50%);
     }
 
+    @media (hover: hover) and (pointer: fine) {
+      .chrome:hover,
+      .panel:hover,
+      .zoom-cluster:hover {
+        opacity: 1;
+      }
+
+      .tool:hover {
+        border-color: color-mix(in srgb, var(--active) 58%, white 12%);
+        color: oklch(99% 0.006 220);
+        background: var(--active-soft);
+        outline: none;
+        transform: translateY(-1px);
+      }
+
+      .brush:hover,
+      .export-option:hover {
+        border-color: color-mix(in srgb, var(--active) 62%, white 10%);
+        background: color-mix(in srgb, var(--active) 12%, transparent);
+      }
+    }
+
     .sr-only {
       position: absolute;
       width: 1px;
@@ -660,15 +717,31 @@
 
     @media (max-width: 880px) {
       :root {
-        --control: 40px;
+        --control: 44px;
       }
 
       .chrome {
         left: 10px;
         right: 10px;
-        top: 10px;
-        align-items: flex-start;
+        top: calc(10px + env(safe-area-inset-top));
+        display: grid;
+        grid-template-columns: 44px minmax(0, 1fr);
+        align-items: start;
         gap: 7px;
+        opacity: 0.9;
+      }
+
+      .chrome::after {
+        position: absolute;
+        top: 0;
+        right: 0;
+        display: block;
+        width: 28px;
+        height: calc(var(--control) + 10px);
+        border-radius: 8px;
+        background: linear-gradient(90deg, transparent, var(--panel));
+        content: "";
+        pointer-events: none;
       }
 
       .brand {
@@ -684,7 +757,17 @@
       }
 
       .toolbar {
-        flex-wrap: wrap;
+        min-width: 0;
+        overflow-x: auto;
+        overflow-y: hidden;
+        flex-wrap: nowrap;
+        scrollbar-width: none;
+        touch-action: pan-x;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .toolbar::-webkit-scrollbar {
+        display: none;
       }
 
       .color-panel {
@@ -718,53 +801,158 @@
     }
 
     @media (max-width: 560px) {
+      :root {
+        --control: 44px;
+      }
+
+      button[data-tooltip]::after {
+        display: none;
+      }
+
+      .chrome {
+        display: block;
+      }
+
+      .brand {
+        display: none;
+      }
+
       .toolbar {
-        max-width: calc(100vw - 64px);
+        max-width: none;
+        gap: 5px;
+        padding: 4px;
       }
 
       .tool {
-        width: 38px;
-        height: 38px;
-        min-width: 38px;
-        min-height: 38px;
+        width: var(--control);
+        height: var(--control);
+        min-width: var(--control);
+        min-height: var(--control);
       }
 
       .panel {
-        overflow: auto;
+        min-width: 0;
+        opacity: 0.96;
+      }
+
+      .aux-drawer-open .params-panel {
+        display: none;
+      }
+
+      .chrome::after {
+        height: 52px;
+      }
+
+      .mini {
+        width: 44px;
+        height: 44px;
+        min-width: 44px;
+        min-height: 44px;
       }
 
       .hue-ring {
-        --handle-radius: 54px;
-        width: 138px;
-        height: 138px;
+        --handle-radius: 58px;
+        width: 150px;
+        height: 150px;
       }
 
       .hue-ring::before {
         inset: 30px;
       }
 
+      .color-panel,
+      .brush-panel {
+        left: 10px;
+        right: 10px;
+        top: calc(72px + env(safe-area-inset-top));
+        width: auto;
+        overflow: auto;
+      }
+
       .color-panel {
-        max-height: 260px;
+        align-content: start;
+        bottom: auto;
+        max-height: calc(100dvh - 340px - env(safe-area-inset-bottom));
       }
 
       .brush-panel {
-        max-height: 170px;
+        align-content: start;
+        bottom: calc(268px + env(safe-area-inset-bottom));
+        max-height: none;
       }
 
       .params-panel {
-        max-height: 216px;
-        overflow: auto;
+        left: 10px;
+        right: 10px;
+        bottom: calc(62px + env(safe-area-inset-bottom));
+        width: auto;
+        max-height: none;
+        gap: 9px;
+        padding: 9px 10px 10px;
+        overflow: visible;
+      }
+
+      .params-panel .panel-head {
+        min-height: 18px;
+      }
+
+      .params-panel .panel-title,
+      .field-label {
+        font-size: 10px;
+        letter-spacing: 0.12em;
+      }
+
+      .slider-row {
+        grid-template-columns: minmax(0, 1fr) 48px;
+      }
+
+      input[type="range"] {
+        height: 24px;
+      }
+
+      input[type="range"]::-webkit-slider-thumb {
+        width: 18px;
+        height: 18px;
+        margin-top: -7px;
       }
 
       .export-menu {
         left: 10px;
-        top: 108px;
+        right: 10px;
+        top: calc(72px + env(safe-area-inset-top));
         bottom: auto;
-        width: min(260px, calc(100vw - 20px));
+        width: auto;
+      }
+
+      .brush,
+      .export-option {
+        min-height: 44px;
+      }
+
+      .segment {
+        height: 40px;
+      }
+
+      .zoom-cluster {
+        left: 10px;
+        right: 10px;
+        bottom: calc(10px + env(safe-area-inset-bottom));
+        width: auto;
+        grid-template-columns: minmax(0, 1fr) 60px;
       }
 
       .zoom-value {
         min-width: 48px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        transition-duration: 1ms !important;
+        animation-duration: 1ms !important;
+        animation-iteration-count: 1 !important;
       }
     }
   </style>
@@ -774,7 +962,6 @@
     <canvas id="art" aria-label="Fractal Brushes drawing canvas"></canvas>
   </div>
   <div class="grain" aria-hidden="true"></div>
-  <div class="hint" aria-hidden="true">tendril engine &middot; fractal brushes</div>
 
   <aside class="chrome" aria-label="Canvas controls">
     <div class="brand" aria-hidden="true">
@@ -813,6 +1000,9 @@
       <button class="tool" id="colorToggle" type="button" title="Color menu" aria-label="Color menu" aria-expanded="true" aria-controls="colorPanel">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 1 0 8 8"/><path d="M12 4a4 4 0 0 1 4 4c0 4-4 4-4 8"/><circle cx="12" cy="12" r="1"/></svg>
       </button>
+      <button class="tool" id="paramsToggle" type="button" title="Parameters" aria-label="Parameters" aria-expanded="true" aria-controls="paramsPanel">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10"/><path d="M18 7h2"/><circle cx="16" cy="7" r="2"/><path d="M4 17h2"/><path d="M10 17h10"/><circle cx="8" cy="17" r="2"/></svg>
+      </button>
       <button class="tool" id="randomize" type="button" title="Randomize" aria-label="Randomize">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>
       </button>
@@ -826,8 +1016,11 @@
   </div>
 
   <aside class="panel params-panel" id="paramsPanel" aria-label="Brush parameters">
-    <div class="panel-head">
+    <div class="panel-head" data-drag-handle>
       <span class="panel-title">Parameters</span>
+      <button class="tool mini" id="closeParamsPanel" type="button" title="Close parameters" aria-label="Close parameters">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
     </div>
     <div class="field">
       <span class="field-label">Brush size</span>
@@ -880,6 +1073,10 @@
         <button class="segment mode" data-mode="single" type="button" aria-label="Single color" aria-pressed="true">Single</button>
         <button class="segment mode" data-mode="blend" type="button" aria-label="Blend colors" aria-pressed="false">Blend</button>
       </div>
+      <div class="segmented target-switch" role="group" aria-label="Blend target">
+        <button class="segment target" data-target="primary" type="button" aria-label="Adjust primary hue" aria-pressed="true">Primary</button>
+        <button class="segment target" data-target="blend" type="button" aria-label="Adjust blend hue" aria-pressed="false">Blend</button>
+      </div>
     </div>
   </aside>
 
@@ -907,14 +1104,19 @@
         mirror: document.getElementById("mirror"),
         brushToggle: document.getElementById("brushToggle"),
         colorToggle: document.getElementById("colorToggle"),
+        paramsToggle: document.getElementById("paramsToggle"),
         randomize: document.getElementById("randomize"),
+        paramsPanel: document.getElementById("paramsPanel"),
         brushPanel: document.getElementById("brushPanel"),
         colorPanel: document.getElementById("colorPanel"),
+        closeParamsPanel: document.getElementById("closeParamsPanel"),
         closeBrushPanel: document.getElementById("closeBrushPanel"),
         closeColorPanel: document.getElementById("closeColorPanel"),
         brushList: document.getElementById("brushList"),
         hueRing: document.getElementById("hueRing"),
         modes: Array.from(document.querySelectorAll(".mode")),
+        targets: Array.from(document.querySelectorAll(".target")),
+        targetSwitch: document.querySelector(".target-switch"),
         zoom: document.getElementById("zoom"),
         zoomValue: document.getElementById("zoomValue"),
         size: document.getElementById("size"),
@@ -930,7 +1132,7 @@
         fairy: {
           name: "Fairy",
           hues: [292, 188],
-          dot: ["#f8a7ff", "#9ff8ff", "#fff7bf"],
+          dot: ["#f8a7ff", "#9ff8ff", "#f7f2bf"],
           count: [3, 5],
           spread: 1.25,
           velocity: [0.22, 1.45],
@@ -949,7 +1151,7 @@
         flame: {
           name: "Flame",
           hues: [28, 348],
-          dot: ["#ffb13d", "#ff4a3d", "#fff3c8"],
+          dot: ["#ffb13d", "#ff4a3d", "#f7efc8"],
           count: [2, 4],
           spread: 0.58,
           velocity: [0.38, 1.58],
@@ -969,7 +1171,7 @@
         thunder: {
           name: "Thunder",
           hues: [195, 264],
-          dot: ["#38e8ff", "#a77dff", "#ffffff"],
+          dot: ["#38e8ff", "#a77dff", "#f7fbff"],
           count: [2, 4],
           spread: 0.46,
           velocity: [0.8, 2.45],
@@ -989,7 +1191,7 @@
         silk: {
           name: "Silk Ribbon",
           hues: [326, 196],
-          dot: ["#ff6fd8", "#77f5ff", "#ffffff"],
+          dot: ["#ff6fd8", "#77f5ff", "#f7fbff"],
           count: [4, 7],
           spread: 0.5,
           velocity: [0.28, 1.32],
@@ -1008,7 +1210,7 @@
         comet: {
           name: "Comet Trail",
           hues: [205, 44],
-          dot: ["#6de7ff", "#ffd166", "#ffffff"],
+          dot: ["#6de7ff", "#ffd166", "#f7fbff"],
           count: [5, 8],
           spread: 0.34,
           velocity: [1.1, 2.85],
@@ -1046,7 +1248,7 @@
         crystal: {
           name: "Crystal Filament",
           hues: [188, 238],
-          dot: ["#aefcff", "#8da2ff", "#ffffff"],
+          dot: ["#aefcff", "#8da2ff", "#f7fbff"],
           count: [2, 4],
           spread: 0.38,
           velocity: [0.72, 2.1],
@@ -1104,7 +1306,7 @@
         frost: {
           name: "Frost",
           hues: [188, 214],
-          dot: ["#d8fbff", "#77c8ff", "#ffffff"],
+          dot: ["#d8fbff", "#77c8ff", "#f7fbff"],
           count: [2, 5],
           spread: 0.54,
           velocity: [0.58, 1.86],
@@ -1124,7 +1326,7 @@
         plasma: {
           name: "Plasma",
           hues: [310, 188],
-          dot: ["#ff38d8", "#38e8ff", "#ffffff"],
+          dot: ["#ff38d8", "#38e8ff", "#f7fbff"],
           count: [5, 8],
           spread: 0.86,
           velocity: [0.62, 2.35],
@@ -1173,7 +1375,8 @@
         history: [],
         redo: [],
         exporting: false,
-        statusTimer: null
+        statusTimer: null,
+        mobileLayout: null
       };
 
       const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -1181,6 +1384,36 @@
       const activeColor = () => `hsl(${Math.round(state.hue)} 100% 62%)`;
       const secondaryColor = () => `hsl(${Math.round(state.hue2)} 100% 62%)`;
       const targetColor = () => state.colorTarget === "primary" ? activeColor() : secondaryColor();
+      const isMobileLayout = () => window.innerWidth <= 560;
+
+      function resetPanelPosition(panel) {
+        panel.style.left = "";
+        panel.style.top = "";
+        panel.style.right = "";
+        panel.style.bottom = "";
+      }
+
+      function closeMobileDrawers() {
+        ui.paramsPanel.hidden = true;
+        ui.brushPanel.hidden = true;
+        ui.colorPanel.hidden = true;
+      }
+
+      function applyResponsiveMode() {
+        const mobile = isMobileLayout();
+        if (state.mobileLayout === mobile) return;
+        state.mobileLayout = mobile;
+        [ui.paramsPanel, ui.brushPanel, ui.colorPanel].forEach(resetPanelPosition);
+        ui.exportMenu.hidden = true;
+
+        if (mobile) {
+          closeMobileDrawers();
+        } else {
+          ui.paramsPanel.hidden = false;
+          ui.brushPanel.hidden = false;
+          ui.colorPanel.hidden = false;
+        }
+      }
 
       function createBrushControls() {
         ui.brushList.innerHTML = "";
@@ -1216,11 +1449,19 @@
         root.style.setProperty("--target-color", targetColor());
         root.style.setProperty("--primary-hue", String(Math.round(state.hue)));
         root.style.setProperty("--blend-hue", String(Math.round(state.hue2)));
+        document.body.classList.toggle("aux-drawer-open", isMobileLayout() && (!ui.brushPanel.hidden || !ui.colorPanel.hidden || !ui.exportMenu.hidden));
         ui.hueRing.dataset.target = state.colorTarget;
         ui.hueRing.dataset.colorMode = state.colorMode;
+        ui.hueRing.setAttribute("role", "slider");
+        ui.hueRing.setAttribute("aria-valuemin", "0");
+        ui.hueRing.setAttribute("aria-valuemax", "359");
+        ui.hueRing.setAttribute("aria-valuenow", String(Math.round(state.colorTarget === "blend" ? state.hue2 : state.hue)));
+        ui.hueRing.setAttribute("aria-valuetext", `${state.colorTarget === "blend" ? "Blend" : "Primary"} hue ${Math.round(state.colorTarget === "blend" ? state.hue2 : state.hue)} degrees`);
+        ui.targetSwitch.dataset.colorMode = state.colorMode;
         ui.undo.disabled = state.history.length === 0;
         ui.redo.disabled = state.redo.length === 0;
         ui.mirror.setAttribute("aria-pressed", String(state.mirror));
+        ui.paramsToggle.setAttribute("aria-expanded", String(!ui.paramsPanel.hidden));
         ui.brushToggle.setAttribute("aria-expanded", String(!ui.brushPanel.hidden));
         ui.colorToggle.setAttribute("aria-expanded", String(!ui.colorPanel.hidden));
         ui.exportToggle.setAttribute("aria-expanded", String(!ui.exportMenu.hidden));
@@ -1237,6 +1478,10 @@
         });
         ui.modes.forEach((button) => {
           button.setAttribute("aria-pressed", String(button.dataset.mode === state.colorMode));
+        });
+        ui.targets.forEach((button) => {
+          button.setAttribute("aria-pressed", String(button.dataset.target === state.colorTarget));
+          button.disabled = state.colorMode !== "blend";
         });
         ui.exportOptions.forEach((button) => {
           button.disabled = state.exporting;
@@ -1297,6 +1542,7 @@
         if (previous) {
           ctx.drawImage(previous, 0, 0, previousWidth, previousHeight, 0, 0, state.width, state.height);
         }
+        applyResponsiveMode();
         clampAllPanels();
         applyZoom();
       }
@@ -1591,6 +1837,37 @@
         updateUi();
       }
 
+      function setColorTarget(target) {
+        if (state.colorMode !== "blend") {
+          state.colorTarget = "primary";
+        } else {
+          state.colorTarget = target === "blend" ? "blend" : "primary";
+        }
+        updateUi();
+      }
+
+      function stepTargetHue(delta) {
+        const currentHue = state.colorTarget === "blend" ? state.hue2 : state.hue;
+        setTargetHue(currentHue + delta);
+      }
+
+      function handleHueKeydown(event) {
+        const keyActions = {
+          ArrowRight: () => stepTargetHue(5),
+          ArrowUp: () => stepTargetHue(5),
+          ArrowLeft: () => stepTargetHue(-5),
+          ArrowDown: () => stepTargetHue(-5),
+          PageUp: () => stepTargetHue(30),
+          PageDown: () => stepTargetHue(-30),
+          Home: () => setTargetHue(0),
+          End: () => setTargetHue(359)
+        };
+        const action = keyActions[event.key];
+        if (!action) return;
+        event.preventDefault();
+        action();
+      }
+
       function setSize(size) {
         state.size = clamp(Number(size), 1, 18);
         updateUi();
@@ -1662,9 +1939,19 @@
       }
 
       function togglePanel(panel, toggle, force) {
-        panel.hidden = force === undefined ? !panel.hidden : !force;
-        toggle.setAttribute("aria-expanded", String(!panel.hidden));
-        if (!panel.hidden) clampPanel(panel);
+        const shouldShow = force === undefined ? panel.hidden : Boolean(force);
+        if (isMobileLayout() && shouldShow) {
+          closeMobileDrawers();
+          ui.exportMenu.hidden = true;
+        }
+        panel.hidden = !shouldShow;
+        toggle.setAttribute("aria-expanded", String(shouldShow));
+        if (shouldShow && !isMobileLayout()) clampPanel(panel);
+        updateUi();
+        if (shouldShow && isMobileLayout()) {
+          const closeButton = panel.querySelector(".mini");
+          if (closeButton) closeButton.focus({ preventScroll: true });
+        }
       }
 
       function showStatus(message) {
@@ -1680,22 +1967,45 @@
         return new Date().toISOString().replace(/[:.]/g, "-");
       }
 
-      function downloadCanvas(sourceCanvas, label) {
-        const link = document.createElement("a");
-        link.download = `fractal-brushes-${label}-${timestamp()}.png`;
-        link.href = sourceCanvas.toDataURL("image/png");
-        link.click();
+      function canvasToBlob(sourceCanvas) {
+        return new Promise((resolve) => {
+          if (sourceCanvas.toBlob) {
+            sourceCanvas.toBlob(resolve, "image/png");
+            return;
+          }
+          const dataUrl = sourceCanvas.toDataURL("image/png");
+          const binary = atob(dataUrl.split(",")[1] || "");
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i += 1) {
+            bytes[i] = binary.charCodeAt(i);
+          }
+          resolve(new Blob([bytes], { type: "image/png" }));
+        });
       }
 
-      function exportPngPreset(presetName) {
+      async function downloadCanvas(sourceCanvas, label) {
+        const blob = await canvasToBlob(sourceCanvas);
+        if (!blob) throw new Error("PNG export failed");
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.download = `fractal-brushes-${label}-${timestamp()}.png`;
+        link.href = url;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 0);
+      }
+
+      async function exportPngPreset(presetName) {
         if (state.exporting) return;
         const preset = exportPresets[presetName];
         if (!preset) return;
         state.exporting = true;
         updateUi();
+        await new Promise((resolve) => requestAnimationFrame(resolve));
         try {
           if (presetName === "current") {
-            downloadCanvas(canvas, preset.label);
+            await downloadCanvas(canvas, preset.label);
           } else {
             const out = document.createElement("canvas");
             out.width = preset.width;
@@ -1710,7 +2020,7 @@
             outCtx.imageSmoothingEnabled = true;
             outCtx.imageSmoothingQuality = "high";
             outCtx.drawImage(canvas, dx, dy, drawWidth, drawHeight);
-            downloadCanvas(out, preset.label);
+            await downloadCanvas(out, preset.label);
           }
           showStatus("PNG export ready.");
         } catch (error) {
@@ -1776,36 +2086,29 @@
         panel.style.left = `${left}px`;
         panel.style.top = `${top}px`;
         panel.style.right = "auto";
+        panel.style.bottom = "auto";
       }
 
       function clampAllPanels() {
-        if (window.innerWidth <= 560) {
-          const margin = 10;
-          const chromeRect = document.querySelector(".chrome").getBoundingClientRect();
-          let top = Math.max(104, chromeRect.bottom + margin);
-          [ui.colorPanel, ui.brushPanel].forEach((panel) => {
-            if (panel.hidden) return;
-            panel.style.left = `${margin}px`;
-            panel.style.top = `${top}px`;
-            panel.style.right = "auto";
-            const rect = panel.getBoundingClientRect();
-            top = Math.min(window.innerHeight - margin, rect.bottom + margin);
-          });
+        if (isMobileLayout()) {
+          [ui.paramsPanel, ui.brushPanel, ui.colorPanel].forEach(resetPanelPosition);
           return;
         }
-        [ui.brushPanel, ui.colorPanel].forEach((panel) => {
+        [ui.paramsPanel, ui.brushPanel, ui.colorPanel].forEach((panel) => {
           if (!panel.hidden) clampPanel(panel);
         });
       }
 
       function makeDraggable(panel) {
         const handle = panel.querySelector("[data-drag-handle]");
+        if (!handle) return;
         let startX = 0;
         let startY = 0;
         let panelX = 0;
         let panelY = 0;
 
         handle.addEventListener("pointerdown", (event) => {
+          if (isMobileLayout()) return;
           if (event.target.closest("button, input")) return;
           const rect = panel.getBoundingClientRect();
           startX = event.clientX;
@@ -1815,6 +2118,7 @@
           panel.style.left = `${panelX}px`;
           panel.style.top = `${panelY}px`;
           panel.style.right = "auto";
+          panel.style.bottom = "auto";
           handle.setPointerCapture(event.pointerId);
 
           const move = (moveEvent) => {
@@ -1837,6 +2141,31 @@
         });
       }
 
+      function closeTransientControls(restoreFocus = false) {
+        let focusTarget = null;
+        if (!ui.exportMenu.hidden) {
+          ui.exportMenu.hidden = true;
+          focusTarget = ui.exportToggle;
+        }
+        if (!ui.paramsPanel.hidden && (isMobileLayout() || ui.paramsPanel.contains(document.activeElement))) {
+          ui.paramsPanel.hidden = true;
+          focusTarget = ui.paramsToggle;
+        }
+        if (!ui.brushPanel.hidden && (isMobileLayout() || ui.brushPanel.contains(document.activeElement))) {
+          ui.brushPanel.hidden = true;
+          focusTarget = ui.brushToggle;
+        }
+        if (!ui.colorPanel.hidden && (isMobileLayout() || ui.colorPanel.contains(document.activeElement))) {
+          ui.colorPanel.hidden = true;
+          focusTarget = ui.colorToggle;
+        }
+        updateUi();
+        if (restoreFocus && focusTarget) {
+          focusTarget.focus({ preventScroll: true });
+        }
+        return Boolean(focusTarget);
+      }
+
       stage.addEventListener("pointerdown", startPainting);
       stage.addEventListener("pointermove", continuePainting);
       window.addEventListener("pointerup", stopPainting);
@@ -1846,8 +2175,15 @@
       ui.undo.addEventListener("click", undo);
       ui.redo.addEventListener("click", redo);
       ui.exportToggle.addEventListener("click", () => {
-        ui.exportMenu.hidden = !ui.exportMenu.hidden;
+        const shouldShow = ui.exportMenu.hidden;
+        if (isMobileLayout() && shouldShow) {
+          closeMobileDrawers();
+        }
+        ui.exportMenu.hidden = !shouldShow;
         updateUi();
+        if (shouldShow) {
+          ui.exportOptions[0].focus({ preventScroll: true });
+        }
       });
       ui.exportOptions.forEach((button) => {
         button.addEventListener("click", () => {
@@ -1858,8 +2194,10 @@
       });
       ui.clear.addEventListener("click", clearArt);
       ui.mirror.addEventListener("click", toggleMirror);
+      ui.paramsToggle.addEventListener("click", () => togglePanel(ui.paramsPanel, ui.paramsToggle));
       ui.brushToggle.addEventListener("click", () => togglePanel(ui.brushPanel, ui.brushToggle));
       ui.colorToggle.addEventListener("click", () => togglePanel(ui.colorPanel, ui.colorToggle));
+      ui.closeParamsPanel.addEventListener("click", () => togglePanel(ui.paramsPanel, ui.paramsToggle, false));
       ui.closeBrushPanel.addEventListener("click", () => togglePanel(ui.brushPanel, ui.brushToggle, false));
       ui.closeColorPanel.addEventListener("click", () => togglePanel(ui.colorPanel, ui.colorToggle, false));
       ui.zoom.addEventListener("input", (event) => setZoom(Number(event.target.value) / 100));
@@ -1873,9 +2211,26 @@
           setColorMode(button.dataset.mode);
         });
       });
+      ui.targets.forEach((button) => {
+        button.addEventListener("click", () => {
+          setColorTarget(button.dataset.target);
+        });
+      });
       ui.hueRing.addEventListener("pointerdown", beginHueDrag);
+      ui.hueRing.addEventListener("keydown", handleHueKeydown);
+
+      document.addEventListener("pointerdown", (event) => {
+        if (event.target.closest("#exportMenu, #exportToggle, #paramsPanel, #paramsToggle, #brushPanel, #brushToggle, #colorPanel, #colorToggle")) return;
+        if (!ui.exportMenu.hidden || (isMobileLayout() && (!ui.paramsPanel.hidden || !ui.brushPanel.hidden || !ui.colorPanel.hidden))) {
+          closeTransientControls(false);
+        }
+      });
 
       window.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && closeTransientControls(true)) {
+          event.preventDefault();
+          return;
+        }
         const key = event.key.toLowerCase();
         const tag = document.activeElement && document.activeElement.tagName;
         if (tag === "INPUT") return;
@@ -1918,6 +2273,7 @@
       window.addEventListener("resize", resize);
       createBrushControls();
       hydrateTooltips();
+      makeDraggable(ui.paramsPanel);
       makeDraggable(ui.brushPanel);
       makeDraggable(ui.colorPanel);
       resize();
