@@ -1286,8 +1286,8 @@
           name: "Flame",
           hues: [28, 348],
           dot: ["#ffb13d", "#ff4a3d", "#f7efc8"],
-          count: [2, 4],
-          spread: 0.58,
+          count: [2, 3],
+          spread: 0.72,
           velocity: [0.38, 1.58],
           life: [26, 62],
           width: [0.46, 0.92],
@@ -1296,11 +1296,12 @@
           branch: 0.002,
           drag: 0.956,
           lift: [0.1, 0.65],
-          alpha: 0.105,
+          alpha: 0.074,
           hueShift: [-14, 24],
           cap: "round",
-          maxTendrils: 900,
-          layers: [[3.8, -10, 38, 0.08], [1.85, 8, 50, 0.16], [0.62, 26, 64, 0.28], [0.12, 0, 88, 0.18, "warm"]]
+          maxTendrils: 760,
+          spacing: 1.22,
+          layers: [[3.4, -10, 38, 0.06], [1.5, 8, 50, 0.11], [0.48, 26, 64, 0.18], [0.08, 0, 86, 0.08, "warm"]]
         },
         thunder: {
           name: "Thunder",
@@ -1326,39 +1327,45 @@
           name: "Silk Ribbon",
           hues: [326, 196],
           dot: ["#ff6fd8", "#77f5ff", "#f7fbff"],
-          count: [4, 7],
-          spread: 0.5,
+          count: [2, 4],
+          spread: 0.64,
           velocity: [0.28, 1.32],
-          life: [92, 162],
-          width: [0.78, 1.42],
+          life: [72, 128],
+          width: [0.58, 1.1],
           jitter: 0.08,
           curl: 0.19,
           branch: 0.001,
           drag: 0.981,
           lift: [-0.03, 0.03],
-          alpha: 0.13,
+          alpha: 0.068,
           hueShift: [-18, 34],
           cap: "round",
-          layers: [[5.8, -12, 54, 0.09], [2.9, 14, 66, 0.18], [0.78, 0, 78, 0.42], [0.16, 0, 96, 0.2, "white"]]
+          composite: "screen",
+          maxTendrils: 820,
+          spacing: 1.58,
+          layers: [[4.6, -12, 54, 0.045], [1.9, 14, 66, 0.09], [0.46, 0, 76, 0.2], [0.06, 0, 90, 0.045, "white"]]
         },
         comet: {
           name: "Comet Trail",
           hues: [205, 44],
           dot: ["#6de7ff", "#ffd166", "#f7fbff"],
-          count: [5, 8],
-          spread: 0.14,
+          count: [3, 4],
+          spread: 0.28,
           velocity: [1.1, 2.85],
-          life: [45, 104],
-          width: [0.04, 1.18],
+          life: [36, 82],
+          width: [0.04, 0.9],
           jitter: 0.18,
           curl: 0.07,
-          branch: 0.012,
+          branch: 0.007,
           drag: 0.952,
           lift: [0, 0.03],
-          alpha: 0.19,
+          alpha: 0.078,
           hueShift: [-16, 22],
           cap: "round",
-          layers: [[6.8, -12, 50, 0.1], [2.2, 18, 64, 0.24], [0.58, 0, 86, 0.62], [0.22, 0, 98, 0.72, "white"]]
+          composite: "screen",
+          maxTendrils: 740,
+          spacing: 1.62,
+          layers: [[5.0, -12, 50, 0.045], [1.35, 18, 64, 0.12], [0.32, 0, 80, 0.26], [0.08, 0, 92, 0.08, "white"]]
         },
         nebula: {
           name: "Nebula Smoke",
@@ -1583,7 +1590,7 @@
         root.style.setProperty("--target-color", targetColor());
         root.style.setProperty("--primary-hue", String(Math.round(state.hue)));
         root.style.setProperty("--blend-hue", String(Math.round(state.hue2)));
-        document.body.classList.toggle("aux-drawer-open", isMobileLayout() && (!ui.brushPanel.hidden || !ui.colorPanel.hidden || !ui.exportMenu.hidden));
+        document.body.classList.toggle("aux-drawer-open", isMobileLayout() && (!ui.paramsPanel.hidden || !ui.brushPanel.hidden || !ui.colorPanel.hidden || !ui.exportMenu.hidden));
         ui.hueRing.dataset.target = state.colorTarget;
         ui.hueRing.dataset.colorMode = state.colorMode;
         ui.hueRing.setAttribute("role", "slider");
@@ -1718,7 +1725,7 @@
         const baseWidth = tendril.width * state.dpr;
         const passes = state.mirror ? 2 : 1;
         const hue = tendril.blend ? mixHue(tendril.hue, tendril.hue2, age) : tendril.hue;
-        ctx.globalCompositeOperation = "lighter";
+        ctx.globalCompositeOperation = profile.composite || "lighter";
 
         for (let mirrorIndex = 0; mirrorIndex < passes; mirrorIndex += 1) {
           const sx0 = mirrorIndex === 0 ? x0 : 2 * state.cx - x0;
@@ -1811,12 +1818,13 @@
       }
 
       function spawnAlong(x0, y0, x1, y1) {
+        const profile = brushProfiles[state.brush] || brushProfiles.thunder;
         const dx = x1 - x0;
         const dy = y1 - y0;
         const distance = Math.hypot(dx, dy);
         const sizeDistanceScale = 0.78 + Math.sqrt(state.size / 7) * 0.36;
         const expansionDistanceScale = 0.82 + state.expansion * 0.32;
-        const spacing = clamp(7.2 * sizeDistanceScale * expansionDistanceScale, 5.5, 20);
+        const spacing = clamp(7.2 * sizeDistanceScale * expansionDistanceScale * (profile.spacing || 1), 5.5, 24);
         const steps = Math.max(1, Math.floor(distance / spacing));
         for (let i = 1; i <= steps; i += 1) {
           const t = i / steps;
