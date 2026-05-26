@@ -193,6 +193,10 @@
       stroke-width: 2;
     }
 
+    .short-label {
+      display: none;
+    }
+
     .button.primary {
       border-color: oklch(84% 0.18 205 / 0.62);
       color: oklch(98% 0.012 220);
@@ -212,6 +216,15 @@
 
     .button:active {
       transform: scale(0.97);
+    }
+
+    @media (pointer: coarse), (any-pointer: coarse) {
+      .button,
+      .nav-links a:not(.button),
+      .creator-links a {
+        min-height: 48px;
+        touch-action: manipulation;
+      }
     }
 
     .hero {
@@ -844,6 +857,7 @@
       .nav-links {
         width: 100%;
         overflow-x: auto;
+        min-height: 48px;
         scrollbar-width: none;
         -webkit-overflow-scrolling: touch;
       }
@@ -854,6 +868,18 @@
 
       .nav-links a:not(.button) {
         display: inline-flex;
+      }
+
+      .nav-links .button:not(.primary) {
+        display: none;
+      }
+
+      .nav-links .button.primary .full-label {
+        display: none;
+      }
+
+      .nav-links .button.primary .short-label {
+        display: inline;
       }
 
       .brand {
@@ -1005,8 +1031,9 @@
       <div class="nav-links">
         <a href="#instrument">Instrument</a>
         <a href="#workflow">Workflow</a>
-        <a class="button primary" href="./app/">
-          Launch luminous canvas
+        <a class="button primary" href="./app/" aria-label="Launch luminous canvas">
+          <span class="full-label">Launch luminous canvas</span>
+          <span class="short-label" aria-hidden="true">Launch app</span>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
         </a>
         <a class="button" href="./white/">
