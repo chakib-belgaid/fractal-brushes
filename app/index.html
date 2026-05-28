@@ -682,6 +682,86 @@
       transform: translateX(-50%);
     }
 
+    @media (pointer: coarse), (any-pointer: coarse) {
+      :root {
+        --control: 48px;
+      }
+
+      button[data-tooltip]::after {
+        display: none;
+      }
+
+      .chrome,
+      .panel,
+      .zoom-cluster {
+        opacity: 0.96;
+      }
+
+      .toolbar,
+      .zoom-cluster {
+        gap: 8px;
+        padding: 6px;
+      }
+
+      .panel {
+        gap: 14px;
+        padding: 12px;
+      }
+
+      .panel-head {
+        min-height: 48px;
+        cursor: default;
+        touch-action: pan-y;
+      }
+
+      .mini {
+        width: 48px;
+        height: 48px;
+        min-width: 48px;
+        min-height: 48px;
+      }
+
+      .brush,
+      .export-option {
+        min-height: 48px;
+      }
+
+      .brush-list,
+      .export-menu {
+        gap: 8px;
+      }
+
+      .segment {
+        height: 44px;
+      }
+
+      input[type="range"] {
+        height: 44px;
+      }
+
+      input[type="range"]::-webkit-slider-thumb {
+        width: 24px;
+        height: 24px;
+        margin-top: -10px;
+      }
+
+      .hue-ring {
+        --handle-radius: 70px;
+        width: 176px;
+        height: 176px;
+      }
+
+      .hue-ring::before {
+        inset: 38px;
+      }
+
+      .hue-ring[data-target="primary"] .hue-handle.primary,
+      .hue-ring[data-target="blend"] .hue-handle.blend {
+        width: 22px;
+        height: 22px;
+      }
+    }
+
     @media (hover: hover) and (pointer: fine) {
       .chrome:hover,
       .panel:hover,
@@ -717,7 +797,7 @@
 
     @media (max-width: 880px) {
       :root {
-        --control: 44px;
+        --control: 48px;
       }
 
       .chrome {
@@ -725,7 +805,7 @@
         right: 10px;
         top: calc(10px + env(safe-area-inset-top));
         display: grid;
-        grid-template-columns: 44px minmax(0, 1fr);
+        grid-template-columns: 48px minmax(0, 1fr);
         align-items: start;
         gap: 7px;
         opacity: 0.9;
@@ -745,8 +825,8 @@
       }
 
       .brand {
-        min-width: 44px;
-        width: 44px;
+        min-width: 48px;
+        width: 48px;
         padding: 0;
         justify-content: center;
       }
@@ -798,12 +878,68 @@
         bottom: 10px;
         width: min(250px, calc(100vw - 20px));
       }
+
+      .brush,
+      .export-option {
+        min-height: 48px;
+      }
+
+      .segment {
+        height: 44px;
+      }
+
+      input[type="range"] {
+        height: 44px;
+      }
+
+      input[type="range"]::-webkit-slider-thumb {
+        width: 22px;
+        height: 22px;
+        margin-top: -9px;
+      }
+    }
+
+    @media (max-width: 880px) and (max-height: 560px) {
+      .color-panel,
+      .brush-panel,
+      .params-panel {
+        top: calc(68px + env(safe-area-inset-top));
+        bottom: 10px;
+        max-height: none;
+        overflow: auto;
+        overscroll-behavior: contain;
+      }
+
+      .color-panel,
+      .params-panel {
+        left: 10px;
+        right: auto;
+        width: min(300px, calc(100vw - 20px));
+      }
+
+      .brush-panel {
+        left: auto;
+        right: 10px;
+        width: min(300px, calc(100vw - 20px));
+      }
+
+      .export-menu {
+        left: 64px;
+        top: calc(68px + env(safe-area-inset-top));
+        width: min(260px, calc(100vw - 84px));
+      }
+
+      .aux-drawer-open .zoom-cluster {
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(8px);
+      }
     }
 
     @media (max-width: 560px) {
       :root {
         --control: 44px;
-        --mobile-dock-height: 148px;
+        --mobile-dock-height: 126px;
       }
 
       button[data-tooltip]::after {
@@ -828,9 +964,9 @@
         position: relative;
         display: grid;
         grid-template-columns: repeat(5, minmax(0, 1fr));
-        gap: 6px;
+        gap: 5px;
         max-width: none;
-        padding: 8px;
+        padding: 6px;
         overflow: hidden;
         border-radius: 8px;
         background:
@@ -856,9 +992,9 @@
 
       .toolbar .tool {
         width: 100%;
-        height: 58px;
+        height: 52px;
         min-width: 0;
-        min-height: 58px;
+        min-height: 52px;
         display: flex;
         flex-direction: column;
         gap: 4px;
@@ -993,7 +1129,7 @@
         left: 10px;
         right: 10px;
         top: auto;
-        bottom: calc(var(--mobile-dock-height) + 20px + env(safe-area-inset-bottom));
+        bottom: calc(var(--mobile-dock-height) + 16px + env(safe-area-inset-bottom));
         width: auto;
         align-content: start;
         max-height: calc(100dvh - var(--mobile-dock-height) - 52px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
@@ -1041,7 +1177,7 @@
         left: 10px;
         right: 10px;
         top: auto;
-        bottom: calc(var(--mobile-dock-height) + 20px + env(safe-area-inset-bottom));
+        bottom: calc(var(--mobile-dock-height) + 16px + env(safe-area-inset-bottom));
         width: auto;
         border-radius: 8px;
         background:
@@ -1054,21 +1190,32 @@
 
       .brush,
       .export-option {
-        min-height: 44px;
+        min-height: 48px;
       }
 
       .segment {
-        height: 40px;
+        height: 44px;
       }
 
       .zoom-cluster {
         left: 10px;
         right: 10px;
-        bottom: calc(var(--mobile-dock-height) + 18px + env(safe-area-inset-bottom));
+        bottom: calc(var(--mobile-dock-height) + 10px + env(safe-area-inset-bottom));
         width: auto;
         grid-template-columns: minmax(0, 1fr) 60px;
+        padding: 6px 9px;
         opacity: 0.94;
         transition: opacity 160ms var(--ease-out), transform 160ms var(--ease-out);
+      }
+
+      input[type="range"] {
+        height: 44px;
+      }
+
+      input[type="range"]::-webkit-slider-thumb {
+        width: 22px;
+        height: 22px;
+        margin-top: -9px;
       }
 
       .zoom-value {
@@ -1076,7 +1223,32 @@
       }
 
       .status {
-        bottom: calc(var(--mobile-dock-height) + 18px + env(safe-area-inset-bottom));
+        bottom: calc(var(--mobile-dock-height) + 62px + env(safe-area-inset-bottom));
+      }
+    }
+
+    @media (max-width: 560px) and (max-height: 700px) {
+      :root {
+        --mobile-dock-height: 118px;
+      }
+
+      .toolbar .tool {
+        height: 48px;
+        min-height: 48px;
+        gap: 3px;
+      }
+
+      .toolbar .tool svg {
+        width: 17px;
+        height: 17px;
+      }
+
+      .toolbar .tool[data-tooltip]::after {
+        font-size: 9px;
+      }
+
+      .zoom-cluster {
+        padding: 5px 8px;
       }
     }
 
@@ -1525,7 +1697,9 @@
       const activeColor = () => `hsl(${Math.round(state.hue)} 100% 62%)`;
       const secondaryColor = () => `hsl(${Math.round(state.hue2)} 100% 62%)`;
       const targetColor = () => state.colorTarget === "primary" ? activeColor() : secondaryColor();
-      const isMobileLayout = () => window.innerWidth <= 560;
+      const isMobileLayout = () => window.innerWidth <= 560 || (window.innerWidth <= 880 && window.innerHeight <= 560);
+      const coarsePointerQuery = window.matchMedia ? window.matchMedia("(pointer: coarse)") : null;
+      const isTouchLike = () => Boolean((coarsePointerQuery && coarsePointerQuery.matches) || navigator.maxTouchPoints > 0);
 
       function resetPanelPosition(panel) {
         panel.style.left = "";
@@ -1571,7 +1745,10 @@
           button.style.setProperty("--dot-b", profile.dot[1]);
           button.style.setProperty("--dot-c", profile.dot[2]);
           button.innerHTML = `<span class="brush-dot" aria-hidden="true"></span><span class="brush-name">${index + 1}. ${profile.name}</span>`;
-          button.addEventListener("click", () => setBrush(id));
+          button.addEventListener("click", () => {
+            setBrush(id);
+            if (isMobileLayout()) togglePanel(ui.brushPanel, ui.brushToggle, false);
+          });
           ui.brushList.append(button);
         });
       }
@@ -1919,6 +2096,7 @@
 
       function startPainting(event) {
         if (event.button !== undefined && event.button !== 0) return;
+        if (state.painting || (event.pointerType === "touch" && event.isPrimary === false)) return;
         pushHistory();
         state.painting = true;
         state.pointerId = event.pointerId ?? "mouse";
@@ -1947,6 +2125,13 @@
         state.painting = false;
         state.pointerId = null;
         state.last = null;
+        if (event.pointerId !== undefined && stage.releasePointerCapture) {
+          try {
+            stage.releasePointerCapture(event.pointerId);
+          } catch (_) {
+            // Pointer capture may already be released by the browser.
+          }
+        }
         updateUi();
       }
 
@@ -2204,6 +2389,7 @@
       }
 
       function beginHueDrag(event) {
+        if (event.pointerType === "touch" && event.isPrimary === false) return;
         chooseColorTargetFromWheel(event);
         setHueFromWheel(event);
         const pointerId = event.pointerId;
@@ -2250,7 +2436,7 @@
         let panelY = 0;
 
         handle.addEventListener("pointerdown", (event) => {
-          if (isMobileLayout()) return;
+          if (isMobileLayout() || isTouchLike() || event.pointerType === "touch") return;
           if (event.target.closest("button, input")) return;
           const rect = panel.getBoundingClientRect();
           startX = event.clientX;
