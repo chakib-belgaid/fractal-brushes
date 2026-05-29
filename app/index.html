@@ -64,7 +64,7 @@
       touch-action: none;
     }
 
-    canvas {
+    #art {
       position: absolute;
       left: 50%;
       top: 50%;
@@ -74,6 +74,44 @@
       transform: translate(-50%, -50%) scale(1);
       transform-origin: center;
       will-change: transform;
+    }
+
+    .symmetry-guide {
+      position: fixed;
+      inset: 0;
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    .symmetry-guide[hidden] {
+      display: none;
+    }
+
+    .symmetry-guide-dot {
+      position: fixed;
+      left: var(--guide-x);
+      top: var(--guide-y);
+      width: 12px;
+      height: 12px;
+      border: 1px solid color-mix(in srgb, var(--active) 72%, white 18%);
+      border-radius: 50%;
+      opacity: 0.78;
+      transform: translate(-50%, -50%);
+      background:
+        radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.94) 0 16%, color-mix(in srgb, var(--active) 78%, transparent) 18% 46%, transparent 62%);
+      box-shadow:
+        0 0 12px color-mix(in srgb, var(--active) 62%, transparent),
+        0 0 24px color-mix(in srgb, var(--secondary) 26%, transparent);
+    }
+
+    .symmetry-guide-dot.origin {
+      width: 15px;
+      height: 15px;
+      opacity: 0.96;
+      border-color: rgba(255, 255, 255, 0.82);
+      box-shadow:
+        0 0 14px color-mix(in srgb, var(--active) 82%, transparent),
+        0 0 28px color-mix(in srgb, var(--secondary) 36%, transparent);
     }
 
     .grain {
@@ -1208,6 +1246,13 @@
         transition: opacity 160ms var(--ease-out), transform 160ms var(--ease-out);
       }
 
+      .aux-drawer-open .zoom-cluster {
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(8px);
+        visibility: hidden;
+      }
+
       input[type="range"] {
         height: 44px;
       }
@@ -1267,6 +1312,7 @@
   <div id="stage" aria-label="Fractal Brushes drawing surface">
     <canvas id="art" aria-label="Fractal Brushes drawing canvas"></canvas>
   </div>
+  <div class="symmetry-guide" id="symmetryGuide" aria-hidden="true" hidden></div>
   <div class="grain" aria-hidden="true"></div>
 
   <aside class="chrome" aria-label="Canvas controls">
@@ -1329,10 +1375,17 @@
       </button>
     </div>
     <div class="field">
-      <span class="field-label">Brush size</span>
+      <span class="field-label">Brush length</span>
       <div class="slider-row">
-        <input id="size" type="range" min="1" max="18" value="7" aria-label="Brush size">
-        <span class="value" id="sizeValue">7</span>
+        <input id="size" type="range" min="0.1" max="6.4" step="0.1" value="0.5" aria-label="Brush length">
+        <span class="value" id="sizeValue">5</span>
+      </div>
+    </div>
+    <div class="field">
+      <span class="field-label">Scale factor</span>
+      <div class="slider-row">
+        <input id="scaleFactor" type="range" min="0.1" max="15" step="0.1" value="3" aria-label="Scale factor">
+        <span class="value" id="scaleFactorValue">30</span>
       </div>
     </div>
     <div class="field">
@@ -1381,7 +1434,7 @@
       </div>
       <div class="segmented target-switch" role="group" aria-label="Blend target">
         <button class="segment target" data-target="primary" type="button" aria-label="Adjust primary hue" aria-pressed="true">Primary</button>
-        <button class="segment target" data-target="blend" type="button" aria-label="Adjust blend hue" aria-pressed="false">Blend</button>
+        <button class="segment target" data-target="blend" type="button" aria-label="Adjust blend hue" aria-pressed="false">Secondary</button>
       </div>
     </div>
   </aside>
@@ -1399,6 +1452,7 @@
       const canvas = document.getElementById("art");
       const ctx = canvas.getContext("2d", { alpha: false });
       const root = document.documentElement;
+      let activeComposite = "lighter";
 
       const ui = {
         undo: document.getElementById("undo"),
@@ -1425,8 +1479,11 @@
         targetSwitch: document.querySelector(".target-switch"),
         zoom: document.getElementById("zoom"),
         zoomValue: document.getElementById("zoomValue"),
+        symmetryGuide: document.getElementById("symmetryGuide"),
         size: document.getElementById("size"),
         sizeValue: document.getElementById("sizeValue"),
+        scaleFactor: document.getElementById("scaleFactor"),
+        scaleFactorValue: document.getElementById("scaleFactorValue"),
         expansion: document.getElementById("expansion"),
         expansionValue: document.getElementById("expansionValue"),
         symmetry: document.getElementById("symmetry"),
@@ -1663,6 +1720,11 @@
         wide4k: { label: "4k-16-9", width: 3840, height: 2160 },
         square4k: { label: "4k-square", width: 4096, height: 4096 }
       };
+      const DISPLAY_FACTOR = 10;
+      const BRUSH_LENGTH_RANGE = { min: 0.1, max: 6.4, default: 0.5 };
+      const SCALE_FACTOR_RANGE = { min: 0.1, max: 15, default: 3 };
+      const DEFAULT_EFFECTIVE_LENGTH = BRUSH_LENGTH_RANGE.default * SCALE_FACTOR_RANGE.default;
+      const LEGACY_DEFAULT_LENGTH = 16;
 
       const state = {
         width: 0,
@@ -1670,13 +1732,14 @@
         dpr: 1,
         cx: 0,
         cy: 0,
-        brush: "thunder",
+        brush: "silk",
         colorTarget: "primary",
         colorMode: "single",
         hue: 195,
         hue2: 314,
         blend: false,
-        size: 7,
+        size: BRUSH_LENGTH_RANGE.default,
+        scaleFactor: SCALE_FACTOR_RANGE.default,
         expansion: 0.85,
         symmetry: 6,
         mirror: true,
@@ -1689,17 +1752,44 @@
         redo: [],
         exporting: false,
         statusTimer: null,
+        symmetryGuidePoint: null,
         mobileLayout: null
       };
 
       const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
       const rand = (min, max) => min + Math.random() * (max - min);
+      const toTenth = (value, fallback) => Math.round((Number(value) || fallback) * DISPLAY_FACTOR) / DISPLAY_FACTOR;
+      const controlDisplayValue = (value) => String(Math.round(Number(value) * DISPLAY_FACTOR));
+      const effectiveBrushLength = (length = state.size, factor = state.scaleFactor) => {
+        const brushLength = Number(length) || BRUSH_LENGTH_RANGE.default;
+        const brushFactor = Number(factor) || SCALE_FACTOR_RANGE.default;
+        return Math.max(BRUSH_LENGTH_RANGE.min, brushLength * brushFactor);
+      };
+      const legacyEquivalentLength = (length = state.size, factor = state.scaleFactor) => {
+        return (effectiveBrushLength(length, factor) / DEFAULT_EFFECTIVE_LENGTH) * LEGACY_DEFAULT_LENGTH;
+      };
       const activeColor = () => `hsl(${Math.round(state.hue)} 100% 62%)`;
       const secondaryColor = () => `hsl(${Math.round(state.hue2)} 100% 62%)`;
       const targetColor = () => state.colorTarget === "primary" ? activeColor() : secondaryColor();
       const isMobileLayout = () => window.innerWidth <= 560 || (window.innerWidth <= 880 && window.innerHeight <= 560);
-      const coarsePointerQuery = window.matchMedia ? window.matchMedia("(pointer: coarse)") : null;
-      const isTouchLike = () => Boolean((coarsePointerQuery && coarsePointerQuery.matches) || navigator.maxTouchPoints > 0);
+      const brushWidthScale = (size) => 0.5 + Math.pow(size / 7, 1.08) * 0.82;
+      const brushSpacingScale = (size) => 0.86 + Math.sqrt(size / 7) * 0.42;
+      const cssNumber = (value) => Number.parseFloat(value) || 0;
+
+      function canvasCssWidth() {
+        return cssNumber(canvas.style.width) || canvas.getBoundingClientRect().width || window.innerWidth;
+      }
+
+      function canvasCssHeight() {
+        return cssNumber(canvas.style.height) || canvas.getBoundingClientRect().height || window.innerHeight;
+      }
+
+      function updateSvgViewport(width = state.width, height = state.height) {
+        const safeWidth = Math.max(1, Math.round(width));
+        const safeHeight = Math.max(1, Math.round(height));
+        canvas.width = safeWidth;
+        canvas.height = safeHeight;
+      }
 
       function resetPanelPosition(panel) {
         panel.style.left = "";
@@ -1784,7 +1874,11 @@
         ui.colorToggle.setAttribute("aria-expanded", String(!ui.colorPanel.hidden));
         ui.exportToggle.setAttribute("aria-expanded", String(!ui.exportMenu.hidden));
         ui.size.value = String(state.size);
-        ui.sizeValue.textContent = String(state.size);
+        ui.sizeValue.textContent = controlDisplayValue(state.size);
+        ui.size.setAttribute("aria-valuetext", `${controlDisplayValue(state.size)} normalized, ${state.size.toFixed(1)} actual`);
+        ui.scaleFactor.value = String(state.scaleFactor);
+        ui.scaleFactorValue.textContent = controlDisplayValue(state.scaleFactor);
+        ui.scaleFactor.setAttribute("aria-valuetext", `${controlDisplayValue(state.scaleFactor)} normalized, ${state.scaleFactor.toFixed(1)}x actual`);
         ui.expansion.value = String(Math.round(state.expansion * 100));
         ui.expansionValue.textContent = `${Math.round(state.expansion * 100)}%`;
         ui.symmetry.value = String(state.symmetry);
@@ -1825,13 +1919,14 @@
         const shot = document.createElement("canvas");
         shot.width = canvas.width;
         shot.height = canvas.height;
-        shot.getContext("2d").drawImage(canvas, 0, 0);
+        shot.getContext("2d", { alpha: false }).drawImage(canvas, 0, 0);
         return shot;
       }
 
       function restoreSnapshot(shot) {
+        if (!shot) return;
         ctx.globalCompositeOperation = "source-over";
-        ctx.drawImage(shot, 0, 0);
+        ctx.drawImage(shot, 0, 0, shot.width, shot.height, 0, 0, state.width, state.height);
       }
 
       function pushHistory() {
@@ -1844,22 +1939,15 @@
       }
 
       function resize() {
-        const previous = canvas.width && canvas.height ? makeSnapshot() : null;
-        const previousWidth = state.width || window.innerWidth;
-        const previousHeight = state.height || window.innerHeight;
-        state.dpr = clamp(window.devicePixelRatio || 1, 1, 2);
-        state.width = Math.floor(window.innerWidth * state.dpr);
-        state.height = Math.floor(window.innerHeight * state.dpr);
+        state.dpr = 1;
+        state.width = Math.floor(window.innerWidth);
+        state.height = Math.floor(window.innerHeight);
         state.cx = state.width / 2;
         state.cy = state.height / 2;
-        canvas.width = state.width;
-        canvas.height = state.height;
+        updateSvgViewport();
         canvas.style.width = `${window.innerWidth}px`;
         canvas.style.height = `${window.innerHeight}px`;
         clearSurface();
-        if (previous) {
-          ctx.drawImage(previous, 0, 0, previousWidth, previousHeight, 0, 0, state.width, state.height);
-        }
         applyResponsiveMode();
         clampAllPanels();
         applyZoom();
@@ -1874,7 +1962,9 @@
       }
 
       function hsla(hue, saturation, lightness, alpha) {
-        return `hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha})`;
+        const h = Math.round(normalizedHue(hue) / 4) * 4;
+        const a = clamp(Math.round(alpha * 50) / 50, 0, 1);
+        return `hsla(${h}, ${saturation}%, ${lightness}%, ${a})`;
       }
 
       function mixHue(from, to, amount) {
@@ -1883,9 +1973,11 @@
       }
 
       function drawLayer(x0, y0, x1, y1, style, width, cap) {
+        ctx.globalCompositeOperation = activeComposite;
         ctx.strokeStyle = style;
-        ctx.lineWidth = width;
-        ctx.lineCap = cap;
+        ctx.lineWidth = Math.max(0.08, width);
+        ctx.lineCap = cap || "round";
+        ctx.lineJoin = "round";
         ctx.beginPath();
         ctx.moveTo(x0, y0);
         ctx.lineTo(x1, y1);
@@ -1902,8 +1994,7 @@
         const baseWidth = tendril.width * state.dpr;
         const passes = state.mirror ? 2 : 1;
         const hue = tendril.blend ? mixHue(tendril.hue, tendril.hue2, age) : tendril.hue;
-        ctx.globalCompositeOperation = profile.composite || "lighter";
-
+        activeComposite = profile.composite || "lighter";
         for (let mirrorIndex = 0; mirrorIndex < passes; mirrorIndex += 1) {
           const sx0 = mirrorIndex === 0 ? x0 : 2 * state.cx - x0;
           const sx1 = mirrorIndex === 0 ? x1 : 2 * state.cx - x1;
@@ -1946,17 +2037,16 @@
         const profile = brushProfiles[state.brush] || brushProfiles.thunder;
         const speed = Math.hypot(dx, dy);
         const baseAngle = Math.atan2(dy, dx);
-        const sizeScale = 0.42 + Math.pow(state.size / 6, 1.22);
+        const sizeScale = brushWidthScale(state.size);
         const expansionScale = clamp(state.expansion, 0.35, 1.6);
         const sizeExpansionScale = 0.78 + Math.sqrt(state.size / 7) * 0.28;
         const coupledExpansion = expansionScale * sizeExpansionScale;
         const spreadScale = 0.45 + coupledExpansion * 0.85;
-        const densityScale = 0.55 + expansionScale * 0.45;
+        const densityScale = 0.48 + expansionScale * 0.4;
         const lifeScale = 0.74 + coupledExpansion * 0.34;
         const velocityScale = 0.82 + coupledExpansion * 0.28;
         const widthScale = 0.86 + coupledExpansion * 0.18;
-        const extraTendrils = Math.floor(clamp((state.size - 5) / 4, 0, 3) * densityScale);
-        const count = Math.max(1, Math.floor(rand(profile.count[0], profile.count[1] + 1) * densityScale) + extraTendrils);
+        const count = Math.max(1, Math.floor(rand(profile.count[0], profile.count[1] + 1) * densityScale));
 
         for (let i = 0; i < count; i += 1) {
           const angle = baseAngle + rand(-profile.spread, profile.spread) * spreadScale;
@@ -1999,9 +2089,9 @@
         const dx = x1 - x0;
         const dy = y1 - y0;
         const distance = Math.hypot(dx, dy);
-        const sizeDistanceScale = 0.78 + Math.sqrt(state.size / 7) * 0.36;
+        const sizeDistanceScale = brushSpacingScale(state.size);
         const expansionDistanceScale = 0.82 + state.expansion * 0.32;
-        const spacing = clamp(7.2 * sizeDistanceScale * expansionDistanceScale * (profile.spacing || 1), 5.5, 24);
+        const spacing = clamp(8.4 * sizeDistanceScale * expansionDistanceScale * (profile.spacing || 1), 6.8, 30);
         const steps = Math.max(1, Math.floor(distance / spacing));
         for (let i = 1; i <= steps; i += 1) {
           const t = i / steps;
@@ -2102,7 +2192,11 @@
         state.pointerId = event.pointerId ?? "mouse";
         state.last = eventPosition(event);
         if (event.pointerId !== undefined && stage.setPointerCapture) {
-          stage.setPointerCapture(event.pointerId);
+          try {
+            stage.setPointerCapture(event.pointerId);
+          } catch (_) {
+            // Synthetic pointer events may not have an active browser pointer.
+          }
         }
         event.preventDefault();
       }
@@ -2196,7 +2290,12 @@
       }
 
       function setSize(size) {
-        state.size = clamp(Number(size), 1, 18);
+        state.size = clamp(toTenth(size, BRUSH_LENGTH_RANGE.default), BRUSH_LENGTH_RANGE.min, BRUSH_LENGTH_RANGE.max);
+        updateUi();
+      }
+
+      function setScaleFactor(scaleFactor) {
+        state.scaleFactor = clamp(toTenth(scaleFactor, SCALE_FACTOR_RANGE.default), SCALE_FACTOR_RANGE.min, SCALE_FACTOR_RANGE.max);
         updateUi();
       }
 
@@ -2258,7 +2357,8 @@
         state.colorMode = Math.random() > 0.28 ? "blend" : "single";
         state.colorTarget = "primary";
         state.blend = state.colorMode === "blend";
-        state.size = Math.floor(3 + Math.random() * 13);
+        state.size = toTenth(rand(0.4, 3.2), BRUSH_LENGTH_RANGE.default);
+        state.scaleFactor = toTenth(rand(1.6, 5.2), SCALE_FACTOR_RANGE.default);
         state.expansion = rand(0.55, 1.28);
         state.symmetry = Math.floor(2 + Math.random() * 15);
         state.mirror = Math.random() > 0.22;
@@ -2294,6 +2394,17 @@
         return new Date().toISOString().replace(/[:.]/g, "-");
       }
 
+      function downloadBlob(blob, label, extension) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.download = `fractal-brushes-${label}-${timestamp()}.${extension}`;
+        link.href = url;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+
       function canvasToBlob(sourceCanvas) {
         return new Promise((resolve) => {
           if (sourceCanvas.toBlob) {
@@ -2310,19 +2421,6 @@
         });
       }
 
-      async function downloadCanvas(sourceCanvas, label) {
-        const blob = await canvasToBlob(sourceCanvas);
-        if (!blob) throw new Error("PNG export failed");
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.download = `fractal-brushes-${label}-${timestamp()}.png`;
-        link.href = url;
-        document.body.append(link);
-        link.click();
-        link.remove();
-        window.setTimeout(() => URL.revokeObjectURL(url), 0);
-      }
-
       async function exportPngPreset(presetName) {
         if (state.exporting) return;
         const preset = exportPresets[presetName];
@@ -2331,23 +2429,25 @@
         updateUi();
         await new Promise((resolve) => requestAnimationFrame(resolve));
         try {
+          const width = preset.width || state.width || Math.round(canvasCssWidth());
+          const height = preset.height || state.height || Math.round(canvasCssHeight());
           if (presetName === "current") {
-            await downloadCanvas(canvas, preset.label);
+            downloadBlob(await canvasToBlob(canvas), preset.label, "png");
           } else {
             const out = document.createElement("canvas");
-            out.width = preset.width;
-            out.height = preset.height;
+            out.width = width;
+            out.height = height;
             const outCtx = out.getContext("2d", { alpha: false });
-            clearSurface(outCtx, out.width, out.height);
-            const scale = Math.min(out.width / canvas.width, out.height / canvas.height);
+            clearSurface(outCtx, width, height);
+            const scale = Math.min(width / canvas.width, height / canvas.height);
             const drawWidth = canvas.width * scale;
             const drawHeight = canvas.height * scale;
-            const dx = (out.width - drawWidth) / 2;
-            const dy = (out.height - drawHeight) / 2;
+            const dx = (width - drawWidth) / 2;
+            const dy = (height - drawHeight) / 2;
             outCtx.imageSmoothingEnabled = true;
             outCtx.imageSmoothingQuality = "high";
             outCtx.drawImage(canvas, dx, dy, drawWidth, drawHeight);
-            await downloadCanvas(out, preset.label);
+            downloadBlob(await canvasToBlob(out), preset.label, "png");
           }
           showStatus("PNG export ready.");
         } catch (error) {
@@ -2436,7 +2536,7 @@
         let panelY = 0;
 
         handle.addEventListener("pointerdown", (event) => {
-          if (isMobileLayout() || isTouchLike() || event.pointerType === "touch") return;
+          if (isMobileLayout() || event.pointerType === "touch") return;
           if (event.target.closest("button, input")) return;
           const rect = panel.getBoundingClientRect();
           startX = event.clientX;
@@ -2494,6 +2594,1101 @@
         return Boolean(focusTarget);
       }
 
+      /* ========================================================================
+         Brush engine patch v2
+
+         Paste this block inside the existing IIFE, just before this line:
+
+           stage.addEventListener("pointerdown", startPainting);
+
+         It fixes three things:
+         1. brush palettes were defined but never applied when selecting a brush;
+         2. additive brightness was not normalized by symmetry/mirror passes;
+         3. all brushes used the same line renderer, so smoke/water/fairy became blobs.
+      ======================================================================== */
+
+      Object.assign(brushProfiles, {
+        fairy: {
+          name: "Fairy",
+          hues: [292, 188],
+          dot: ["#f8a7ff", "#9ff8ff", "#f7f2bf"],
+          renderer: "fairy",
+          count: [2, 4],
+          spread: 1.15,
+          velocity: [0.18, 1.05],
+          life: [24, 62],
+          width: [0.16, 0.42],
+          jitter: 0.22,
+          curl: 0.18,
+          branch: 0.002,
+          drag: 0.963,
+          lift: [-0.02, 0.08],
+          alpha: 0.34,
+          hueShift: [-34, 42],
+          cap: "round",
+          composite: "lighter",
+          maxTendrils: 480,
+          spacing: 1.45,
+          energy: 1.15,
+          layers: [[1.55, 0, 74, 0.35], [0.42, 0, 96, 0.7, "white"]]
+        },
+        flame: {
+          name: "Flame",
+          hues: [28, 348],
+          dot: ["#ffb13d", "#ff4a3d", "#f7efc8"],
+          renderer: "flame",
+          count: [2, 3],
+          spread: 0.58,
+          velocity: [0.28, 1.25],
+          life: [24, 54],
+          width: [0.28, 0.72],
+          jitter: 0.1,
+          curl: 0.16,
+          branch: 0.0015,
+          drag: 0.952,
+          lift: [0.18, 0.74],
+          alpha: 0.24,
+          hueShift: [-10, 22],
+          cap: "round",
+          composite: "lighter",
+          maxTendrils: 560,
+          spacing: 1.35,
+          energy: 0.96,
+          layers: [[2.4, -10, 40, 0.16], [1.05, 8, 56, 0.34], [0.32, 28, 72, 0.46], [0.08, 0, 92, 0.16, "warm"]]
+        },
+        thunder: {
+          name: "Thunder",
+          hues: [195, 264],
+          dot: ["#38e8ff", "#a77dff", "#f7fbff"],
+          renderer: "line",
+          count: [1, 3],
+          spread: 0.38,
+          velocity: [0.72, 2.25],
+          life: [24, 56],
+          width: [0.18, 0.58],
+          jitter: 0.31,
+          curl: 0.025,
+          branch: 0.026,
+          drag: 0.956,
+          lift: [0, 0],
+          alpha: 0.44,
+          hueShift: [-14, 22],
+          angular: 0.24,
+          cap: "butt",
+          composite: "lighter",
+          maxTendrils: 620,
+          spacing: 1.3,
+          energy: 1.22,
+          layers: [[2.6, -24, 52, 0.2], [0.78, 10, 68, 0.62], [0.14, 0, 98, 0.9, "white"]]
+        },
+        silk: {
+          name: "Silk Ribbon",
+          hues: [326, 196],
+          dot: ["#ff6fd8", "#77f5ff", "#f7fbff"],
+          renderer: "ribbon",
+          count: [1, 1],
+          spread: 0.58,
+          velocity: [0.9, 2.2],
+          life: [96, 170],
+          width: [0.32, 0.76],
+          jitter: 0.035,
+          curl: 0.1,
+          branch: 0.0002,
+          drag: 0.986,
+          lift: [-0.02, 0.02],
+          alpha: 0.28,
+          hueShift: [-16, 30],
+          cap: "round",
+          composite: "screen",
+          maxTendrils: 180,
+          spacing: 3.2,
+          energy: 1.48,
+          layers: [[3.2, -12, 54, 0.18], [1.1, 14, 70, 0.5], [0.22, 0, 92, 0.86, "white"]]
+        },
+        comet: {
+          name: "Comet Trail",
+          hues: [205, 44],
+          dot: ["#6de7ff", "#ffd166", "#f7fbff"],
+          renderer: "comet",
+          count: [1, 2],
+          spread: 0.24,
+          velocity: [1.0, 2.65],
+          life: [30, 70],
+          width: [0.08, 0.68],
+          jitter: 0.12,
+          curl: 0.045,
+          branch: 0.003,
+          drag: 0.948,
+          lift: [0, 0.02],
+          alpha: 0.28,
+          hueShift: [-12, 20],
+          cap: "round",
+          composite: "screen",
+          maxTendrils: 460,
+          spacing: 1.8,
+          energy: 0.95,
+          layers: [[3.8, -12, 50, 0.1], [1.0, 18, 66, 0.26], [0.22, 0, 88, 0.48], [0.06, 0, 98, 0.18, "white"]]
+        },
+        nebula: {
+          name: "Nebula Smoke",
+          hues: [268, 178],
+          dot: ["#b98bff", "#6ef8d4", "#ff8adf"],
+          renderer: "smoke",
+          count: [1, 3],
+          spread: 1.0,
+          velocity: [0.08, 0.52],
+          life: [62, 132],
+          width: [0.65, 1.35],
+          jitter: 0.11,
+          curl: 0.18,
+          branch: 0.0008,
+          drag: 0.986,
+          lift: [-0.04, 0.06],
+          alpha: 0.18,
+          hueShift: [-48, 58],
+          cap: "round",
+          composite: "screen",
+          maxTendrils: 360,
+          spacing: 2.6,
+          energy: 0.72,
+          stampScale: 7.4,
+          layers: [[1.2, 0, 64, 0.08]]
+        },
+        crystal: {
+          name: "Crystal Filament",
+          hues: [188, 238],
+          dot: ["#aefcff", "#8da2ff", "#f7fbff"],
+          renderer: "line",
+          count: [1, 2],
+          spread: 0.28,
+          velocity: [0.68, 1.9],
+          life: [34, 74],
+          width: [0.12, 0.38],
+          jitter: 0.055,
+          curl: 0.01,
+          branch: 0.018,
+          drag: 0.965,
+          lift: [0, 0],
+          alpha: 0.46,
+          hueShift: [-10, 26],
+          angular: 0.5,
+          cap: "butt",
+          composite: "lighter",
+          maxTendrils: 540,
+          spacing: 1.45,
+          energy: 1.18,
+          layers: [[2.0, -8, 58, 0.18], [0.56, 16, 74, 0.62], [0.12, 0, 98, 0.88, "white"]]
+        },
+        water: {
+          name: "Water",
+          hues: [196, 226],
+          dot: ["#38e8ff", "#386dff", "#d8fbff"],
+          renderer: "water",
+          count: [2, 4],
+          spread: 0.58,
+          velocity: [0.26, 1.22],
+          life: [48, 104],
+          width: [0.34, 0.9],
+          jitter: 0.075,
+          curl: 0.19,
+          branch: 0.0008,
+          drag: 0.975,
+          lift: [-0.03, 0.03],
+          alpha: 0.24,
+          hueShift: [-22, 16],
+          cap: "round",
+          composite: "screen",
+          maxTendrils: 620,
+          spacing: 1.7,
+          energy: 0.92,
+          layers: [[3.0, -18, 48, 0.13], [1.05, 8, 64, 0.35], [0.28, 0, 86, 0.52], [0.08, 0, 98, 0.22, "white"]]
+        },
+        ember: {
+          name: "Ember",
+          hues: [22, 48],
+          dot: ["#ff5b2f", "#ffd166", "#6d1a00"],
+          renderer: "ember",
+          count: [2, 4],
+          spread: 0.8,
+          velocity: [0.38, 1.7],
+          life: [18, 46],
+          width: [0.14, 0.46],
+          jitter: 0.2,
+          curl: 0.08,
+          branch: 0.009,
+          drag: 0.935,
+          lift: [0.12, 0.48],
+          alpha: 0.38,
+          hueShift: [-8, 32],
+          cap: "round",
+          composite: "lighter",
+          maxTendrils: 540,
+          spacing: 1.45,
+          energy: 0.95,
+          layers: [[1.6, -10, 40, 0.22], [0.52, 12, 60, 0.62], [0.12, 0, 94, 0.5, "warm"]]
+        },
+        frost: {
+          name: "Frost",
+          hues: [188, 214],
+          dot: ["#d8fbff", "#77c8ff", "#f7fbff"],
+          renderer: "line",
+          count: [1, 3],
+          spread: 0.42,
+          velocity: [0.48, 1.58],
+          life: [38, 82],
+          width: [0.12, 0.44],
+          jitter: 0.08,
+          curl: 0.015,
+          branch: 0.024,
+          drag: 0.962,
+          lift: [0, 0],
+          alpha: 0.42,
+          hueShift: [-16, 18],
+          angular: 0.43,
+          cap: "butt",
+          composite: "lighter",
+          maxTendrils: 560,
+          spacing: 1.55,
+          energy: 1.12,
+          layers: [[2.2, -8, 64, 0.16], [0.62, 10, 78, 0.56], [0.13, 0, 98, 0.9, "white"]]
+        },
+        plasma: {
+          name: "Plasma",
+          hues: [310, 188],
+          dot: ["#ff38d8", "#38e8ff", "#f7fbff"],
+          renderer: "plasma",
+          count: [3, 5],
+          spread: 0.72,
+          velocity: [0.48, 1.9],
+          life: [34, 82],
+          width: [0.28, 0.82],
+          jitter: 0.26,
+          curl: 0.22,
+          branch: 0.01,
+          drag: 0.954,
+          lift: [-0.02, 0.02],
+          alpha: 0.32,
+          hueShift: [-34, 38],
+          cap: "round",
+          composite: "lighter",
+          maxTendrils: 680,
+          spacing: 1.35,
+          energy: 1.0,
+          layers: [[3.3, -28, 48, 0.16], [1.05, 24, 64, 0.42], [0.25, 0, 86, 0.65], [0.08, 0, 98, 0.42, "white"]]
+        }
+      });
+
+      function drawLayerPack(x0, y0, x1, y1, profile, hue, alpha, baseWidth) {
+        profile.layers.forEach(([scale, hueOffset, lightness, layerAlpha, special]) => {
+          const width = Math.max(0.12, baseWidth * scale);
+          let style = hsla(normalizedHue(hue + hueOffset), 96, lightness, alpha * layerAlpha);
+          if (special === "white") {
+            style = `rgba(255, 255, 255, ${alpha * layerAlpha})`;
+          } else if (special === "warm") {
+            style = `rgba(255, 246, 219, ${alpha * layerAlpha})`;
+          }
+          drawLayer(x0, y0, x1, y1, style, width, profile.cap || "round");
+        });
+      }
+
+      function drawSymmetricLayerPack(x0, y0, x1, y1, profile, hue, alpha, baseWidth) {
+        const passes = state.mirror ? 2 : 1;
+        profile.layers.forEach(([scale, hueOffset, lightness, layerAlpha, special]) => {
+          const width = Math.max(0.12, baseWidth * scale);
+          let style = hsla(normalizedHue(hue + hueOffset), 96, lightness, alpha * layerAlpha);
+          if (special === "white") {
+            style = `rgba(255, 255, 255, ${alpha * layerAlpha})`;
+          } else if (special === "warm") {
+            style = `rgba(255, 246, 219, ${alpha * layerAlpha})`;
+          }
+
+          ctx.globalCompositeOperation = activeComposite;
+          ctx.strokeStyle = style;
+          ctx.lineWidth = width;
+          ctx.lineCap = profile.cap || "round";
+          ctx.lineJoin = "round";
+          ctx.beginPath();
+
+          for (let mirrorIndex = 0; mirrorIndex < passes; mirrorIndex += 1) {
+            const sx0 = mirrorIndex === 0 ? x0 : 2 * state.cx - x0;
+            const sx1 = mirrorIndex === 0 ? x1 : 2 * state.cx - x1;
+
+            for (let i = 0; i < state.symmetry; i += 1) {
+              const angle = (Math.PI * 2 * i) / state.symmetry;
+              const [rx0, ry0] = rotateAroundCenter(sx0, y0, angle);
+              const [rx1, ry1] = rotateAroundCenter(sx1, y1, angle);
+              ctx.moveTo(rx0, ry0);
+              ctx.lineTo(rx1, ry1);
+            }
+          }
+
+          ctx.stroke();
+        });
+      }
+
+      function drawSoftStamp(x, y, radius, hue, alpha, special) {
+        const r = Math.max(0.6, radius);
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, r);
+        if (special === "white") {
+          gradient.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
+          gradient.addColorStop(0.34, `rgba(225, 248, 255, ${alpha * 0.34})`);
+          gradient.addColorStop(1, "rgba(225, 248, 255, 0)");
+        } else if (special === "warm") {
+          gradient.addColorStop(0, `rgba(255, 248, 218, ${alpha})`);
+          gradient.addColorStop(0.38, hsla(normalizedHue(hue + 12), 96, 62, alpha * 0.42));
+          gradient.addColorStop(1, hsla(normalizedHue(hue - 8), 96, 42, 0));
+        } else {
+          gradient.addColorStop(0, hsla(normalizedHue(hue), 96, 72, alpha));
+          gradient.addColorStop(0.48, hsla(normalizedHue(hue + 8), 94, 56, alpha * 0.34));
+          gradient.addColorStop(1, hsla(normalizedHue(hue), 94, 42, 0));
+        }
+        ctx.globalCompositeOperation = activeComposite;
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      function drawSpark(x, y, radius, hue, alpha) {
+        const r = Math.max(1, radius);
+        const style = `rgba(255, 255, 255, ${alpha})`;
+        drawLayer(x - r, y, x + r, y, style, Math.max(0.35, r * 0.08), "round");
+        drawLayer(x, y - r, x, y + r, style, Math.max(0.35, r * 0.08), "round");
+        drawSoftStamp(x, y, r * 1.35, hue, alpha * 0.45, "white");
+      }
+
+      drawBrushSegment = function patchedDrawBrushSegment(x0, y0, x1, y1, tendril) {
+        const profile = brushProfiles[tendril.brush] || brushProfiles.thunder;
+        const age = 1 - tendril.life / tendril.maxLife;
+        const envelope = Math.sin(Math.PI * clamp(age, 0, 1));
+        if (envelope <= 0.001) return;
+
+        const passCount = Math.max(1, state.symmetry * (state.mirror ? 2 : 1));
+        const symmetryEnergy = 1 / Math.sqrt(passCount);
+        const expansionEnergy = 1 / (0.92 + state.expansion * 0.24);
+        const effectiveSize = legacyEquivalentLength();
+        const sizeEnergy = 1 / Math.sqrt(0.86 + effectiveSize / 12);
+        const alpha = tendril.alpha * envelope * symmetryEnergy * expansionEnergy * sizeEnergy * (profile.energy || 1);
+        if (alpha <= 0.001) return;
+
+        const baseWidth = Math.max(0.12, tendril.width * state.dpr);
+        const hue = tendril.blend ? mixHue(tendril.hue, tendril.hue2, age) : tendril.hue;
+        const passes = state.mirror ? 2 : 1;
+        const renderer = profile.renderer || "line";
+        activeComposite = profile.composite || "lighter";
+        if (renderer === "ribbon" || renderer === "line") {
+          drawSymmetricLayerPack(x0, y0, x1, y1, profile, hue, alpha, baseWidth);
+          return;
+        }
+
+        for (let mirrorIndex = 0; mirrorIndex < passes; mirrorIndex += 1) {
+          const sx0 = mirrorIndex === 0 ? x0 : 2 * state.cx - x0;
+          const sx1 = mirrorIndex === 0 ? x1 : 2 * state.cx - x1;
+
+          for (let i = 0; i < state.symmetry; i += 1) {
+            const angle = (Math.PI * 2 * i) / state.symmetry;
+            const [rx0, ry0] = rotateAroundCenter(sx0, y0, angle);
+            const [rx1, ry1] = rotateAroundCenter(sx1, y1, angle);
+            const mx = (rx0 + rx1) * 0.5;
+            const my = (ry0 + ry1) * 0.5;
+
+            if (renderer === "smoke") {
+              drawLayerPack(rx0, ry0, rx1, ry1, profile, hue, alpha * 0.42, baseWidth);
+              drawSoftStamp(mx, my, baseWidth * (profile.stampScale || 6.2), hue, alpha * 0.36);
+              drawSoftStamp(rx1, ry1, baseWidth * 2.7, hue + 22, alpha * 0.14);
+            } else if (renderer === "fairy") {
+              drawLayerPack(rx0, ry0, rx1, ry1, profile, hue, alpha, baseWidth);
+              if (Math.random() < 0.2) drawSoftStamp(rx1, ry1, baseWidth * 2.1, hue, alpha * 0.38, "white");
+              if (Math.random() < 0.055) drawSpark(rx1, ry1, baseWidth * rand(2.4, 4.8), hue, alpha * 0.75);
+            } else if (renderer === "flame") {
+              drawLayerPack(rx0, ry0, rx1, ry1, profile, hue, alpha, baseWidth);
+              if (Math.random() < 0.2) drawSoftStamp(rx1, ry1, baseWidth * 2.4, hue + 12, alpha * 0.28, "warm");
+            } else if (renderer === "water") {
+              drawLayerPack(rx0, ry0, rx1, ry1, profile, hue, alpha, baseWidth);
+              if (Math.random() < 0.12) drawSoftStamp(rx1, ry1, baseWidth * rand(1.6, 3.2), hue + 10, alpha * 0.3, "white");
+            } else if (renderer === "comet") {
+              drawLayerPack(rx0, ry0, rx1, ry1, profile, hue, alpha, baseWidth);
+              drawSoftStamp(rx1, ry1, baseWidth * 2.1, hue, alpha * 0.34, "white");
+            } else if (renderer === "ember") {
+              drawLayerPack(rx0, ry0, rx1, ry1, profile, hue, alpha, baseWidth);
+              if (Math.random() < 0.22) drawSoftStamp(rx1, ry1, baseWidth * rand(1.2, 2.8), hue + 18, alpha * 0.5, "warm");
+            } else if (renderer === "plasma") {
+              drawLayerPack(rx0, ry0, rx1, ry1, profile, hue, alpha, baseWidth);
+              if (Math.random() < 0.1) drawSoftStamp(mx, my, baseWidth * 2.6, hue + 30, alpha * 0.18);
+            } else {
+              drawLayerPack(rx0, ry0, rx1, ry1, profile, hue, alpha, baseWidth);
+            }
+          }
+        }
+      };
+
+      spawnFan = function patchedSpawnFan(x, y, dx, dy) {
+        const profile = brushProfiles[state.brush] || brushProfiles.thunder;
+        const speed = Math.hypot(dx, dy);
+        const baseAngle = Math.atan2(dy, dx || 0.0001);
+        const sizeScale = brushWidthScale(state.size);
+        const expansionScale = clamp(state.expansion, 0.35, 1.6);
+        const spreadScale = 0.62 + expansionScale * 0.4;
+        const densityScale = clamp(0.62 + Math.sqrt(state.size / 7) * 0.15 - Math.max(0, expansionScale - 1) * 0.12, 0.48, 0.98);
+        const lifeScale = 0.72 + expansionScale * 0.24;
+        const velocityScale = 0.82 + expansionScale * 0.2;
+        const widthScale = 0.78 + Math.sqrt(state.size / 7) * 0.24;
+        const motionBoost = clamp(0.75 + Math.sqrt(speed) * 0.1, 0.75, 1.55);
+        const count = Math.max(1, Math.round(rand(profile.count[0], profile.count[1]) * densityScale));
+
+        for (let i = 0; i < count; i += 1) {
+          const angle = baseAngle + rand(-profile.spread, profile.spread) * spreadScale;
+          const velocity = rand(profile.velocity[0], profile.velocity[1]) * velocityScale * motionBoost;
+          const life = rand(profile.life[0], profile.life[1]) * lifeScale;
+          const lift = rand(profile.lift[0], profile.lift[1]) * state.dpr;
+          const hue = tendrilHue(profile, state.hue);
+          const hue2 = state.blend ? tendrilHue(profile, state.hue2) : hue;
+
+          state.tendrils.push({
+            x: x * state.dpr,
+            y: y * state.dpr,
+            vx: Math.cos(angle) * velocity * state.dpr,
+            vy: Math.sin(angle) * velocity * state.dpr - lift,
+            life,
+            maxLife: life,
+            hue,
+            hue2,
+            blend: state.blend,
+            width: rand(profile.width[0], profile.width[1]) * sizeScale * widthScale,
+            jitter: profile.jitter,
+            curl: profile.curl,
+            drag: profile.drag,
+            lift: (profile.lift[0] + profile.lift[1]) * 0.006,
+            alpha: profile.alpha,
+            branch: profile.branch,
+            seed: Math.random() * Math.PI * 2,
+            angular: profile.angular || 0,
+            brush: state.brush
+          });
+        }
+
+        const maxTendrils = Math.round((profile.maxTendrils || 720) * (0.85 + expansionScale * 0.16));
+        if (state.tendrils.length > maxTendrils) {
+          state.tendrils.splice(0, state.tendrils.length - maxTendrils);
+        }
+      };
+
+      spawnAlong = function patchedSpawnAlong(x0, y0, x1, y1) {
+        const profile = brushProfiles[state.brush] || brushProfiles.thunder;
+        const dx = x1 - x0;
+        const dy = y1 - y0;
+        const distance = Math.hypot(dx, dy);
+        const sizeDistanceScale = brushSpacingScale(state.size);
+        const expansionDistanceScale = 0.9 + state.expansion * 0.42;
+        const spacing = clamp(10.5 * sizeDistanceScale * expansionDistanceScale * (profile.spacing || 1), 8, 44);
+        const steps = Math.max(1, Math.floor(distance / spacing));
+        for (let i = 1; i <= steps; i += 1) {
+          const t = i / steps;
+          spawnFan(x0 + dx * t, y0 + dy * t, dx / steps, dy / steps);
+        }
+      };
+
+      setBrush = function patchedSetBrush(brush) {
+        const profile = brushProfiles[brush];
+        if (!profile) return;
+        state.brush = brush;
+        if (Array.isArray(profile.hues) && profile.hues.length) {
+          state.hue = normalizedHue(profile.hues[0]);
+          state.hue2 = normalizedHue(profile.hues[1] ?? profile.hues[0] + 120);
+          state.colorMode = profile.hues.length > 1 ? "blend" : "single";
+          state.blend = state.colorMode === "blend";
+          state.colorTarget = "primary";
+        }
+        updateUi();
+      };
+
+      setSymmetry = function patchedSetSymmetry(symmetry) {
+        state.symmetry = clamp(Math.round(Number(symmetry) || 1), 1, 16);
+        updateUi();
+      };
+
+      setBrush(state.brush);
+
+      /* ========================================================================
+         Canvas + mobile experience patch v3 extension
+
+         Keep this block after the brush-engine patch and still before:
+
+           stage.addEventListener("pointerdown", startPainting);
+
+         Adds:
+         - larger virtual canvas than the visible viewport;
+         - broader brush length range and larger default brush scale;
+         - DPR/pixel-budget caps for mobile performance;
+         - two-finger pan/zoom on touch screens;
+         - coalesced pointer events for smoother drawing;
+         - lighter mobile UI CSS.
+      ======================================================================== */
+
+      {
+        const CANVAS_CONFIG = {
+          desktopScale: 1.82,
+          mobileScale: 1.45,
+          desktopMaxPixels: 14000000,
+          mobileMaxPixels: 5200000,
+          desktopDprCap: 2.15,
+          mobileDprCap: 1.6,
+          desktopMinDpr: 1.5,
+          mobileMinDpr: 1.25,
+          desktopBrushBoost: 1.42,
+          mobileBrushBoost: 1.58,
+          maxBrushSize: BRUSH_LENGTH_RANGE.max,
+          desktopHistoryLimit: 8,
+          mobileHistoryLimit: 5
+        };
+        const WIDTH_TO_LENGTH_RATIO = 0.08;
+
+        state.canvasScale = state.canvasScale || 1;
+        state.brushBoost = state.brushBoost || 1;
+        state.panX = state.panX || 0;
+        state.panY = state.panY || 0;
+        state.gesturing = false;
+        state.holdBloomTimer = null;
+        state.lastMotion = [0.32, 0];
+
+        function mobileLike() {
+          return isMobileLayout() || window.matchMedia("(pointer: coarse)").matches;
+        }
+
+        function syncCanvasConfig() {
+          const mobile = mobileLike();
+          state.canvasScale = mobile ? CANVAS_CONFIG.mobileScale : CANVAS_CONFIG.desktopScale;
+          state.brushBoost = mobile ? CANVAS_CONFIG.mobileBrushBoost : CANVAS_CONFIG.desktopBrushBoost;
+          ui.size.min = String(BRUSH_LENGTH_RANGE.min);
+          ui.size.max = String(CANVAS_CONFIG.maxBrushSize);
+          ui.size.step = "0.1";
+          ui.scaleFactor.min = String(SCALE_FACTOR_RANGE.min);
+          ui.scaleFactor.max = String(SCALE_FACTOR_RANGE.max);
+          ui.scaleFactor.step = "0.1";
+          ui.zoom.min = String(Math.ceil(100 / state.canvasScale));
+          ui.zoom.max = "240";
+        }
+
+        function cssCanvasSize() {
+          const scale = state.canvasScale || 1;
+          return {
+            width: Math.ceil(window.innerWidth * scale),
+            height: Math.ceil(window.innerHeight * scale)
+          };
+        }
+
+        function computeBudgetedDpr(cssWidth, cssHeight) {
+          const mobile = mobileLike();
+          const cap = mobile ? CANVAS_CONFIG.mobileDprCap : CANVAS_CONFIG.desktopDprCap;
+          const min = mobile ? CANVAS_CONFIG.mobileMinDpr : CANVAS_CONFIG.desktopMinDpr;
+          const raw = clamp(Math.max(window.devicePixelRatio || 1, min), 0.75, cap);
+          const maxPixels = mobile ? CANVAS_CONFIG.mobileMaxPixels : CANVAS_CONFIG.desktopMaxPixels;
+          const budget = Math.sqrt(maxPixels / Math.max(1, cssWidth * cssHeight));
+          return clamp(Math.min(raw, budget), 0.75, raw);
+        }
+
+        function clampPan() {
+          const cssWidth = canvasCssWidth() || cssCanvasSize().width;
+          const cssHeight = canvasCssHeight() || cssCanvasSize().height;
+          const renderedWidth = cssWidth * state.zoom;
+          const renderedHeight = cssHeight * state.zoom;
+          const maxX = Math.max(0, (renderedWidth - window.innerWidth) / 2);
+          const maxY = Math.max(0, (renderedHeight - window.innerHeight) / 2);
+          state.panX = clamp(Number(state.panX) || 0, -maxX, maxX);
+          state.panY = clamp(Number(state.panY) || 0, -maxY, maxY);
+        }
+
+        function expandedBrushLengthScale(length) {
+          return clamp(Math.pow(effectiveBrushLength(length) / DEFAULT_EFFECTIVE_LENGTH, 0.9), 0.34, 3.6);
+        }
+
+        function expandedBrushWidthScale(length) {
+          const baseAtDefaultLength = 0.46 + Math.pow(LEGACY_DEFAULT_LENGTH / 7, 1.12) * 1.08;
+          const lengthScale = expandedBrushLengthScale(length);
+          const widthScale = 1 + (lengthScale - 1) * WIDTH_TO_LENGTH_RATIO;
+          const normalizedFactor = (state.scaleFactor || SCALE_FACTOR_RANGE.default) / SCALE_FACTOR_RANGE.default;
+          const factorWidthScale = 1 + (normalizedFactor - 1) * WIDTH_TO_LENGTH_RATIO;
+          return baseAtDefaultLength * Math.max(0.2, widthScale) * Math.max(0.2, factorWidthScale) * (state.brushBoost || 1);
+        }
+
+        function expandedBrushSpacingScale(length) {
+          const lengthScale = expandedBrushLengthScale(length);
+          return clamp(1 + (lengthScale - 1) * 0.48, 0.62, 2.15);
+        }
+
+        function installMobileCssPatch() {
+          if (document.getElementById("expandedCanvasMobilePatch")) return;
+          const style = document.createElement("style");
+          style.id = "expandedCanvasMobilePatch";
+          style.textContent = `
+            @media (pointer: coarse), (any-pointer: coarse) {
+              #stage { cursor: default; }
+              .grain { display: none; }
+              .brand, .toolbar, .panel, .zoom-cluster, .export-menu, .status {
+                backdrop-filter: none !important;
+                -webkit-backdrop-filter: none !important;
+              }
+              .panel, .export-menu {
+                box-shadow: 0 -12px 36px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255,255,255,0.07) !important;
+              }
+              .brush-list {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+              }
+              .brush {
+                grid-template-columns: 18px minmax(0, 1fr);
+                gap: 7px;
+                padding-inline: 8px;
+              }
+              .brush-name {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                font-size: 12px;
+              }
+              .params-panel .field {
+                gap: 4px;
+              }
+              .status {
+                font-size: 11px;
+              }
+            }
+          `;
+          document.head.append(style);
+        }
+
+        function clearHoldBloom() {
+          window.clearInterval(state.holdBloomTimer);
+          state.holdBloomTimer = null;
+        }
+
+        function beginHoldBloom(point) {
+          clearHoldBloom();
+          state.lastMotion = [0.48, 0];
+          spawnFan(point[0], point[1], state.lastMotion[0], state.lastMotion[1]);
+          state.holdBloomTimer = window.setInterval(() => {
+            if (!state.painting || state.gesturing || !state.last) {
+              clearHoldBloom();
+              return;
+            }
+            const motion = state.lastMotion || [0.32, 0];
+            const energy = Math.max(0.32, Math.hypot(motion[0], motion[1]) * 0.18);
+            spawnFan(state.last[0], state.last[1], motion[0] || energy, motion[1] || 0);
+          }, 90);
+        }
+
+        function emitSmoothedMove(point) {
+          if (!state.last) return;
+          const start = state.last;
+          const dx = point[0] - start[0];
+          const dy = point[1] - start[1];
+          const distance = Math.hypot(dx, dy);
+          if (distance * distance < 0.45) return;
+
+          const steps = Math.max(1, Math.ceil(distance / 52));
+          let cursor = start;
+          for (let i = 1; i <= steps; i += 1) {
+            const target = [
+              start[0] + dx * (i / steps),
+              start[1] + dy * (i / steps)
+            ];
+            const remaining = Math.hypot(target[0] - cursor[0], target[1] - cursor[1]);
+            const smoothing = clamp(0.46 + Math.min(remaining / 220, 0.18), 0.46, 0.64);
+            const next = [
+              cursor[0] + (target[0] - cursor[0]) * smoothing,
+              cursor[1] + (target[1] - cursor[1]) * smoothing
+            ];
+            if (Math.hypot(next[0] - cursor[0], next[1] - cursor[1]) > 0.35) {
+              spawnAlong(cursor[0], cursor[1], next[0], next[1]);
+            }
+            cursor = next;
+          }
+
+          state.lastMotion = [cursor[0] - start[0], cursor[1] - start[1]];
+          state.last = cursor;
+        }
+
+        applyZoom = function patchedExpandedApplyZoom() {
+          syncCanvasConfig();
+          state.zoom = clamp(Number(state.zoom) || 1, 1 / (state.canvasScale || 1), 2.4);
+          clampPan();
+          canvas.style.left = `calc(50% + ${state.panX}px)`;
+          canvas.style.top = `calc(50% + ${state.panY}px)`;
+          canvas.style.transform = `translate(-50%, -50%) scale(${state.zoom})`;
+          updateUi();
+        };
+
+        setZoom = function patchedExpandedSetZoom(zoom) {
+          syncCanvasConfig();
+          state.zoom = clamp(Number(zoom) || 1, 1 / (state.canvasScale || 1), 2.4);
+          applyZoom();
+        };
+
+        setSize = function patchedExpandedSetSize(size) {
+          state.size = clamp(toTenth(size, BRUSH_LENGTH_RANGE.default), BRUSH_LENGTH_RANGE.min, CANVAS_CONFIG.maxBrushSize);
+          updateUi();
+        };
+
+        setScaleFactor = function patchedExpandedSetScaleFactor(scaleFactor) {
+          state.scaleFactor = clamp(toTenth(scaleFactor, SCALE_FACTOR_RANGE.default), SCALE_FACTOR_RANGE.min, SCALE_FACTOR_RANGE.max);
+          updateUi();
+        };
+
+        pushHistory = function patchedExpandedPushHistory() {
+          state.history.push(makeSnapshot());
+          const limit = mobileLike() ? CANVAS_CONFIG.mobileHistoryLimit : CANVAS_CONFIG.desktopHistoryLimit;
+          if (state.history.length > limit) {
+            state.history.splice(0, state.history.length - limit);
+          }
+          state.redo = [];
+          updateUi();
+        };
+
+        resize = function patchedExpandedResize() {
+          const previous = state.width && state.height ? makeSnapshot() : null;
+
+          syncCanvasConfig();
+          const cssSize = cssCanvasSize();
+          state.dpr = computeBudgetedDpr(cssSize.width, cssSize.height);
+          state.width = Math.max(1, Math.floor(cssSize.width * state.dpr));
+          state.height = Math.max(1, Math.floor(cssSize.height * state.dpr));
+          state.cx = state.width / 2;
+          state.cy = state.height / 2;
+
+          updateSvgViewport();
+          canvas.style.width = `${cssSize.width}px`;
+          canvas.style.height = `${cssSize.height}px`;
+
+          if (previous) {
+            restoreSnapshot(previous);
+          } else {
+            clearSurface();
+          }
+
+          applyResponsiveMode();
+          clampAllPanels();
+          applyZoom();
+        };
+
+        eventPosition = function patchedExpandedEventPosition(event) {
+          const rect = canvas.getBoundingClientRect();
+          const cssWidth = canvasCssWidth();
+          const cssHeight = canvasCssHeight();
+          const x = (event.clientX - rect.left) * (cssWidth / Math.max(1, rect.width));
+          const y = (event.clientY - rect.top) * (cssHeight / Math.max(1, rect.height));
+          return [clamp(x, 0, cssWidth), clamp(y, 0, cssHeight)];
+        };
+
+        function canvasPointToViewport(x, y) {
+          const rect = canvas.getBoundingClientRect();
+          const cssWidth = canvasCssWidth();
+          const cssHeight = canvasCssHeight();
+          return [
+            rect.left + (x / Math.max(1, cssWidth)) * rect.width,
+            rect.top + (y / Math.max(1, cssHeight)) * rect.height
+          ];
+        }
+
+        function rotateCssAroundCenter(x, y, angle) {
+          const cx = canvasCssWidth() / 2;
+          const cy = canvasCssHeight() / 2;
+          const dx = x - cx;
+          const dy = y - cy;
+          const ca = Math.cos(angle);
+          const sa = Math.sin(angle);
+          return [cx + dx * ca - dy * sa, cy + dx * sa + dy * ca];
+        }
+
+        function symmetryGuidePoints(point) {
+          const cssWidth = canvasCssWidth();
+          const cx = cssWidth / 2;
+          const passes = state.mirror ? 2 : 1;
+          const points = [];
+
+          for (let mirrorIndex = 0; mirrorIndex < passes; mirrorIndex += 1) {
+            const x = mirrorIndex === 0 ? point[0] : 2 * cx - point[0];
+            const y = point[1];
+
+            for (let i = 0; i < state.symmetry; i += 1) {
+              const angle = (Math.PI * 2 * i) / state.symmetry;
+              const [rx, ry] = rotateCssAroundCenter(x, y, angle);
+              const [vx, vy] = canvasPointToViewport(rx, ry);
+              points.push({ x: vx, y: vy, origin: mirrorIndex === 0 && i === 0 });
+            }
+          }
+
+          return points;
+        }
+
+        function showSymmetryGuide(point) {
+          if (!point || state.gesturing) {
+            hideSymmetryGuide();
+            return;
+          }
+
+          state.symmetryGuidePoint = point;
+          const fragment = document.createDocumentFragment();
+          symmetryGuidePoints(point).forEach((guidePoint) => {
+            const dot = document.createElement("span");
+            dot.className = guidePoint.origin ? "symmetry-guide-dot origin" : "symmetry-guide-dot";
+            dot.setAttribute("aria-hidden", "true");
+            dot.style.setProperty("--guide-x", `${guidePoint.x}px`);
+            dot.style.setProperty("--guide-y", `${guidePoint.y}px`);
+            fragment.append(dot);
+          });
+          ui.symmetryGuide.replaceChildren(fragment);
+          ui.symmetryGuide.hidden = false;
+        }
+
+        function hideSymmetryGuide() {
+          state.symmetryGuidePoint = null;
+          ui.symmetryGuide.hidden = true;
+          ui.symmetryGuide.replaceChildren();
+        }
+
+        function refreshSymmetryGuide() {
+          if (!state.symmetryGuidePoint || ui.symmetryGuide.hidden) return;
+          showSymmetryGuide(state.symmetryGuidePoint);
+        }
+
+        spawnFan = function patchedExpandedSpawnFan(x, y, dx, dy) {
+          const profile = brushProfiles[state.brush] || brushProfiles.thunder;
+          const speed = Math.hypot(dx, dy);
+          const baseAngle = Math.atan2(dy, dx || 0.0001);
+          const lengthScale = expandedBrushLengthScale(state.size);
+          const sizeScale = expandedBrushWidthScale(state.size);
+          const expansionScale = clamp(state.expansion, 0.35, 1.6);
+          const spreadScale = 0.64 + expansionScale * 0.38;
+          const perfScale = mobileLike() ? 0.78 : 1;
+          const densityScale = clamp(
+            (0.66 - Math.max(0, lengthScale - 1) * 0.18 - Math.max(0, expansionScale - 1) * 0.14) * perfScale,
+            mobileLike() ? 0.34 : 0.44,
+            mobileLike() ? 0.78 : 0.94
+          );
+          const factorScale = clamp(
+            (state.scaleFactor || SCALE_FACTOR_RANGE.default) / SCALE_FACTOR_RANGE.default,
+            SCALE_FACTOR_RANGE.min / SCALE_FACTOR_RANGE.default,
+            SCALE_FACTOR_RANGE.max / SCALE_FACTOR_RANGE.default
+          );
+          const lifeScale = (0.72 + expansionScale * 0.23) * Math.pow(lengthScale, 1.32) * Math.sqrt(factorScale);
+          const velocityScale = (0.82 + expansionScale * 0.22) * Math.pow(lengthScale, 0.68) * factorScale;
+          const widthScale = (0.92 + expansionScale * 0.08) * (1 + (factorScale - 1) * WIDTH_TO_LENGTH_RATIO);
+          const motionBoost = clamp(0.72 + Math.sqrt(speed) * 0.105, 0.72, 1.55);
+          const count = Math.max(1, Math.round(rand(profile.count[0], profile.count[1]) * densityScale));
+
+          for (let i = 0; i < count; i += 1) {
+            const angle = baseAngle + rand(-profile.spread, profile.spread) * spreadScale;
+            const velocity = rand(profile.velocity[0], profile.velocity[1]) * velocityScale * motionBoost;
+            const life = rand(profile.life[0], profile.life[1]) * lifeScale;
+            const lift = rand(profile.lift[0], profile.lift[1]) * state.dpr;
+            const hue = tendrilHue(profile, state.hue);
+            const hue2 = state.blend ? tendrilHue(profile, state.hue2) : hue;
+
+            state.tendrils.push({
+              x: x * state.dpr,
+              y: y * state.dpr,
+              vx: Math.cos(angle) * velocity * state.dpr,
+              vy: Math.sin(angle) * velocity * state.dpr - lift,
+              life,
+              maxLife: life,
+              hue,
+              hue2,
+              blend: state.blend,
+              width: rand(profile.width[0], profile.width[1]) * sizeScale * widthScale,
+              jitter: profile.jitter,
+              curl: profile.curl,
+              drag: profile.drag,
+              lift: (profile.lift[0] + profile.lift[1]) * 0.006,
+              alpha: profile.alpha,
+              branch: profile.branch,
+              seed: Math.random() * Math.PI * 2,
+              angular: profile.angular || 0,
+              brush: state.brush
+            });
+          }
+
+          const mobileTendrilScale = mobileLike() ? 0.72 : 1;
+          const maxTendrils = Math.round((profile.maxTendrils || 720) * (0.78 + expansionScale * 0.14) * mobileTendrilScale);
+          if (state.tendrils.length > maxTendrils) {
+            state.tendrils.splice(0, state.tendrils.length - maxTendrils);
+          }
+        };
+
+        spawnAlong = function patchedExpandedSpawnAlong(x0, y0, x1, y1) {
+          const profile = brushProfiles[state.brush] || brushProfiles.thunder;
+          const dx = x1 - x0;
+          const dy = y1 - y0;
+          const distance = Math.hypot(dx, dy);
+          const sizeDistanceScale = expandedBrushSpacingScale(state.size);
+          const expansionDistanceScale = 0.9 + state.expansion * 0.46;
+          const spacing = clamp(11.8 * sizeDistanceScale * expansionDistanceScale * (profile.spacing || 1), mobileLike() ? 12 : 10, mobileLike() ? 76 : 96);
+          const steps = Math.max(1, Math.floor(distance / spacing));
+          for (let i = 1; i <= steps; i += 1) {
+            const t = i / steps;
+            spawnFan(x0 + dx * t, y0 + dy * t, dx / steps, dy / steps);
+          }
+        };
+
+        const originalStartPainting = startPainting;
+        startPainting = function patchedExpandedStartPainting(event) {
+          if (state.gesturing) return;
+          if (mobileLike()) closeTransientControls(false);
+          const result = originalStartPainting(event);
+          if (state.painting && state.last) {
+            showSymmetryGuide(state.last);
+            beginHoldBloom(state.last);
+          }
+          return result;
+        };
+
+        continuePainting = function patchedExpandedContinuePainting(event) {
+          const pointerId = event.pointerId ?? "mouse";
+          if (state.gesturing || !state.painting || pointerId !== state.pointerId || !state.last) return;
+          const coalescedEvents = typeof event.getCoalescedEvents === "function" ? event.getCoalescedEvents() : null;
+          const events = coalescedEvents && coalescedEvents.length ? coalescedEvents : [event];
+
+          for (const moveEvent of events) {
+            const point = eventPosition(moveEvent);
+            showSymmetryGuide(point);
+            emitSmoothedMove(point);
+          }
+
+          event.preventDefault();
+        };
+
+        const originalStopPainting = stopPainting;
+        stopPainting = function patchedExpandedStopPainting(event) {
+          clearHoldBloom();
+          hideSymmetryGuide();
+          if (state.gesturing) {
+            state.painting = false;
+            state.pointerId = null;
+            state.last = null;
+            return;
+          }
+          return originalStopPainting(event);
+        };
+
+        const originalSetSymmetry = setSymmetry;
+        setSymmetry = function patchedExpandedGuideSetSymmetry(symmetry) {
+          const result = originalSetSymmetry(symmetry);
+          refreshSymmetryGuide();
+          return result;
+        };
+
+        const originalToggleMirror = toggleMirror;
+        toggleMirror = function patchedExpandedGuideToggleMirror() {
+          const result = originalToggleMirror();
+          refreshSymmetryGuide();
+          return result;
+        };
+
+        randomize = function patchedExpandedRandomize() {
+          state.brush = brushOrder[Math.floor(Math.random() * brushOrder.length)];
+          const profile = brushProfiles[state.brush] || brushProfiles.thunder;
+          state.hue = normalizedHue(profile.hues?.[0] ?? Math.floor(Math.random() * 360));
+          state.hue2 = normalizedHue(profile.hues?.[1] ?? state.hue + Math.floor(80 + Math.random() * 190));
+          state.colorMode = profile.hues && profile.hues.length > 1 ? "blend" : (Math.random() > 0.34 ? "blend" : "single");
+          state.colorTarget = "primary";
+          state.blend = state.colorMode === "blend";
+          state.size = toTenth(rand(mobileLike() ? 0.6 : 0.4, mobileLike() ? 2.4 : 3.2), BRUSH_LENGTH_RANGE.default);
+          state.scaleFactor = toTenth(rand(1.6, mobileLike() ? 4.6 : 5.4), SCALE_FACTOR_RANGE.default);
+          state.expansion = rand(0.58, 1.18);
+          state.symmetry = Math.floor(2 + Math.random() * 15);
+          state.mirror = Math.random() > 0.22;
+          updateUi();
+        };
+
+        const activeTouchPointers = new Map();
+        let gestureStart = null;
+
+        function gestureMetrics() {
+          const points = Array.from(activeTouchPointers.values());
+          if (points.length < 2) return null;
+          const a = points[0];
+          const b = points[1];
+          return {
+            cx: (a.x + b.x) / 2,
+            cy: (a.y + b.y) / 2,
+            distance: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y))
+          };
+        }
+
+        function beginGestureIfNeeded(event) {
+          if (event.pointerType !== "touch") return;
+          activeTouchPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+          if (activeTouchPointers.size < 2) return;
+
+          const metrics = gestureMetrics();
+          if (!metrics) return;
+          state.gesturing = true;
+          state.painting = false;
+          state.pointerId = null;
+          state.last = null;
+          clearHoldBloom();
+          hideSymmetryGuide();
+          gestureStart = {
+            cx: metrics.cx,
+            cy: metrics.cy,
+            distance: metrics.distance,
+            zoom: state.zoom,
+            panX: state.panX,
+            panY: state.panY
+          };
+          event.preventDefault();
+          event.stopPropagation();
+        }
+
+        function updateGesture(event) {
+          if (event.pointerType !== "touch" || !activeTouchPointers.has(event.pointerId)) return;
+          activeTouchPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+          if (!state.gesturing || !gestureStart || activeTouchPointers.size < 2) return;
+
+          const metrics = gestureMetrics();
+          if (!metrics) return;
+          const ratio = metrics.distance / gestureStart.distance;
+          state.zoom = clamp(gestureStart.zoom * ratio, 1 / (state.canvasScale || 1), 2.4);
+          state.panX = gestureStart.panX + metrics.cx - gestureStart.cx;
+          state.panY = gestureStart.panY + metrics.cy - gestureStart.cy;
+          applyZoom();
+          event.preventDefault();
+          event.stopPropagation();
+        }
+
+        function endGesturePointer(event) {
+          if (event.pointerType !== "touch") return;
+          activeTouchPointers.delete(event.pointerId);
+          if (activeTouchPointers.size < 2) {
+            state.gesturing = false;
+            gestureStart = null;
+            state.painting = false;
+            state.pointerId = null;
+            state.last = null;
+            hideSymmetryGuide();
+            updateUi();
+          }
+        }
+
+        function previewSymmetryGuide(event) {
+          if (state.painting || state.gesturing || event.pointerType === "touch") return;
+          showSymmetryGuide(eventPosition(event));
+        }
+
+        stage.addEventListener("pointerdown", beginGestureIfNeeded, { capture: true });
+        stage.addEventListener("pointermove", updateGesture, { capture: true });
+        stage.addEventListener("pointermove", previewSymmetryGuide);
+        window.addEventListener("pointerup", endGesturePointer, { capture: true });
+        stage.addEventListener("pointercancel", endGesturePointer, { capture: true });
+        stage.addEventListener("pointerleave", endGesturePointer, { capture: true });
+        stage.addEventListener("pointerleave", hideSymmetryGuide);
+
+        installMobileCssPatch();
+        syncCanvasConfig();
+        if (state.size < BRUSH_LENGTH_RANGE.default) {
+          state.size = BRUSH_LENGTH_RANGE.default;
+        }
+        state.zoom = clamp(state.zoom, 1 / (state.canvasScale || 1), 2.4);
+      }
+
       stage.addEventListener("pointerdown", startPainting);
       stage.addEventListener("pointermove", continuePainting);
       window.addEventListener("pointerup", stopPainting);
@@ -2532,6 +3727,7 @@
       ui.zoom.addEventListener("dblclick", () => setZoom(1));
       ui.randomize.addEventListener("click", randomize);
       ui.size.addEventListener("input", (event) => setSize(event.target.value));
+      ui.scaleFactor.addEventListener("input", (event) => setScaleFactor(event.target.value));
       ui.expansion.addEventListener("input", (event) => setExpansion(Number(event.target.value) / 100));
       ui.symmetry.addEventListener("input", (event) => setSymmetry(event.target.value));
       ui.modes.forEach((button) => {

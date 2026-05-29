@@ -3,7 +3,7 @@
 [![Deploy GitHub Pages](https://github.com/chakib-belgaid/fractal-brushes/actions/workflows/pages.yml/badge.svg)](https://github.com/chakib-belgaid/fractal-brushes/actions/workflows/pages.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Fractal Brushes is a static HTML5 canvas drawing toy for symmetry art. It pairs a luminous mirrored canvas with a white-paper ink canvas, pointer drawing, compact controls, undo/redo, and browser-native PNG export.
+Fractal Brushes is a static canvas drawing toy for symmetry art. It pairs a luminous mirrored canvas with a white-paper ink canvas, pointer drawing, compact controls, undo/redo, and browser-native PNG export presets.
 
 The package is designed for GitHub Pages and has no build step or runtime dependencies.
 
@@ -31,7 +31,7 @@ The luminous `/app/` route includes the full color and 4K export toolset:
 - Use the main toolbar for undo, redo, export, clear, mirror, brush menu, color menu, and random brush selection.
 - Use the bottom-right zoom slider to adjust zoom and inspect the current zoom percentage. Double-click the slider to reset to 100%.
 - Open the brush and color panels independently. Panels are intended to be draggable and clamped within the viewport.
-- Use the bottom-left parameter panel for Brush Size, Expansion, and Symmetry. Brush Size and Expansion scale together: larger brushes also increase the spacing between expansion fans.
+- Use the bottom-left parameter panel for Brush Length, Scale Factor, Expansion, and Symmetry. The luminous route opens on Silk Ribbon at actual length `0.5` and actual scale `3`. The UI shows normalized control values by multiplying both numbers by `10`, so the defaults display as length `5` and scale `30`. Brush Length ranges from `0.1` to `6.4`; Scale Factor ranges from `0.1` to `15`. Scale Factor multiplies the effective brush length before the renderer derives tendril travel, spacing, and width. Brush Length primarily extends tendril travel; stroke width follows at a smaller fixed ratio. A live symmetry guide shows the mirrored/rotated drawing points while hovering or painting.
 - Keyboard shortcuts for core drawing actions should remain available when supported by the app.
 
 The `/white/` route keeps the controls focused on monochrome ink: brush swatches, ink density, water, edge style, brush size, symmetry, mirror, undo/redo, clear, randomize, and single-click PNG export. Its renderer stamps brush footprints along the pointer path, using paper grain, bristle masks, wash bloom, dry gaps, edge darkening, and splatter rather than the luminous route's animated trail system.
@@ -54,7 +54,7 @@ Notation:
 - `U(a, b)` is a uniform random sample in `[a, b)`.
 - `H(x, y, seed) = fract(sin(127.1x + 311.7y + 74.7seed) * 43758.5453123)`.
 - `clamp(x, a, b) = max(a, min(b, x))`.
-- `S` is brush size, `E` is expansion, `DPR` is device pixel ratio, `C = (cx, cy)` is the canvas center, and `Nsym` is the symmetry count.
+- `L` is actual brush length, `F` is actual scale factor, `E` is expansion, `DPR` is device pixel ratio, `C = (cx, cy)` is the canvas center, and `Nsym` is the symmetry count. The displayed length and scale values are `round(10L)` and `round(10F)`.
 
 ### Luminous Tendril Model (`/app/`)
 
@@ -65,9 +65,12 @@ dx = x1 - x0
 dy = y1 - y0
 D = sqrt(dx^2 + dy^2)
 
-distanceScale = 0.78 + sqrt(S / 7) * 0.36
-expansionDistanceScale = 0.82 + E * 0.32
-spacing = clamp(7.2 * distanceScale * expansionDistanceScale * (profile.spacing or 1), 5.5, 24)
+effectiveLength = max(0.1, L * F)
+defaultEffectiveLength = 0.5 * 3 = 1.5
+lengthScale = clamp((effectiveLength / defaultEffectiveLength)^0.9, 0.34, 3.6)
+distanceScale = clamp(1 + (lengthScale - 1) * 0.48, 0.62, 2.15)
+expansionDistanceScale = 0.9 + E * 0.46
+spacing = clamp(11.8 * distanceScale * expansionDistanceScale * (profile.spacing or 1), 10, 96)
 steps = max(1, floor(D / spacing))
 
 sample_i = P0 + (i / steps) * (P1 - P0), for i in 1..steps
@@ -79,26 +82,27 @@ At each `sample_i`, the active brush emits `K` tendrils:
 baseAngle = atan2(dy, dx)
 pointerSpeed = sqrt(dx^2 + dy^2)
 
-sizeScale = 0.42 + (S / 6)^1.22
+normalizedFactor = F / 3
+widthFromLength = 1 + (lengthScale - 1) * 0.08
+factorWidthScale = 1 + (normalizedFactor - 1) * 0.08
+sizeScale = defaultWidthScale * widthFromLength * factorWidthScale
 expansionScale = clamp(E, 0.35, 1.6)
-sizeExpansionScale = 0.78 + sqrt(S / 7) * 0.28
-coupledExpansion = expansionScale * sizeExpansionScale
 
-spreadScale = 0.45 + coupledExpansion * 0.85
-densityScale = 0.55 + expansionScale * 0.45
-lifeScale = 0.74 + coupledExpansion * 0.34
-velocityScale = 0.82 + coupledExpansion * 0.28
-widthScale = 0.86 + coupledExpansion * 0.18
+spreadScale = 0.64 + expansionScale * 0.38
+densityScale = clamp(0.66 - max(0, lengthScale - 1) * 0.18 - max(0, expansionScale - 1) * 0.14, 0.44, 0.94)
+lifeScale = (0.72 + expansionScale * 0.23) * lengthScale^1.32 * sqrt(normalizedFactor)
+velocityScale = (0.82 + expansionScale * 0.22) * lengthScale^0.68 * normalizedFactor
+widthScale = (0.92 + expansionScale * 0.08) * (1 + (normalizedFactor - 1) * 0.08)
 
-extraTendrils = floor(clamp((S - 5) / 4, 0, 3) * densityScale)
-K = max(1, floor(U(countMin, countMax + 1) * densityScale) + extraTendrils)
+K = max(1, floor(U(countMin, countMax + 1) * densityScale))
 ```
 
 Each tendril state is initialized as:
 
 ```text
 theta = baseAngle + U(-spread, spread) * spreadScale
-speed = U(velocityMin, velocityMax) * velocityScale * (0.55 + min(pointerSpeed * 0.045, 1.6))
+motionBoost = clamp(0.72 + sqrt(pointerSpeed) * 0.105, 0.72, 1.55)
+speed = U(velocityMin, velocityMax) * velocityScale * motionBoost
 T = U(lifeMin, lifeMax) * lifeScale
 
 x = sample_x * DPR
@@ -353,7 +357,7 @@ The luminous export menu exposes PNG presets:
 - 4K 16:9 PNG - exports 3840x2160.
 - 4K Square PNG - exports 4096x4096.
 
-Export filenames use this pattern:
+Luminous export filenames use this pattern:
 
 ```text
 fractal-brushes-<preset>-<timestamp>.png
