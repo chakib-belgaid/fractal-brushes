@@ -16,6 +16,10 @@ const mobileScreenshotPath = path.join(screenshotDir, "fractal-qa-mobile.png");
 test.use({ acceptDownloads: true, viewport: { width: 960, height: 720 } });
 
 test("root and app render without console errors on desktop and mobile", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem("fractalBrushes.tutorialSeen", "1");
+  });
+
   const consoleIssues = [];
   page.on("console", (msg) => {
     if (msg.type() === "error") consoleIssues.push(`console ${msg.type()}: ${msg.text()}`);
