@@ -373,7 +373,8 @@
 
     .panel[hidden],
     .export-menu[hidden],
-    .status[hidden] {
+    .status[hidden],
+    .tutorial[hidden] {
       display: none;
     }
 
@@ -718,6 +719,215 @@
       font-weight: 620;
       text-align: center;
       transform: translateX(-50%);
+    }
+
+    .tutorial {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      background:
+        radial-gradient(circle at 48% 42%, color-mix(in srgb, var(--active) 14%, transparent), transparent 34%),
+        rgba(2, 4, 12, 0.56);
+      backdrop-filter: blur(7px);
+      -webkit-backdrop-filter: blur(7px);
+      pointer-events: none;
+    }
+
+    .tutorial-spotlight {
+      position: fixed;
+      left: var(--spotlight-left, -120px);
+      top: var(--spotlight-top, -120px);
+      width: var(--spotlight-width, 0);
+      height: var(--spotlight-height, 0);
+      z-index: 31;
+      display: grid;
+      place-items: center;
+      border: 2px solid color-mix(in srgb, var(--active) 76%, white 10%);
+      border-radius: 12px;
+      box-shadow:
+        0 0 0 5px color-mix(in srgb, var(--active) 16%, transparent),
+        0 0 30px color-mix(in srgb, var(--active) 58%, transparent),
+        0 0 46px color-mix(in srgb, var(--secondary) 26%, transparent);
+      opacity: 0.96;
+      pointer-events: none;
+      transition: left 220ms var(--ease-out), top 220ms var(--ease-out), width 220ms var(--ease-out), height 220ms var(--ease-out), opacity 180ms var(--ease-out);
+      animation: tutorialPulse 1.8s var(--ease-in-out) infinite;
+    }
+
+    .tutorial-spotlight[hidden] {
+      display: none;
+    }
+
+    .spotlight-preview {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      place-items: center;
+      border-radius: 10px;
+      color: oklch(99% 0.006 220);
+      background:
+        radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--active) 20%, transparent), transparent 74%),
+        rgba(7, 10, 20, 0.92);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    }
+
+    .spotlight-preview[hidden] {
+      display: none;
+    }
+
+    .spotlight-preview svg {
+      width: min(26px, 68%);
+      height: min(26px, 68%);
+      fill: none;
+      stroke: currentColor;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 1.9;
+      filter: drop-shadow(0 0 12px color-mix(in srgb, var(--active) 72%, transparent));
+    }
+
+    .tutorial-card {
+      position: relative;
+      z-index: 32;
+      width: min(430px, calc(100vw - 36px));
+      max-height: calc(100dvh - 36px);
+      display: grid;
+      gap: 14px;
+      padding: 16px;
+      overflow: auto;
+      border: 1px solid color-mix(in srgb, var(--active) 34%, rgba(255, 255, 255, 0.12));
+      border-radius: 8px;
+      background:
+        linear-gradient(145deg, color-mix(in srgb, var(--active) 15%, transparent), transparent 40%),
+        var(--panel-strong);
+      box-shadow:
+        0 28px 80px oklch(2% 0.02 260 / 0.66),
+        inset 0 1px 0 oklch(100% 0 0 / 0.08);
+      pointer-events: auto;
+    }
+
+    .tutorial-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .tutorial-kicker,
+    .tutorial-progress {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 760;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+
+    .tutorial-title {
+      margin: 0;
+      color: var(--text);
+      font-size: 22px;
+      font-weight: 780;
+      line-height: 1.12;
+    }
+
+    .tutorial-copy {
+      margin: 0;
+      color: color-mix(in srgb, var(--text) 74%, var(--muted));
+      font-size: 14px;
+      font-weight: 540;
+      line-height: 1.55;
+    }
+
+    .tutorial-target {
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      align-items: center;
+      gap: 10px;
+      min-height: 46px;
+      padding: 8px 10px;
+      border: 1px solid rgba(190, 215, 255, 0.14);
+      border-radius: 8px;
+      color: color-mix(in srgb, var(--active) 78%, white 14%);
+      background: rgba(255, 255, 255, 0.05);
+      font-size: 12px;
+      font-weight: 720;
+    }
+
+    .tutorial-target svg {
+      width: 22px;
+      height: 22px;
+      justify-self: center;
+      fill: none;
+      stroke: currentColor;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 1.9;
+    }
+
+    .tutorial-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .tutorial-button {
+      min-height: 42px;
+      padding: 0 14px;
+      border: 1px solid rgba(190, 215, 255, 0.16);
+      border-radius: 8px;
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.055);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 760;
+      appearance: none;
+      transition: transform 150ms var(--ease-out), border-color 150ms var(--ease-out), background 150ms var(--ease-out), color 150ms var(--ease-out);
+    }
+
+    .tutorial-button.primary {
+      border-color: color-mix(in srgb, var(--active) 68%, white 10%);
+      color: oklch(99% 0.006 220);
+      background: color-mix(in srgb, var(--active) 22%, transparent);
+      box-shadow: 0 0 24px color-mix(in srgb, var(--active) 24%, transparent);
+    }
+
+    .tutorial-button:focus-visible {
+      border-color: color-mix(in srgb, var(--active) 58%, white 12%);
+      outline: 3px solid var(--focus);
+      outline-offset: 2px;
+    }
+
+    .tutorial-button:active {
+      transform: scale(0.98);
+    }
+
+    .tutorial-button:disabled {
+      cursor: not-allowed;
+      color: rgba(237, 245, 255, 0.34);
+      background: rgba(255, 255, 255, 0.03);
+      transform: none;
+      box-shadow: none;
+    }
+
+    @keyframes tutorialPulse {
+      0%,
+      100% {
+        box-shadow:
+          0 0 0 5px color-mix(in srgb, var(--active) 16%, transparent),
+          0 0 30px color-mix(in srgb, var(--active) 58%, transparent),
+          0 0 46px color-mix(in srgb, var(--secondary) 26%, transparent);
+      }
+
+      50% {
+        box-shadow:
+          0 0 0 9px color-mix(in srgb, var(--active) 10%, transparent),
+          0 0 36px color-mix(in srgb, var(--active) 68%, transparent),
+          0 0 56px color-mix(in srgb, var(--secondary) 32%, transparent);
+      }
     }
 
     @media (pointer: coarse), (any-pointer: coarse) {
@@ -1129,6 +1339,10 @@
         order: 9;
       }
 
+      .toolbar #help {
+        order: 10;
+      }
+
       .panel {
         min-width: 0;
         opacity: 0.96;
@@ -1270,6 +1484,35 @@
       .status {
         bottom: calc(var(--mobile-dock-height) + 62px + env(safe-area-inset-bottom));
       }
+
+      .tutorial {
+        align-items: end;
+        padding: 10px;
+        padding-bottom: calc(var(--mobile-dock-height) + 16px + env(safe-area-inset-bottom));
+      }
+
+      .tutorial-card {
+        width: 100%;
+        max-height: calc(100dvh - var(--mobile-dock-height) - 30px - env(safe-area-inset-bottom));
+      }
+
+      .tutorial-title {
+        font-size: 20px;
+      }
+
+      .tutorial-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .tutorial-button {
+        width: 100%;
+      }
+
+      #tutorialNext,
+      #tutorialDone {
+        grid-column: 1 / -1;
+      }
     }
 
     @media (max-width: 560px) and (max-height: 700px) {
@@ -1304,6 +1547,10 @@
         transition-duration: 1ms !important;
         animation-duration: 1ms !important;
         animation-iteration-count: 1 !important;
+      }
+
+      .tutorial-spotlight {
+        animation: none;
       }
     }
   </style>
@@ -1357,6 +1604,9 @@
       </button>
       <button class="tool" id="randomize" type="button" title="Randomize" aria-label="Randomize" data-mobile-label="Random">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>
+      </button>
+      <button class="tool" id="help" type="button" title="Help" aria-label="Help" data-mobile-label="Help" aria-haspopup="dialog" aria-controls="tutorial">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.8 9a2.4 2.4 0 0 1 4.5 1.2c0 1.6-2.3 1.9-2.3 3.4"/><path d="M12 17h.01"/></svg>
       </button>
     </div>
   </aside>
@@ -1446,6 +1696,30 @@
 
   <div class="status" id="status" hidden role="status" aria-live="polite"></div>
 
+  <section class="tutorial" id="tutorial" role="dialog" aria-modal="false" aria-labelledby="tutorialTitle" aria-describedby="tutorialCopy" hidden>
+    <div class="tutorial-spotlight" id="tutorialSpotlight" aria-hidden="true" hidden>
+      <div class="spotlight-preview" id="spotlightPreview" hidden></div>
+    </div>
+    <div class="tutorial-card">
+      <div class="tutorial-head">
+        <span class="tutorial-kicker">Walkthrough</span>
+        <span class="tutorial-progress" id="tutorialProgress">1 / 7</span>
+      </div>
+      <h2 class="tutorial-title" id="tutorialTitle">Draw on the canvas</h2>
+      <p class="tutorial-copy" id="tutorialCopy">Drag anywhere on the canvas to paint. Hold still for a small bloom, or move in arcs to let the symmetry build a larger form.</p>
+      <div class="tutorial-target" id="tutorialTarget">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19c3.5-8 10.5-12 14-14"/><path d="M7 16c3 2 6 2 9 0"/><path d="M5 19h.01"/><path d="M19 5h.01"/></svg>
+        <span>Start with a steady drag. The demo button paints a short sample stroke.</span>
+      </div>
+      <div class="tutorial-actions">
+        <button class="tutorial-button" id="tutorialBack" type="button">Back</button>
+        <button class="tutorial-button" id="tutorialSkip" type="button">Skip</button>
+        <button class="tutorial-button primary" id="tutorialNext" type="button">Next</button>
+        <button class="tutorial-button primary" id="tutorialDone" type="button" hidden>Start painting</button>
+      </div>
+    </div>
+  </section>
+
   <script>
     (() => {
       const stage = document.getElementById("stage");
@@ -1466,6 +1740,7 @@
         colorToggle: document.getElementById("colorToggle"),
         paramsToggle: document.getElementById("paramsToggle"),
         randomize: document.getElementById("randomize"),
+        help: document.getElementById("help"),
         paramsPanel: document.getElementById("paramsPanel"),
         brushPanel: document.getElementById("brushPanel"),
         colorPanel: document.getElementById("colorPanel"),
@@ -1488,7 +1763,18 @@
         expansionValue: document.getElementById("expansionValue"),
         symmetry: document.getElementById("symmetry"),
         symmetryValue: document.getElementById("symmetryValue"),
-        status: document.getElementById("status")
+        status: document.getElementById("status"),
+        tutorial: document.getElementById("tutorial"),
+        tutorialTitle: document.getElementById("tutorialTitle"),
+        tutorialCopy: document.getElementById("tutorialCopy"),
+        tutorialProgress: document.getElementById("tutorialProgress"),
+        tutorialSpotlight: document.getElementById("tutorialSpotlight"),
+        spotlightPreview: document.getElementById("spotlightPreview"),
+        tutorialTarget: document.getElementById("tutorialTarget"),
+        tutorialBack: document.getElementById("tutorialBack"),
+        tutorialSkip: document.getElementById("tutorialSkip"),
+        tutorialNext: document.getElementById("tutorialNext"),
+        tutorialDone: document.getElementById("tutorialDone")
       };
 
       const brushProfiles = {
@@ -1720,6 +2006,67 @@
         wide4k: { label: "4k-16-9", width: 3840, height: 2160 },
         square4k: { label: "4k-square", width: 4096, height: 4096 }
       };
+      const TUTORIAL_COOKIE = "fractalBrushesTutorialSeen";
+      const TUTORIAL_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
+      const TUTORIAL_STORAGE_KEY = "fractalBrushes.tutorialSeen";
+      const tutorialSteps = [
+        {
+          title: "Draw on the canvas",
+          copy: "Drag anywhere on the canvas to paint. Hold still for a small bloom, or move in arcs to let the symmetry build a larger form.",
+          target: "Start with a steady drag. The demo button paints a short sample stroke.",
+          targetId: "stage",
+          actionLabel: "Paint demo",
+          icon: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19c3.5-8 10.5-12 14-14"/><path d="M7 16c3 2 6 2 9 0"/><path d="M5 19h.01"/><path d="M19 5h.01"/></svg>`
+        },
+        {
+          title: "Start with a brush",
+          copy: "Pick a brush style, then drag across the canvas. Each stroke fans into mirrored fractal tendrils around the center point.",
+          target: "Open Brushes to switch between silk, flame, water, crystal, and more.",
+          targetId: "brushToggle",
+          actionLabel: "Show brushes",
+          icon: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20c4 0 5.5-1.5 6-4"/><path d="M10 16 20 6a2 2 0 0 0-2.8-2.8L7.2 13.2"/><path d="M7 13c2.6.3 3.7 1.4 4 4"/></svg>`
+        },
+        {
+          title: "Tune length and expansion",
+          copy: "Brush length controls how far tendrils travel. Scale factor multiplies that length, and expansion spreads or tightens the fan.",
+          target: "Open Tune to adjust Brush length, Scale factor, and Expansion before you draw.",
+          targetId: "paramsToggle",
+          actionLabel: "Open tuning",
+          icon: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10"/><path d="M18 7h2"/><circle cx="16" cy="7" r="2"/><path d="M4 17h2"/><path d="M10 17h10"/><circle cx="8" cy="17" r="2"/></svg>`
+        },
+        {
+          title: "Set symmetry points",
+          copy: "Points sets how many copies are drawn around the center. Fewer points feel bold; more points make denser mandala-like forms.",
+          target: "The demo action sets Points to 10 so you can see a denser guide.",
+          targetId: "symmetry",
+          actionLabel: "Set 10 points",
+          icon: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2"/><path d="M12 3v4"/><path d="M12 17v4"/><path d="M3 12h4"/><path d="M17 12h4"/><path d="m5.6 5.6 2.8 2.8"/><path d="m15.6 15.6 2.8 2.8"/><path d="m18.4 5.6-2.8 2.8"/><path d="m8.4 15.6-2.8 2.8"/></svg>`
+        },
+        {
+          title: "Use mirror mode",
+          copy: "Mirror doubles each stroke across the vertical center line. Turn it off for single-sided radial marks, or on for balanced reflections.",
+          target: "The demo action toggles Mirror so you can see the button state change.",
+          targetId: "mirror",
+          actionLabel: "Toggle mirror",
+          icon: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16"/><path d="M4 8l6 4-6 4V8Z"/><path d="M20 8l-6 4 6 4V8Z"/></svg>`
+        },
+        {
+          title: "Shape the color",
+          copy: "The color wheel sets the active hue. Switch to Blend to paint with a second hue that shifts through each tendril as it fades.",
+          target: "Open Color, choose Blend, then adjust Primary and Secondary.",
+          targetId: "colorToggle",
+          actionLabel: "Try blend",
+          icon: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 1 0 8 8"/><path d="M12 4a4 4 0 0 1 4 4c0 4-4 4-4 8"/><circle cx="12" cy="12" r="1"/></svg>`
+        },
+        {
+          title: "Export the canvas",
+          copy: "When the image feels finished, export the current view or a larger 4K render. Undo, redo, clear, and randomize stay in the toolbar.",
+          target: "Use Export to download a PNG. Press Help any time to see this again.",
+          targetId: "exportToggle",
+          actionLabel: "Open export",
+          icon: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11"/><path d="m7 9 5 5 5-5"/><path d="M5 19h14"/></svg>`
+        }
+      ];
       const DISPLAY_FACTOR = 10;
       const BRUSH_LENGTH_RANGE = { min: 0.1, max: 6.4, default: 0.5 };
       const SCALE_FACTOR_RANGE = { min: 0.1, max: 15, default: 3 };
@@ -1753,7 +2100,9 @@
         exporting: false,
         statusTimer: null,
         symmetryGuidePoint: null,
-        mobileLayout: null
+        mobileLayout: null,
+        tutorialStep: 0,
+        tutorialReturnFocus: null
       };
 
       const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -1845,6 +2194,7 @@
 
       function hydrateTooltips() {
         document.querySelectorAll("button").forEach((button) => {
+          if (button.closest(".tutorial")) return;
           const label = button.getAttribute("aria-label") || button.title || button.textContent.trim();
           if (label) button.dataset.tooltip = label;
         });
@@ -1951,6 +2301,7 @@
         applyResponsiveMode();
         clampAllPanels();
         applyZoom();
+        updateTutorialSpotlight();
       }
 
       function rotateAroundCenter(x, y, angle) {
@@ -2185,6 +2536,7 @@
       }
 
       function startPainting(event) {
+        if (!ui.tutorial.hidden) return;
         if (event.button !== undefined && event.button !== 0) return;
         if (state.painting || (event.pointerType === "touch" && event.isPrimary === false)) return;
         pushHistory();
@@ -2379,6 +2731,33 @@
           const closeButton = panel.querySelector(".mini");
           if (closeButton) closeButton.focus({ preventScroll: true });
         }
+        updateTutorialSpotlight();
+      }
+
+      function showExportMenu() {
+        if (isMobileLayout()) {
+          closeMobileDrawers();
+        }
+        ui.exportMenu.hidden = false;
+        updateUi();
+      }
+
+      function paintTutorialDemo() {
+        if (!state.width || !state.height) return;
+        pushHistory();
+        const left = Math.max(90, state.cx - Math.min(220, state.width * 0.28));
+        const right = Math.min(state.width - 90, state.cx + Math.min(220, state.width * 0.28));
+        const midY = state.cy + Math.min(82, state.height * 0.14);
+        const points = [
+          [left, midY],
+          [left + (right - left) * 0.28, midY - 58],
+          [left + (right - left) * 0.58, midY + 34],
+          [right, midY - 24]
+        ];
+        for (let i = 1; i < points.length; i += 1) {
+          spawnAlong(points[i - 1][0], points[i - 1][1], points[i][0], points[i][1]);
+        }
+        showStatus("Drag on the canvas to paint your own stroke.");
       }
 
       function showStatus(message) {
@@ -2388,6 +2767,161 @@
         state.statusTimer = window.setTimeout(() => {
           ui.status.hidden = true;
         }, 2200);
+      }
+
+      function hasCookie(name) {
+        return document.cookie
+          .split(";")
+          .map((item) => item.trim())
+          .some((item) => item === `${name}=1`);
+      }
+
+      function getLocalFlag(key) {
+        try {
+          return window.localStorage.getItem(key) === "1";
+        } catch (_) {
+          return false;
+        }
+      }
+
+      function setLocalFlag(key) {
+        try {
+          window.localStorage.setItem(key, "1");
+        } catch (_) {
+          // Cookie persistence is the primary path; localStorage only helps file previews.
+        }
+      }
+
+      function hasSeenTutorial() {
+        return hasCookie(TUTORIAL_COOKIE) || getLocalFlag(TUTORIAL_STORAGE_KEY);
+      }
+
+      function rememberTutorialSeen() {
+        document.cookie = `${TUTORIAL_COOKIE}=1; Max-Age=${TUTORIAL_COOKIE_MAX_AGE}; SameSite=Lax; Path=/`;
+        setLocalFlag(TUTORIAL_STORAGE_KEY);
+      }
+
+      function renderTutorialStep() {
+        const step = tutorialSteps[state.tutorialStep];
+        ui.tutorialTitle.textContent = step.title;
+        ui.tutorialCopy.textContent = step.copy;
+        ui.tutorialProgress.textContent = `${state.tutorialStep + 1} / ${tutorialSteps.length}`;
+        ui.tutorialTarget.innerHTML = `${step.icon}<span>${step.target}</span>`;
+        ui.tutorialBack.disabled = state.tutorialStep === 0;
+        ui.tutorialNext.hidden = state.tutorialStep === tutorialSteps.length - 1;
+        ui.tutorialNext.textContent = step.actionLabel || "Next";
+        ui.tutorialDone.hidden = state.tutorialStep !== tutorialSteps.length - 1;
+        updateTutorialSpotlight();
+      }
+
+      function updateTutorialSpotlight() {
+        if (ui.tutorial.hidden) return;
+        const step = tutorialSteps[state.tutorialStep];
+        const target = step && document.getElementById(step.targetId);
+        if (!target) {
+          ui.tutorialSpotlight.hidden = true;
+          ui.spotlightPreview.hidden = true;
+          return;
+        }
+        const rect = target.getBoundingClientRect();
+        if (!rect.width || !rect.height) {
+          ui.tutorialSpotlight.hidden = true;
+          ui.spotlightPreview.hidden = true;
+          return;
+        }
+        const margin = isMobileLayout() ? 5 : 7;
+        ui.tutorialSpotlight.dataset.targetId = step.targetId;
+        ui.tutorialSpotlight.style.setProperty("--spotlight-left", `${Math.max(0, rect.left - margin)}px`);
+        ui.tutorialSpotlight.style.setProperty("--spotlight-top", `${Math.max(0, rect.top - margin)}px`);
+        ui.tutorialSpotlight.style.setProperty("--spotlight-width", `${Math.min(window.innerWidth, rect.width + margin * 2)}px`);
+        ui.tutorialSpotlight.style.setProperty("--spotlight-height", `${Math.min(window.innerHeight, rect.height + margin * 2)}px`);
+        const icon = target.querySelector("svg") || null;
+        const isLargeTarget = rect.width > 260 || rect.height > 120;
+        if (isLargeTarget) {
+          ui.spotlightPreview.hidden = true;
+          ui.spotlightPreview.innerHTML = "";
+        } else {
+          ui.spotlightPreview.innerHTML = icon ? icon.outerHTML : step.icon;
+          ui.spotlightPreview.hidden = false;
+        }
+        ui.tutorialSpotlight.hidden = false;
+      }
+
+      function openTutorial() {
+        closeTransientControls(false);
+        state.tutorialStep = 0;
+        state.tutorialReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : ui.help;
+        renderTutorialStep();
+        ui.tutorial.hidden = false;
+        ui.help.setAttribute("aria-expanded", "true");
+        updateTutorialSpotlight();
+        window.requestAnimationFrame(() => {
+          updateTutorialSpotlight();
+          ui.tutorialNext.focus({ preventScroll: true });
+        });
+      }
+
+      function closeTutorial(remember = true) {
+        if (remember) rememberTutorialSeen();
+        ui.tutorial.hidden = true;
+        ui.tutorialSpotlight.hidden = true;
+        ui.spotlightPreview.hidden = true;
+        ui.help.setAttribute("aria-expanded", "false");
+        const focusTarget = state.tutorialReturnFocus || ui.help;
+        state.tutorialReturnFocus = null;
+        if (focusTarget && typeof focusTarget.focus === "function") {
+          focusTarget.focus({ preventScroll: true });
+        }
+      }
+
+      function nextTutorialStep() {
+        state.tutorialStep = clamp(state.tutorialStep + 1, 0, tutorialSteps.length - 1);
+        renderTutorialStep();
+        if (ui.tutorialDone.hidden) {
+          ui.tutorialNext.focus({ preventScroll: true });
+        } else {
+          ui.tutorialDone.focus({ preventScroll: true });
+        }
+      }
+
+      function previousTutorialStep() {
+        state.tutorialStep = clamp(state.tutorialStep - 1, 0, tutorialSteps.length - 1);
+        renderTutorialStep();
+        ui.tutorialBack.focus({ preventScroll: true });
+      }
+
+      function activateTutorialStep() {
+        const step = tutorialSteps[state.tutorialStep];
+        if (step.targetId === "stage") {
+          paintTutorialDemo();
+        } else if (step.targetId === "brushToggle") {
+          togglePanel(ui.brushPanel, ui.brushToggle, true);
+        } else if (step.targetId === "paramsToggle") {
+          togglePanel(ui.paramsPanel, ui.paramsToggle, true);
+        } else if (step.targetId === "symmetry") {
+          togglePanel(ui.paramsPanel, ui.paramsToggle, true);
+          setSymmetry(10);
+        } else if (step.targetId === "mirror") {
+          toggleMirror();
+        } else if (step.targetId === "colorToggle") {
+          togglePanel(ui.colorPanel, ui.colorToggle, true);
+          setColorMode("blend");
+        } else if (step.targetId === "exportToggle") {
+          showExportMenu();
+        }
+
+        if (state.tutorialStep < tutorialSteps.length - 1) {
+          nextTutorialStep();
+        } else {
+          updateTutorialSpotlight();
+        }
+      }
+
+      function initializeTutorial() {
+        ui.help.setAttribute("aria-expanded", "false");
+        if (!hasSeenTutorial()) {
+          openTutorial();
+        }
       }
 
       function timestamp() {
@@ -3699,14 +4233,14 @@
       ui.redo.addEventListener("click", redo);
       ui.exportToggle.addEventListener("click", () => {
         const shouldShow = ui.exportMenu.hidden;
-        if (isMobileLayout() && shouldShow) {
-          closeMobileDrawers();
-        }
-        ui.exportMenu.hidden = !shouldShow;
-        updateUi();
         if (shouldShow) {
+          showExportMenu();
           ui.exportOptions[0].focus({ preventScroll: true });
+        } else {
+          ui.exportMenu.hidden = true;
+          updateUi();
         }
+        updateTutorialSpotlight();
       });
       ui.exportOptions.forEach((button) => {
         button.addEventListener("click", () => {
@@ -3726,6 +4260,11 @@
       ui.zoom.addEventListener("input", (event) => setZoom(Number(event.target.value) / 100));
       ui.zoom.addEventListener("dblclick", () => setZoom(1));
       ui.randomize.addEventListener("click", randomize);
+      ui.help.addEventListener("click", openTutorial);
+      ui.tutorialBack.addEventListener("click", previousTutorialStep);
+      ui.tutorialNext.addEventListener("click", activateTutorialStep);
+      ui.tutorialSkip.addEventListener("click", () => closeTutorial(true));
+      ui.tutorialDone.addEventListener("click", () => closeTutorial(true));
       ui.size.addEventListener("input", (event) => setSize(event.target.value));
       ui.scaleFactor.addEventListener("input", (event) => setScaleFactor(event.target.value));
       ui.expansion.addEventListener("input", (event) => setExpansion(Number(event.target.value) / 100));
@@ -3751,6 +4290,11 @@
       });
 
       window.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !ui.tutorial.hidden) {
+          event.preventDefault();
+          closeTutorial(true);
+          return;
+        }
         if (event.key === "Escape" && closeTransientControls(true)) {
           event.preventDefault();
           return;
@@ -3802,6 +4346,7 @@
       makeDraggable(ui.colorPanel);
       resize();
       updateUi();
+      initializeTutorial();
       step();
     })();
   </script>
