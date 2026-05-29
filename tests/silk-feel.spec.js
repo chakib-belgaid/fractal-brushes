@@ -57,12 +57,20 @@ async function preparePage(page) {
   await page.goto(appUrl);
 }
 
-async function drawLengthSample(page, length) {
+async function drawLengthSample(page, length, scaleFactor = null) {
+  await page.goto(appUrl);
   await page.locator("#size").evaluate((input, nextLength) => {
     input.value = String(nextLength);
     input.dispatchEvent(new Event("input", { bubbles: true }));
   }, length);
-  await expect(page.locator("#sizeValue")).toHaveText(String(length));
+  await expect(page.locator("#sizeValue")).toHaveText(String(Math.round(length * 10)));
+  if (scaleFactor !== null) {
+    await page.locator("#scaleFactor").evaluate((input, nextScaleFactor) => {
+      input.value = String(nextScaleFactor);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    }, scaleFactor);
+    await expect(page.locator("#scaleFactorValue")).toHaveText(String(Math.round(scaleFactor * 10)));
+  }
   await page.evaluate(() => {
     window.__brushDrawCalls = 0;
     window.__brushStrokeMetrics = [];
@@ -105,7 +113,8 @@ async function drawLengthSample(page, length) {
     const averageWidth = metrics.length
       ? metrics.reduce((sum, stroke) => sum + stroke.width, 0) / metrics.length
       : 0;
-    return { averageWidth, drawCalls: window.__brushDrawCalls || 0, totalLength };
+    const averageStrokeLength = metrics.length ? totalLength / metrics.length : 0;
+    return { averageStrokeLength, averageWidth, drawCalls: window.__brushDrawCalls || 0, totalLength };
   });
 }
 
@@ -114,7 +123,10 @@ test("brush length control exposes a broad silk-style range", async ({ page }) =
 
   await expect(page.locator(".params-panel .field-label").filter({ hasText: "Brush length" })).toHaveCount(1);
   await expect(page.locator("#size")).toHaveAttribute("aria-label", "Brush length");
-  await expect.poll(async () => Number(await page.locator("#size").getAttribute("max"))).toBeGreaterThanOrEqual(64);
+  await expect(page.locator("#size")).toHaveAttribute("min", "0.1");
+  await expect(page.locator("#size")).toHaveAttribute("step", "0.1");
+  await expect(page.locator("#size")).toHaveAttribute("max", "6.4");
+  await expect(page.locator("#sizeValue")).toHaveText("5");
 
   await page.locator("#size").evaluate((input) => {
     input.value = input.max;
@@ -124,24 +136,71 @@ test("brush length control exposes a broad silk-style range", async ({ page }) =
   await expect(page.locator("#sizeValue")).toHaveText("64");
 });
 
+test("scale factor control multiplies the brush stroke math", async ({ page }) => {
+  await preparePage(page);
+
+  await expect(page.locator(".params-panel .field-label").filter({ hasText: "Scale factor" })).toHaveCount(1);
+  await expect(page.locator("#scaleFactor")).toHaveAttribute("aria-label", "Scale factor");
+  await expect(page.locator("#scaleFactor")).toHaveAttribute("max", "15");
+  await expect(page.locator("#scaleFactorValue")).toHaveText("30");
+
+  const baseline = await drawLengthSample(page, 0.5, 1);
+  const scaled = await drawLengthSample(page, 0.5, 3);
+
+  expect(baseline.totalLength).toBeGreaterThan(0);
+  expect(scaled.averageStrokeLength).toBeGreaterThan(baseline.averageStrokeLength * 1.8);
+  expect(scaled.averageWidth).toBeGreaterThan(baseline.averageWidth * 1.05);
+});
+
 test("luminous app opens with a silk ribbon brush and longer default length", async ({ page }) => {
   await preparePage(page);
 
   await expect(page.locator("[data-brush='silk']")).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator("#sizeValue")).toHaveText("16");
+  await expect(page.locator("#sizeValue")).toHaveText("5");
+  await expect(page.locator("#scaleFactorValue")).toHaveText("30");
 });
 
 test("brush length scales stroke travel more than stroke width", async ({ page }) => {
   await preparePage(page);
 
-  const shortBrush = await drawLengthSample(page, 8);
+  const shortBrush = await drawLengthSample(page, 0.8);
   await page.locator("#clear").click();
-  const longBrush = await drawLengthSample(page, 64);
+  const longBrush = await drawLengthSample(page, 6.4);
 
   expect(shortBrush.totalLength).toBeGreaterThan(0);
   expect(longBrush.totalLength).toBeGreaterThan(shortBrush.totalLength * 1.45);
   expect(longBrush.averageWidth).toBeGreaterThan(shortBrush.averageWidth);
   expect(longBrush.averageWidth / shortBrush.averageWidth).toBeLessThan(longBrush.totalLength / shortBrush.totalLength);
+});
+
+test("symmetry guide shows mirrored drawing points while painting", async ({ page }) => {
+  await preparePage(page);
+
+  await page.locator("#stage").dispatchEvent("pointerdown", {
+    clientX: 300,
+    clientY: 340,
+    pointerId: 1,
+    pointerType: "mouse",
+    button: 0,
+    buttons: 1,
+    bubbles: true
+  });
+
+  await expect(page.locator("#symmetryGuide")).toBeVisible();
+  await expect(page.locator(".symmetry-guide-dot")).toHaveCount(12);
+  await expect(page.locator(".symmetry-guide-dot.origin")).toHaveCount(1);
+
+  await page.locator("#stage").dispatchEvent("pointerup", {
+    clientX: 300,
+    clientY: 340,
+    pointerId: 1,
+    pointerType: "mouse",
+    button: 0,
+    buttons: 0,
+    bubbles: true
+  });
+
+  await expect(page.locator("#symmetryGuide")).toBeHidden();
 });
 
 test("canvas keeps extra backing resolution for zoom quality", async ({ page }) => {

@@ -76,6 +76,44 @@
       will-change: transform;
     }
 
+    .symmetry-guide {
+      position: fixed;
+      inset: 0;
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    .symmetry-guide[hidden] {
+      display: none;
+    }
+
+    .symmetry-guide-dot {
+      position: fixed;
+      left: var(--guide-x);
+      top: var(--guide-y);
+      width: 12px;
+      height: 12px;
+      border: 1px solid color-mix(in srgb, var(--active) 72%, white 18%);
+      border-radius: 50%;
+      opacity: 0.78;
+      transform: translate(-50%, -50%);
+      background:
+        radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.94) 0 16%, color-mix(in srgb, var(--active) 78%, transparent) 18% 46%, transparent 62%);
+      box-shadow:
+        0 0 12px color-mix(in srgb, var(--active) 62%, transparent),
+        0 0 24px color-mix(in srgb, var(--secondary) 26%, transparent);
+    }
+
+    .symmetry-guide-dot.origin {
+      width: 15px;
+      height: 15px;
+      opacity: 0.96;
+      border-color: rgba(255, 255, 255, 0.82);
+      box-shadow:
+        0 0 14px color-mix(in srgb, var(--active) 82%, transparent),
+        0 0 28px color-mix(in srgb, var(--secondary) 36%, transparent);
+    }
+
     .grain {
       position: fixed;
       inset: 0;
@@ -1274,6 +1312,7 @@
   <div id="stage" aria-label="Fractal Brushes drawing surface">
     <canvas id="art" aria-label="Fractal Brushes drawing canvas"></canvas>
   </div>
+  <div class="symmetry-guide" id="symmetryGuide" aria-hidden="true" hidden></div>
   <div class="grain" aria-hidden="true"></div>
 
   <aside class="chrome" aria-label="Canvas controls">
@@ -1338,8 +1377,15 @@
     <div class="field">
       <span class="field-label">Brush length</span>
       <div class="slider-row">
-        <input id="size" type="range" min="1" max="18" value="7" aria-label="Brush length">
-        <span class="value" id="sizeValue">7</span>
+        <input id="size" type="range" min="0.1" max="6.4" step="0.1" value="0.5" aria-label="Brush length">
+        <span class="value" id="sizeValue">5</span>
+      </div>
+    </div>
+    <div class="field">
+      <span class="field-label">Scale factor</span>
+      <div class="slider-row">
+        <input id="scaleFactor" type="range" min="0.1" max="15" step="0.1" value="3" aria-label="Scale factor">
+        <span class="value" id="scaleFactorValue">30</span>
       </div>
     </div>
     <div class="field">
@@ -1433,8 +1479,11 @@
         targetSwitch: document.querySelector(".target-switch"),
         zoom: document.getElementById("zoom"),
         zoomValue: document.getElementById("zoomValue"),
+        symmetryGuide: document.getElementById("symmetryGuide"),
         size: document.getElementById("size"),
         sizeValue: document.getElementById("sizeValue"),
+        scaleFactor: document.getElementById("scaleFactor"),
+        scaleFactorValue: document.getElementById("scaleFactorValue"),
         expansion: document.getElementById("expansion"),
         expansionValue: document.getElementById("expansionValue"),
         symmetry: document.getElementById("symmetry"),
@@ -1671,6 +1720,11 @@
         wide4k: { label: "4k-16-9", width: 3840, height: 2160 },
         square4k: { label: "4k-square", width: 4096, height: 4096 }
       };
+      const DISPLAY_FACTOR = 10;
+      const BRUSH_LENGTH_RANGE = { min: 0.1, max: 6.4, default: 0.5 };
+      const SCALE_FACTOR_RANGE = { min: 0.1, max: 15, default: 3 };
+      const DEFAULT_EFFECTIVE_LENGTH = BRUSH_LENGTH_RANGE.default * SCALE_FACTOR_RANGE.default;
+      const LEGACY_DEFAULT_LENGTH = 16;
 
       const state = {
         width: 0,
@@ -1684,7 +1738,8 @@
         hue: 195,
         hue2: 314,
         blend: false,
-        size: 16,
+        size: BRUSH_LENGTH_RANGE.default,
+        scaleFactor: SCALE_FACTOR_RANGE.default,
         expansion: 0.85,
         symmetry: 6,
         mirror: true,
@@ -1697,11 +1752,22 @@
         redo: [],
         exporting: false,
         statusTimer: null,
+        symmetryGuidePoint: null,
         mobileLayout: null
       };
 
       const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
       const rand = (min, max) => min + Math.random() * (max - min);
+      const toTenth = (value, fallback) => Math.round((Number(value) || fallback) * DISPLAY_FACTOR) / DISPLAY_FACTOR;
+      const controlDisplayValue = (value) => String(Math.round(Number(value) * DISPLAY_FACTOR));
+      const effectiveBrushLength = (length = state.size, factor = state.scaleFactor) => {
+        const brushLength = Number(length) || BRUSH_LENGTH_RANGE.default;
+        const brushFactor = Number(factor) || SCALE_FACTOR_RANGE.default;
+        return Math.max(BRUSH_LENGTH_RANGE.min, brushLength * brushFactor);
+      };
+      const legacyEquivalentLength = (length = state.size, factor = state.scaleFactor) => {
+        return (effectiveBrushLength(length, factor) / DEFAULT_EFFECTIVE_LENGTH) * LEGACY_DEFAULT_LENGTH;
+      };
       const activeColor = () => `hsl(${Math.round(state.hue)} 100% 62%)`;
       const secondaryColor = () => `hsl(${Math.round(state.hue2)} 100% 62%)`;
       const targetColor = () => state.colorTarget === "primary" ? activeColor() : secondaryColor();
@@ -1808,7 +1874,11 @@
         ui.colorToggle.setAttribute("aria-expanded", String(!ui.colorPanel.hidden));
         ui.exportToggle.setAttribute("aria-expanded", String(!ui.exportMenu.hidden));
         ui.size.value = String(state.size);
-        ui.sizeValue.textContent = String(state.size);
+        ui.sizeValue.textContent = controlDisplayValue(state.size);
+        ui.size.setAttribute("aria-valuetext", `${controlDisplayValue(state.size)} normalized, ${state.size.toFixed(1)} actual`);
+        ui.scaleFactor.value = String(state.scaleFactor);
+        ui.scaleFactorValue.textContent = controlDisplayValue(state.scaleFactor);
+        ui.scaleFactor.setAttribute("aria-valuetext", `${controlDisplayValue(state.scaleFactor)} normalized, ${state.scaleFactor.toFixed(1)}x actual`);
         ui.expansion.value = String(Math.round(state.expansion * 100));
         ui.expansionValue.textContent = `${Math.round(state.expansion * 100)}%`;
         ui.symmetry.value = String(state.symmetry);
@@ -2220,7 +2290,12 @@
       }
 
       function setSize(size) {
-        state.size = clamp(Number(size), 1, 18);
+        state.size = clamp(toTenth(size, BRUSH_LENGTH_RANGE.default), BRUSH_LENGTH_RANGE.min, BRUSH_LENGTH_RANGE.max);
+        updateUi();
+      }
+
+      function setScaleFactor(scaleFactor) {
+        state.scaleFactor = clamp(toTenth(scaleFactor, SCALE_FACTOR_RANGE.default), SCALE_FACTOR_RANGE.min, SCALE_FACTOR_RANGE.max);
         updateUi();
       }
 
@@ -2282,7 +2357,8 @@
         state.colorMode = Math.random() > 0.28 ? "blend" : "single";
         state.colorTarget = "primary";
         state.blend = state.colorMode === "blend";
-        state.size = Math.floor(3 + Math.random() * 13);
+        state.size = toTenth(rand(0.4, 3.2), BRUSH_LENGTH_RANGE.default);
+        state.scaleFactor = toTenth(rand(1.6, 5.2), SCALE_FACTOR_RANGE.default);
         state.expansion = rand(0.55, 1.28);
         state.symmetry = Math.floor(2 + Math.random() * 15);
         state.mirror = Math.random() > 0.22;
@@ -2890,7 +2966,8 @@
         const passCount = Math.max(1, state.symmetry * (state.mirror ? 2 : 1));
         const symmetryEnergy = 1 / Math.sqrt(passCount);
         const expansionEnergy = 1 / (0.92 + state.expansion * 0.24);
-        const sizeEnergy = 1 / Math.sqrt(0.86 + state.size / 12);
+        const effectiveSize = legacyEquivalentLength();
+        const sizeEnergy = 1 / Math.sqrt(0.86 + effectiveSize / 12);
         const alpha = tendril.alpha * envelope * symmetryEnergy * expansionEnergy * sizeEnergy * (profile.energy || 1);
         if (alpha <= 0.001) return;
 
@@ -3060,11 +3137,10 @@
           mobileMinDpr: 1.25,
           desktopBrushBoost: 1.42,
           mobileBrushBoost: 1.58,
-          maxBrushSize: 64,
+          maxBrushSize: BRUSH_LENGTH_RANGE.max,
           desktopHistoryLimit: 8,
           mobileHistoryLimit: 5
         };
-        const BRUSH_LENGTH_BASE = 16;
         const WIDTH_TO_LENGTH_RATIO = 0.08;
 
         state.canvasScale = state.canvasScale || 1;
@@ -3083,7 +3159,12 @@
           const mobile = mobileLike();
           state.canvasScale = mobile ? CANVAS_CONFIG.mobileScale : CANVAS_CONFIG.desktopScale;
           state.brushBoost = mobile ? CANVAS_CONFIG.mobileBrushBoost : CANVAS_CONFIG.desktopBrushBoost;
+          ui.size.min = String(BRUSH_LENGTH_RANGE.min);
           ui.size.max = String(CANVAS_CONFIG.maxBrushSize);
+          ui.size.step = "0.1";
+          ui.scaleFactor.min = String(SCALE_FACTOR_RANGE.min);
+          ui.scaleFactor.max = String(SCALE_FACTOR_RANGE.max);
+          ui.scaleFactor.step = "0.1";
           ui.zoom.min = String(Math.ceil(100 / state.canvasScale));
           ui.zoom.max = "240";
         }
@@ -3118,15 +3199,16 @@
         }
 
         function expandedBrushLengthScale(length) {
-          const value = clamp(Number(length) || 1, 1, CANVAS_CONFIG.maxBrushSize);
-          return clamp(Math.pow(value / BRUSH_LENGTH_BASE, 0.9), 0.34, 3.6);
+          return clamp(Math.pow(effectiveBrushLength(length) / DEFAULT_EFFECTIVE_LENGTH, 0.9), 0.34, 3.6);
         }
 
         function expandedBrushWidthScale(length) {
-          const baseAtDefaultLength = 0.46 + Math.pow(BRUSH_LENGTH_BASE / 7, 1.12) * 1.08;
+          const baseAtDefaultLength = 0.46 + Math.pow(LEGACY_DEFAULT_LENGTH / 7, 1.12) * 1.08;
           const lengthScale = expandedBrushLengthScale(length);
           const widthScale = 1 + (lengthScale - 1) * WIDTH_TO_LENGTH_RATIO;
-          return baseAtDefaultLength * Math.max(0.2, widthScale) * (state.brushBoost || 1);
+          const normalizedFactor = (state.scaleFactor || SCALE_FACTOR_RANGE.default) / SCALE_FACTOR_RANGE.default;
+          const factorWidthScale = 1 + (normalizedFactor - 1) * WIDTH_TO_LENGTH_RATIO;
+          return baseAtDefaultLength * Math.max(0.2, widthScale) * Math.max(0.2, factorWidthScale) * (state.brushBoost || 1);
         }
 
         function expandedBrushSpacingScale(length) {
@@ -3242,7 +3324,12 @@
         };
 
         setSize = function patchedExpandedSetSize(size) {
-          state.size = clamp(Math.round(Number(size) || 1), 1, CANVAS_CONFIG.maxBrushSize);
+          state.size = clamp(toTenth(size, BRUSH_LENGTH_RANGE.default), BRUSH_LENGTH_RANGE.min, CANVAS_CONFIG.maxBrushSize);
+          updateUi();
+        };
+
+        setScaleFactor = function patchedExpandedSetScaleFactor(scaleFactor) {
+          state.scaleFactor = clamp(toTenth(scaleFactor, SCALE_FACTOR_RANGE.default), SCALE_FACTOR_RANGE.min, SCALE_FACTOR_RANGE.max);
           updateUi();
         };
 
@@ -3291,6 +3378,78 @@
           return [clamp(x, 0, cssWidth), clamp(y, 0, cssHeight)];
         };
 
+        function canvasPointToViewport(x, y) {
+          const rect = canvas.getBoundingClientRect();
+          const cssWidth = canvasCssWidth();
+          const cssHeight = canvasCssHeight();
+          return [
+            rect.left + (x / Math.max(1, cssWidth)) * rect.width,
+            rect.top + (y / Math.max(1, cssHeight)) * rect.height
+          ];
+        }
+
+        function rotateCssAroundCenter(x, y, angle) {
+          const cx = canvasCssWidth() / 2;
+          const cy = canvasCssHeight() / 2;
+          const dx = x - cx;
+          const dy = y - cy;
+          const ca = Math.cos(angle);
+          const sa = Math.sin(angle);
+          return [cx + dx * ca - dy * sa, cy + dx * sa + dy * ca];
+        }
+
+        function symmetryGuidePoints(point) {
+          const cssWidth = canvasCssWidth();
+          const cx = cssWidth / 2;
+          const passes = state.mirror ? 2 : 1;
+          const points = [];
+
+          for (let mirrorIndex = 0; mirrorIndex < passes; mirrorIndex += 1) {
+            const x = mirrorIndex === 0 ? point[0] : 2 * cx - point[0];
+            const y = point[1];
+
+            for (let i = 0; i < state.symmetry; i += 1) {
+              const angle = (Math.PI * 2 * i) / state.symmetry;
+              const [rx, ry] = rotateCssAroundCenter(x, y, angle);
+              const [vx, vy] = canvasPointToViewport(rx, ry);
+              points.push({ x: vx, y: vy, origin: mirrorIndex === 0 && i === 0 });
+            }
+          }
+
+          return points;
+        }
+
+        function showSymmetryGuide(point) {
+          if (!point || state.gesturing) {
+            hideSymmetryGuide();
+            return;
+          }
+
+          state.symmetryGuidePoint = point;
+          const fragment = document.createDocumentFragment();
+          symmetryGuidePoints(point).forEach((guidePoint) => {
+            const dot = document.createElement("span");
+            dot.className = guidePoint.origin ? "symmetry-guide-dot origin" : "symmetry-guide-dot";
+            dot.setAttribute("aria-hidden", "true");
+            dot.style.setProperty("--guide-x", `${guidePoint.x}px`);
+            dot.style.setProperty("--guide-y", `${guidePoint.y}px`);
+            fragment.append(dot);
+          });
+          ui.symmetryGuide.replaceChildren(fragment);
+          ui.symmetryGuide.hidden = false;
+        }
+
+        function hideSymmetryGuide() {
+          state.symmetryGuidePoint = null;
+          ui.symmetryGuide.hidden = true;
+          ui.symmetryGuide.replaceChildren();
+        }
+
+        function refreshSymmetryGuide() {
+          if (!state.symmetryGuidePoint || ui.symmetryGuide.hidden) return;
+          showSymmetryGuide(state.symmetryGuidePoint);
+        }
+
         spawnFan = function patchedExpandedSpawnFan(x, y, dx, dy) {
           const profile = brushProfiles[state.brush] || brushProfiles.thunder;
           const speed = Math.hypot(dx, dy);
@@ -3305,9 +3464,14 @@
             mobileLike() ? 0.34 : 0.44,
             mobileLike() ? 0.78 : 0.94
           );
-          const lifeScale = (0.72 + expansionScale * 0.23) * Math.pow(lengthScale, 1.32);
-          const velocityScale = (0.82 + expansionScale * 0.22) * (0.88 + Math.sqrt(lengthScale) * 0.12);
-          const widthScale = 0.92 + expansionScale * 0.08;
+          const factorScale = clamp(
+            (state.scaleFactor || SCALE_FACTOR_RANGE.default) / SCALE_FACTOR_RANGE.default,
+            SCALE_FACTOR_RANGE.min / SCALE_FACTOR_RANGE.default,
+            SCALE_FACTOR_RANGE.max / SCALE_FACTOR_RANGE.default
+          );
+          const lifeScale = (0.72 + expansionScale * 0.23) * Math.pow(lengthScale, 1.32) * Math.sqrt(factorScale);
+          const velocityScale = (0.82 + expansionScale * 0.22) * Math.pow(lengthScale, 0.68) * factorScale;
+          const widthScale = (0.92 + expansionScale * 0.08) * (1 + (factorScale - 1) * WIDTH_TO_LENGTH_RATIO);
           const motionBoost = clamp(0.72 + Math.sqrt(speed) * 0.105, 0.72, 1.55);
           const count = Math.max(1, Math.round(rand(profile.count[0], profile.count[1]) * densityScale));
 
@@ -3370,6 +3534,7 @@
           if (mobileLike()) closeTransientControls(false);
           const result = originalStartPainting(event);
           if (state.painting && state.last) {
+            showSymmetryGuide(state.last);
             beginHoldBloom(state.last);
           }
           return result;
@@ -3383,6 +3548,7 @@
 
           for (const moveEvent of events) {
             const point = eventPosition(moveEvent);
+            showSymmetryGuide(point);
             emitSmoothedMove(point);
           }
 
@@ -3392,6 +3558,7 @@
         const originalStopPainting = stopPainting;
         stopPainting = function patchedExpandedStopPainting(event) {
           clearHoldBloom();
+          hideSymmetryGuide();
           if (state.gesturing) {
             state.painting = false;
             state.pointerId = null;
@@ -3399,6 +3566,20 @@
             return;
           }
           return originalStopPainting(event);
+        };
+
+        const originalSetSymmetry = setSymmetry;
+        setSymmetry = function patchedExpandedGuideSetSymmetry(symmetry) {
+          const result = originalSetSymmetry(symmetry);
+          refreshSymmetryGuide();
+          return result;
+        };
+
+        const originalToggleMirror = toggleMirror;
+        toggleMirror = function patchedExpandedGuideToggleMirror() {
+          const result = originalToggleMirror();
+          refreshSymmetryGuide();
+          return result;
         };
 
         randomize = function patchedExpandedRandomize() {
@@ -3409,7 +3590,8 @@
           state.colorMode = profile.hues && profile.hues.length > 1 ? "blend" : (Math.random() > 0.34 ? "blend" : "single");
           state.colorTarget = "primary";
           state.blend = state.colorMode === "blend";
-          state.size = Math.floor((mobileLike() ? 10 : 8) + Math.random() * (mobileLike() ? 20 : 24));
+          state.size = toTenth(rand(mobileLike() ? 0.6 : 0.4, mobileLike() ? 2.4 : 3.2), BRUSH_LENGTH_RANGE.default);
+          state.scaleFactor = toTenth(rand(1.6, mobileLike() ? 4.6 : 5.4), SCALE_FACTOR_RANGE.default);
           state.expansion = rand(0.58, 1.18);
           state.symmetry = Math.floor(2 + Math.random() * 15);
           state.mirror = Math.random() > 0.22;
@@ -3443,6 +3625,7 @@
           state.pointerId = null;
           state.last = null;
           clearHoldBloom();
+          hideSymmetryGuide();
           gestureStart = {
             cx: metrics.cx,
             cy: metrics.cy,
@@ -3480,20 +3663,28 @@
             state.painting = false;
             state.pointerId = null;
             state.last = null;
+            hideSymmetryGuide();
             updateUi();
           }
         }
 
+        function previewSymmetryGuide(event) {
+          if (state.painting || state.gesturing || event.pointerType === "touch") return;
+          showSymmetryGuide(eventPosition(event));
+        }
+
         stage.addEventListener("pointerdown", beginGestureIfNeeded, { capture: true });
         stage.addEventListener("pointermove", updateGesture, { capture: true });
+        stage.addEventListener("pointermove", previewSymmetryGuide);
         window.addEventListener("pointerup", endGesturePointer, { capture: true });
         stage.addEventListener("pointercancel", endGesturePointer, { capture: true });
         stage.addEventListener("pointerleave", endGesturePointer, { capture: true });
+        stage.addEventListener("pointerleave", hideSymmetryGuide);
 
         installMobileCssPatch();
         syncCanvasConfig();
-        if (state.size < (mobileLike() ? 14 : 12)) {
-          state.size = mobileLike() ? 14 : 12;
+        if (state.size < BRUSH_LENGTH_RANGE.default) {
+          state.size = BRUSH_LENGTH_RANGE.default;
         }
         state.zoom = clamp(state.zoom, 1 / (state.canvasScale || 1), 2.4);
       }
@@ -3536,6 +3727,7 @@
       ui.zoom.addEventListener("dblclick", () => setZoom(1));
       ui.randomize.addEventListener("click", randomize);
       ui.size.addEventListener("input", (event) => setSize(event.target.value));
+      ui.scaleFactor.addEventListener("input", (event) => setScaleFactor(event.target.value));
       ui.expansion.addEventListener("input", (event) => setExpansion(Number(event.target.value) / 100));
       ui.symmetry.addEventListener("input", (event) => setSymmetry(event.target.value));
       ui.modes.forEach((button) => {
