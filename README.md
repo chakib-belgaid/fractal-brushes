@@ -31,7 +31,7 @@ The luminous `/app/` route includes the full color and 4K export toolset:
 - Use the main toolbar for undo, redo, export, clear, mirror, brush menu, color menu, and random brush selection.
 - Use the bottom-right zoom slider to adjust zoom and inspect the current zoom percentage. Double-click the slider to reset to 100%.
 - Open the brush and color panels independently. Panels are intended to be draggable and clamped within the viewport.
-- Use the bottom-left parameter panel for Brush Size, Expansion, and Symmetry. The luminous route opens on Silk Ribbon at size 16 and supports brush sizes up to 64. Brush Size and Expansion scale together: larger brushes also increase the spacing between expansion fans.
+- Use the bottom-left parameter panel for Brush Length, Expansion, and Symmetry. The luminous route opens on Silk Ribbon at length 16 and supports brush lengths up to 64. Brush Length primarily extends tendril travel; stroke width follows at a smaller fixed ratio.
 - Keyboard shortcuts for core drawing actions should remain available when supported by the app.
 
 The `/white/` route keeps the controls focused on monochrome ink: brush swatches, ink density, water, edge style, brush size, symmetry, mirror, undo/redo, clear, randomize, and single-click PNG export. Its renderer stamps brush footprints along the pointer path, using paper grain, bristle masks, wash bloom, dry gaps, edge darkening, and splatter rather than the luminous route's animated trail system.
@@ -54,7 +54,7 @@ Notation:
 - `U(a, b)` is a uniform random sample in `[a, b)`.
 - `H(x, y, seed) = fract(sin(127.1x + 311.7y + 74.7seed) * 43758.5453123)`.
 - `clamp(x, a, b) = max(a, min(b, x))`.
-- `S` is brush size, `E` is expansion, `DPR` is device pixel ratio, `C = (cx, cy)` is the canvas center, and `Nsym` is the symmetry count.
+- `L` is brush length, `E` is expansion, `DPR` is device pixel ratio, `C = (cx, cy)` is the canvas center, and `Nsym` is the symmetry count.
 
 ### Luminous Tendril Model (`/app/`)
 
@@ -65,9 +65,10 @@ dx = x1 - x0
 dy = y1 - y0
 D = sqrt(dx^2 + dy^2)
 
-distanceScale = 0.86 + sqrt(S / 7) * 0.42
-expansionDistanceScale = 0.82 + E * 0.32
-spacing = clamp(8.4 * distanceScale * expansionDistanceScale * (profile.spacing or 1), 6.8, 30)
+lengthScale = clamp((L / 16)^0.9, 0.34, 3.6)
+distanceScale = clamp(1 + (lengthScale - 1) * 0.48, 0.62, 2.15)
+expansionDistanceScale = 0.9 + E * 0.46
+spacing = clamp(11.8 * distanceScale * expansionDistanceScale * (profile.spacing or 1), 10, 96)
 steps = max(1, floor(D / spacing))
 
 sample_i = P0 + (i / steps) * (P1 - P0), for i in 1..steps
@@ -79,16 +80,15 @@ At each `sample_i`, the active brush emits `K` tendrils:
 baseAngle = atan2(dy, dx)
 pointerSpeed = sqrt(dx^2 + dy^2)
 
-sizeScale = 0.5 + (S / 7)^1.08 * 0.82
+widthFromLength = 1 + (lengthScale - 1) * 0.08
+sizeScale = defaultWidthScale * widthFromLength
 expansionScale = clamp(E, 0.35, 1.6)
-sizeExpansionScale = 0.78 + sqrt(S / 7) * 0.28
-coupledExpansion = expansionScale * sizeExpansionScale
 
-spreadScale = 0.45 + coupledExpansion * 0.85
-densityScale = 0.48 + expansionScale * 0.4
-lifeScale = 0.74 + coupledExpansion * 0.34
-velocityScale = 0.82 + coupledExpansion * 0.28
-widthScale = 0.86 + coupledExpansion * 0.18
+spreadScale = 0.64 + expansionScale * 0.38
+densityScale = clamp(0.66 - max(0, lengthScale - 1) * 0.18 - max(0, expansionScale - 1) * 0.14, 0.44, 0.94)
+lifeScale = (0.72 + expansionScale * 0.23) * lengthScale^1.32
+velocityScale = (0.82 + expansionScale * 0.22) * (0.88 + sqrt(lengthScale) * 0.12)
+widthScale = 0.92 + expansionScale * 0.08
 
 K = max(1, floor(U(countMin, countMax + 1) * densityScale))
 ```
@@ -97,7 +97,8 @@ Each tendril state is initialized as:
 
 ```text
 theta = baseAngle + U(-spread, spread) * spreadScale
-speed = U(velocityMin, velocityMax) * velocityScale * (0.55 + min(pointerSpeed * 0.045, 1.6))
+motionBoost = clamp(0.72 + sqrt(pointerSpeed) * 0.105, 0.72, 1.55)
+speed = U(velocityMin, velocityMax) * velocityScale * motionBoost
 T = U(lifeMin, lifeMax) * lifeScale
 
 x = sample_x * DPR

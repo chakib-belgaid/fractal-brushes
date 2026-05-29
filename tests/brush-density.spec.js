@@ -26,13 +26,13 @@ async function preparePage(page) {
   await page.setViewportSize({ width: 960, height: 720 });
 }
 
-async function drawMeasuredStroke(page, size) {
+async function drawMeasuredStroke(page, length) {
   await page.goto(appUrl);
-  await page.locator("#size").evaluate((input, nextSize) => {
-    input.value = String(nextSize);
+  await page.locator("#size").evaluate((input, nextLength) => {
+    input.value = String(nextLength);
     input.dispatchEvent(new Event("input", { bubbles: true }));
-  }, size);
-  await expect(page.locator("#sizeValue")).toHaveText(String(size));
+  }, length);
+  await expect(page.locator("#sizeValue")).toHaveText(String(length));
   await page.evaluate(() => {
     window.__brushStrokeCalls = 0;
   });
@@ -71,7 +71,7 @@ async function drawMeasuredStroke(page, size) {
   return page.evaluate(() => window.__brushStrokeCalls || 0);
 }
 
-test("maximum brush size does not emit a much denser stroke than the default size", async ({ page }) => {
+test("maximum brush length does not emit a much denser stroke than the default length", async ({ page }) => {
   await preparePage(page);
 
   const defaultDensity = await drawMeasuredStroke(page, 7);

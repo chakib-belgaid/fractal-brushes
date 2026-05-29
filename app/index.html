@@ -1336,9 +1336,9 @@
       </button>
     </div>
     <div class="field">
-      <span class="field-label">Brush size</span>
+      <span class="field-label">Brush length</span>
       <div class="slider-row">
-        <input id="size" type="range" min="1" max="18" value="7" aria-label="Brush size">
+        <input id="size" type="range" min="1" max="18" value="7" aria-label="Brush length">
         <span class="value" id="sizeValue">7</span>
       </div>
     </div>
@@ -3041,7 +3041,7 @@
 
          Adds:
          - larger virtual canvas than the visible viewport;
-         - bigger brush size range and larger default brush scale;
+         - broader brush length range and larger default brush scale;
          - DPR/pixel-budget caps for mobile performance;
          - two-finger pan/zoom on touch screens;
          - coalesced pointer events for smoother drawing;
@@ -3064,6 +3064,8 @@
           desktopHistoryLimit: 8,
           mobileHistoryLimit: 5
         };
+        const BRUSH_LENGTH_BASE = 16;
+        const WIDTH_TO_LENGTH_RATIO = 0.08;
 
         state.canvasScale = state.canvasScale || 1;
         state.brushBoost = state.brushBoost || 1;
@@ -3115,15 +3117,21 @@
           state.panY = clamp(Number(state.panY) || 0, -maxY, maxY);
         }
 
-        function expandedBrushWidthScale(size) {
-          const s = clamp(Number(size) || 1, 1, CANVAS_CONFIG.maxBrushSize);
-          const base = 0.46 + Math.pow(s / 7, 1.12) * 1.08;
-          return base * (state.brushBoost || 1);
+        function expandedBrushLengthScale(length) {
+          const value = clamp(Number(length) || 1, 1, CANVAS_CONFIG.maxBrushSize);
+          return clamp(Math.pow(value / BRUSH_LENGTH_BASE, 0.9), 0.34, 3.6);
         }
 
-        function expandedBrushSpacingScale(size) {
-          const s = clamp(Number(size) || 1, 1, CANVAS_CONFIG.maxBrushSize);
-          return 0.95 + Math.sqrt(s / 7) * 0.62;
+        function expandedBrushWidthScale(length) {
+          const baseAtDefaultLength = 0.46 + Math.pow(BRUSH_LENGTH_BASE / 7, 1.12) * 1.08;
+          const lengthScale = expandedBrushLengthScale(length);
+          const widthScale = 1 + (lengthScale - 1) * WIDTH_TO_LENGTH_RATIO;
+          return baseAtDefaultLength * Math.max(0.2, widthScale) * (state.brushBoost || 1);
+        }
+
+        function expandedBrushSpacingScale(length) {
+          const lengthScale = expandedBrushLengthScale(length);
+          return clamp(1 + (lengthScale - 1) * 0.48, 0.62, 2.15);
         }
 
         function installMobileCssPatch() {
@@ -3287,19 +3295,19 @@
           const profile = brushProfiles[state.brush] || brushProfiles.thunder;
           const speed = Math.hypot(dx, dy);
           const baseAngle = Math.atan2(dy, dx || 0.0001);
+          const lengthScale = expandedBrushLengthScale(state.size);
           const sizeScale = expandedBrushWidthScale(state.size);
           const expansionScale = clamp(state.expansion, 0.35, 1.6);
           const spreadScale = 0.64 + expansionScale * 0.38;
           const perfScale = mobileLike() ? 0.78 : 1;
-          const sizeLoad = Math.sqrt(state.size / 7);
           const densityScale = clamp(
-            (0.66 - Math.max(0, sizeLoad - 1) * 0.16 - Math.max(0, expansionScale - 1) * 0.14) * perfScale,
+            (0.66 - Math.max(0, lengthScale - 1) * 0.18 - Math.max(0, expansionScale - 1) * 0.14) * perfScale,
             mobileLike() ? 0.34 : 0.44,
             mobileLike() ? 0.78 : 0.94
           );
-          const lifeScale = 0.72 + expansionScale * 0.23;
-          const velocityScale = 0.82 + expansionScale * 0.22;
-          const widthScale = 0.82 + Math.sqrt(state.size / 7) * 0.2;
+          const lifeScale = (0.72 + expansionScale * 0.23) * Math.pow(lengthScale, 1.32);
+          const velocityScale = (0.82 + expansionScale * 0.22) * (0.88 + Math.sqrt(lengthScale) * 0.12);
+          const widthScale = 0.92 + expansionScale * 0.08;
           const motionBoost = clamp(0.72 + Math.sqrt(speed) * 0.105, 0.72, 1.55);
           const count = Math.max(1, Math.round(rand(profile.count[0], profile.count[1]) * densityScale));
 
