@@ -9,6 +9,9 @@ const { test, expect } = require(playwrightTestPath);
 
 const rootUrl = pathToFileURL(path.resolve(__dirname, "../index.html")).toString();
 const appUrl = pathToFileURL(path.resolve(__dirname, "../app/index.html")).toString();
+const screenshotDir = path.resolve(__dirname, "../test-results");
+const desktopScreenshotPath = path.join(screenshotDir, "fractal-qa-desktop.png");
+const mobileScreenshotPath = path.join(screenshotDir, "fractal-qa-mobile.png");
 
 test.use({ acceptDownloads: true, viewport: { width: 960, height: 720 } });
 
@@ -67,8 +70,9 @@ test("root and app render without console errors on desktop and mobile", async (
   await expect(download.failure()).resolves.toBeNull();
   expect(download.suggestedFilename()).toMatch(/\.png$/);
 
-  await page.screenshot({ path: "/private/tmp/fractal-qa-desktop.png", fullPage: false });
-  expect(fs.existsSync("/private/tmp/fractal-qa-desktop.png")).toBeTruthy();
+  fs.mkdirSync(screenshotDir, { recursive: true });
+  await page.screenshot({ path: desktopScreenshotPath, fullPage: false });
+  expect(fs.existsSync(desktopScreenshotPath)).toBeTruthy();
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(appUrl);
@@ -90,8 +94,8 @@ test("root and app render without console errors on desktop and mobile", async (
     expect(box.visible).toBeTruthy();
     expect(box.inside).toBeTruthy();
   });
-  await page.screenshot({ path: "/private/tmp/fractal-qa-mobile.png", fullPage: false });
-  expect(fs.existsSync("/private/tmp/fractal-qa-mobile.png")).toBeTruthy();
+  await page.screenshot({ path: mobileScreenshotPath, fullPage: false });
+  expect(fs.existsSync(mobileScreenshotPath)).toBeTruthy();
 
   expect(consoleIssues).toEqual([]);
 });
