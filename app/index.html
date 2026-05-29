@@ -733,7 +733,7 @@
         rgba(2, 4, 12, 0.56);
       backdrop-filter: blur(7px);
       -webkit-backdrop-filter: blur(7px);
-      pointer-events: none;
+      pointer-events: auto;
     }
 
     .tutorial-spotlight {
@@ -4265,6 +4265,7 @@
       ui.tutorialNext.addEventListener("click", activateTutorialStep);
       ui.tutorialSkip.addEventListener("click", () => closeTutorial(true));
       ui.tutorialDone.addEventListener("click", () => closeTutorial(true));
+      ui.tutorial.addEventListener("pointerdown", (event) => event.stopPropagation());
       ui.size.addEventListener("input", (event) => setSize(event.target.value));
       ui.scaleFactor.addEventListener("input", (event) => setScaleFactor(event.target.value));
       ui.expansion.addEventListener("input", (event) => setExpansion(Number(event.target.value) / 100));

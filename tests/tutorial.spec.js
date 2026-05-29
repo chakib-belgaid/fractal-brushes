@@ -137,6 +137,35 @@ test("walkthrough actions operate real controls step by step", async ({ page, co
   await expect(page.locator("#tutorial")).toBeHidden();
 });
 
+test("walkthrough backdrop blocks clicks from controls underneath", async ({ page, context }) => {
+  await context.clearCookies();
+  await page.goto(`${baseUrl}/app/index.html`);
+
+  await expect(page.locator("#tutorial")).toBeVisible();
+  const mirror = page.locator("#mirror");
+  await expect(mirror).toHaveAttribute("aria-pressed", "true");
+
+  const box = await mirror.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+
+  await expect(mirror).toHaveAttribute("aria-pressed", "true");
+});
+
+test("walkthrough backdrop keeps tutorial-opened mobile controls stable", async ({ page, context }) => {
+  await context.clearCookies();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${baseUrl}/app/index.html`);
+
+  await page.locator("#tutorialNext").click();
+  await page.locator("#tutorialNext").click();
+  await expect(page.locator("#brushPanel")).toBeVisible();
+
+  await page.mouse.click(20, 20);
+
+  await expect(page.locator("#brushPanel")).toBeVisible();
+});
+
 test("walkthrough stays usable on mobile width", async ({ page, context }) => {
   await context.clearCookies();
   await page.setViewportSize({ width: 390, height: 844 });
