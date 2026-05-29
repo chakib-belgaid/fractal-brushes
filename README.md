@@ -65,9 +65,9 @@ dx = x1 - x0
 dy = y1 - y0
 D = sqrt(dx^2 + dy^2)
 
-distanceScale = 0.78 + sqrt(S / 7) * 0.36
+distanceScale = 0.86 + sqrt(S / 7) * 0.42
 expansionDistanceScale = 0.82 + E * 0.32
-spacing = clamp(7.2 * distanceScale * expansionDistanceScale * (profile.spacing or 1), 5.5, 24)
+spacing = clamp(8.4 * distanceScale * expansionDistanceScale * (profile.spacing or 1), 6.8, 30)
 steps = max(1, floor(D / spacing))
 
 sample_i = P0 + (i / steps) * (P1 - P0), for i in 1..steps
@@ -79,19 +79,18 @@ At each `sample_i`, the active brush emits `K` tendrils:
 baseAngle = atan2(dy, dx)
 pointerSpeed = sqrt(dx^2 + dy^2)
 
-sizeScale = 0.42 + (S / 6)^1.22
+sizeScale = 0.5 + (S / 7)^1.08 * 0.82
 expansionScale = clamp(E, 0.35, 1.6)
 sizeExpansionScale = 0.78 + sqrt(S / 7) * 0.28
 coupledExpansion = expansionScale * sizeExpansionScale
 
 spreadScale = 0.45 + coupledExpansion * 0.85
-densityScale = 0.55 + expansionScale * 0.45
+densityScale = 0.48 + expansionScale * 0.4
 lifeScale = 0.74 + coupledExpansion * 0.34
 velocityScale = 0.82 + coupledExpansion * 0.28
 widthScale = 0.86 + coupledExpansion * 0.18
 
-extraTendrils = floor(clamp((S - 5) / 4, 0, 3) * densityScale)
-K = max(1, floor(U(countMin, countMax + 1) * densityScale) + extraTendrils)
+K = max(1, floor(U(countMin, countMax + 1) * densityScale))
 ```
 
 Each tendril state is initialized as:
