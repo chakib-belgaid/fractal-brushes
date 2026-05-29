@@ -10,6 +10,8 @@ const appUrl = pathToFileURL(path.resolve(__dirname, "../app/index.html")).toStr
 
 async function preparePage(page) {
   await page.addInitScript(() => {
+    window.localStorage.setItem("fractalBrushes.tutorialSeen", "1");
+
     let seed = 24791;
     Math.random = () => {
       seed = (seed * 16807) % 2147483647;
