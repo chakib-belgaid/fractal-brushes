@@ -33,7 +33,6 @@ async function drawMeasuredStroke(page, size) {
     input.dispatchEvent(new Event("input", { bubbles: true }));
   }, size);
   await expect(page.locator("#sizeValue")).toHaveText(String(size));
-
   await page.evaluate(() => {
     window.__brushStrokeCalls = 0;
   });
@@ -69,14 +68,14 @@ async function drawMeasuredStroke(page, size) {
   });
   await page.waitForTimeout(450);
 
-  return page.evaluate(() => window.__brushStrokeCalls);
+  return page.evaluate(() => window.__brushStrokeCalls || 0);
 }
 
 test("maximum brush size does not emit a much denser stroke than the default size", async ({ page }) => {
   await preparePage(page);
 
   const defaultDensity = await drawMeasuredStroke(page, 7);
-  const maximumDensity = await drawMeasuredStroke(page, 18);
+  const maximumDensity = await drawMeasuredStroke(page, 64);
 
   expect(defaultDensity).toBeGreaterThan(0);
   expect(maximumDensity).toBeLessThanOrEqual(Math.round(defaultDensity * 1.2));

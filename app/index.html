@@ -64,7 +64,7 @@
       touch-action: none;
     }
 
-    canvas {
+    #art {
       position: absolute;
       left: 50%;
       top: 50%;
@@ -1388,7 +1388,7 @@
       </div>
       <div class="segmented target-switch" role="group" aria-label="Blend target">
         <button class="segment target" data-target="primary" type="button" aria-label="Adjust primary hue" aria-pressed="true">Primary</button>
-        <button class="segment target" data-target="blend" type="button" aria-label="Adjust blend hue" aria-pressed="false">Blend</button>
+        <button class="segment target" data-target="blend" type="button" aria-label="Adjust blend hue" aria-pressed="false">Secondary</button>
       </div>
     </div>
   </aside>
@@ -1406,6 +1406,7 @@
       const canvas = document.getElementById("art");
       const ctx = canvas.getContext("2d", { alpha: false });
       const root = document.documentElement;
+      let activeComposite = "lighter";
 
       const ui = {
         undo: document.getElementById("undo"),
@@ -1677,13 +1678,13 @@
         dpr: 1,
         cx: 0,
         cy: 0,
-        brush: "thunder",
+        brush: "silk",
         colorTarget: "primary",
         colorMode: "single",
         hue: 195,
         hue2: 314,
         blend: false,
-        size: 7,
+        size: 16,
         expansion: 0.85,
         symmetry: 6,
         mirror: true,
@@ -1707,6 +1708,22 @@
       const isMobileLayout = () => window.innerWidth <= 560 || (window.innerWidth <= 880 && window.innerHeight <= 560);
       const brushWidthScale = (size) => 0.5 + Math.pow(size / 7, 1.08) * 0.82;
       const brushSpacingScale = (size) => 0.86 + Math.sqrt(size / 7) * 0.42;
+      const cssNumber = (value) => Number.parseFloat(value) || 0;
+
+      function canvasCssWidth() {
+        return cssNumber(canvas.style.width) || canvas.getBoundingClientRect().width || window.innerWidth;
+      }
+
+      function canvasCssHeight() {
+        return cssNumber(canvas.style.height) || canvas.getBoundingClientRect().height || window.innerHeight;
+      }
+
+      function updateSvgViewport(width = state.width, height = state.height) {
+        const safeWidth = Math.max(1, Math.round(width));
+        const safeHeight = Math.max(1, Math.round(height));
+        canvas.width = safeWidth;
+        canvas.height = safeHeight;
+      }
 
       function resetPanelPosition(panel) {
         panel.style.left = "";
@@ -1832,13 +1849,14 @@
         const shot = document.createElement("canvas");
         shot.width = canvas.width;
         shot.height = canvas.height;
-        shot.getContext("2d").drawImage(canvas, 0, 0);
+        shot.getContext("2d", { alpha: false }).drawImage(canvas, 0, 0);
         return shot;
       }
 
       function restoreSnapshot(shot) {
+        if (!shot) return;
         ctx.globalCompositeOperation = "source-over";
-        ctx.drawImage(shot, 0, 0);
+        ctx.drawImage(shot, 0, 0, shot.width, shot.height, 0, 0, state.width, state.height);
       }
 
       function pushHistory() {
@@ -1851,22 +1869,15 @@
       }
 
       function resize() {
-        const previous = canvas.width && canvas.height ? makeSnapshot() : null;
-        const previousWidth = state.width || window.innerWidth;
-        const previousHeight = state.height || window.innerHeight;
-        state.dpr = clamp(window.devicePixelRatio || 1, 1, 2);
-        state.width = Math.floor(window.innerWidth * state.dpr);
-        state.height = Math.floor(window.innerHeight * state.dpr);
+        state.dpr = 1;
+        state.width = Math.floor(window.innerWidth);
+        state.height = Math.floor(window.innerHeight);
         state.cx = state.width / 2;
         state.cy = state.height / 2;
-        canvas.width = state.width;
-        canvas.height = state.height;
+        updateSvgViewport();
         canvas.style.width = `${window.innerWidth}px`;
         canvas.style.height = `${window.innerHeight}px`;
         clearSurface();
-        if (previous) {
-          ctx.drawImage(previous, 0, 0, previousWidth, previousHeight, 0, 0, state.width, state.height);
-        }
         applyResponsiveMode();
         clampAllPanels();
         applyZoom();
@@ -1881,7 +1892,9 @@
       }
 
       function hsla(hue, saturation, lightness, alpha) {
-        return `hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha})`;
+        const h = Math.round(normalizedHue(hue) / 4) * 4;
+        const a = clamp(Math.round(alpha * 50) / 50, 0, 1);
+        return `hsla(${h}, ${saturation}%, ${lightness}%, ${a})`;
       }
 
       function mixHue(from, to, amount) {
@@ -1890,9 +1903,11 @@
       }
 
       function drawLayer(x0, y0, x1, y1, style, width, cap) {
+        ctx.globalCompositeOperation = activeComposite;
         ctx.strokeStyle = style;
-        ctx.lineWidth = width;
-        ctx.lineCap = cap;
+        ctx.lineWidth = Math.max(0.08, width);
+        ctx.lineCap = cap || "round";
+        ctx.lineJoin = "round";
         ctx.beginPath();
         ctx.moveTo(x0, y0);
         ctx.lineTo(x1, y1);
@@ -1909,8 +1924,7 @@
         const baseWidth = tendril.width * state.dpr;
         const passes = state.mirror ? 2 : 1;
         const hue = tendril.blend ? mixHue(tendril.hue, tendril.hue2, age) : tendril.hue;
-        ctx.globalCompositeOperation = profile.composite || "lighter";
-
+        activeComposite = profile.composite || "lighter";
         for (let mirrorIndex = 0; mirrorIndex < passes; mirrorIndex += 1) {
           const sx0 = mirrorIndex === 0 ? x0 : 2 * state.cx - x0;
           const sx1 = mirrorIndex === 0 ? x1 : 2 * state.cx - x1;
@@ -2304,6 +2318,17 @@
         return new Date().toISOString().replace(/[:.]/g, "-");
       }
 
+      function downloadBlob(blob, label, extension) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.download = `fractal-brushes-${label}-${timestamp()}.${extension}`;
+        link.href = url;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+
       function canvasToBlob(sourceCanvas) {
         return new Promise((resolve) => {
           if (sourceCanvas.toBlob) {
@@ -2320,19 +2345,6 @@
         });
       }
 
-      async function downloadCanvas(sourceCanvas, label) {
-        const blob = await canvasToBlob(sourceCanvas);
-        if (!blob) throw new Error("PNG export failed");
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.download = `fractal-brushes-${label}-${timestamp()}.png`;
-        link.href = url;
-        document.body.append(link);
-        link.click();
-        link.remove();
-        window.setTimeout(() => URL.revokeObjectURL(url), 0);
-      }
-
       async function exportPngPreset(presetName) {
         if (state.exporting) return;
         const preset = exportPresets[presetName];
@@ -2341,23 +2353,25 @@
         updateUi();
         await new Promise((resolve) => requestAnimationFrame(resolve));
         try {
+          const width = preset.width || state.width || Math.round(canvasCssWidth());
+          const height = preset.height || state.height || Math.round(canvasCssHeight());
           if (presetName === "current") {
-            await downloadCanvas(canvas, preset.label);
+            downloadBlob(await canvasToBlob(canvas), preset.label, "png");
           } else {
             const out = document.createElement("canvas");
-            out.width = preset.width;
-            out.height = preset.height;
+            out.width = width;
+            out.height = height;
             const outCtx = out.getContext("2d", { alpha: false });
-            clearSurface(outCtx, out.width, out.height);
-            const scale = Math.min(out.width / canvas.width, out.height / canvas.height);
+            clearSurface(outCtx, width, height);
+            const scale = Math.min(width / canvas.width, height / canvas.height);
             const drawWidth = canvas.width * scale;
             const drawHeight = canvas.height * scale;
-            const dx = (out.width - drawWidth) / 2;
-            const dy = (out.height - drawHeight) / 2;
+            const dx = (width - drawWidth) / 2;
+            const dy = (height - drawHeight) / 2;
             outCtx.imageSmoothingEnabled = true;
             outCtx.imageSmoothingQuality = "high";
             outCtx.drawImage(canvas, dx, dy, drawWidth, drawHeight);
-            await downloadCanvas(out, preset.label);
+            downloadBlob(await canvasToBlob(out), preset.label, "png");
           }
           showStatus("PNG export ready.");
         } catch (error) {
@@ -2596,24 +2610,24 @@
           hues: [326, 196],
           dot: ["#ff6fd8", "#77f5ff", "#f7fbff"],
           renderer: "ribbon",
-          count: [1, 2],
-          spread: 0.44,
-          velocity: [0.24, 1.1],
-          life: [54, 102],
-          width: [0.38, 0.86],
-          jitter: 0.045,
-          curl: 0.14,
-          branch: 0.0005,
-          drag: 0.979,
+          count: [1, 1],
+          spread: 0.58,
+          velocity: [0.9, 2.2],
+          life: [96, 170],
+          width: [0.32, 0.76],
+          jitter: 0.035,
+          curl: 0.1,
+          branch: 0.0002,
+          drag: 0.986,
           lift: [-0.02, 0.02],
-          alpha: 0.18,
+          alpha: 0.28,
           hueShift: [-16, 30],
           cap: "round",
           composite: "screen",
-          maxTendrils: 500,
-          spacing: 1.8,
-          energy: 0.9,
-          layers: [[3.2, -12, 52, 0.09], [1.15, 14, 68, 0.22], [0.22, 0, 86, 0.48], [0.05, 0, 96, 0.14, "white"]]
+          maxTendrils: 180,
+          spacing: 3.2,
+          energy: 1.48,
+          layers: [[3.2, -12, 54, 0.18], [1.1, 14, 70, 0.5], [0.22, 0, 92, 0.86, "white"]]
         },
         comet: {
           name: "Comet Trail",
@@ -2801,6 +2815,41 @@
         });
       }
 
+      function drawSymmetricLayerPack(x0, y0, x1, y1, profile, hue, alpha, baseWidth) {
+        const passes = state.mirror ? 2 : 1;
+        profile.layers.forEach(([scale, hueOffset, lightness, layerAlpha, special]) => {
+          const width = Math.max(0.12, baseWidth * scale);
+          let style = hsla(normalizedHue(hue + hueOffset), 96, lightness, alpha * layerAlpha);
+          if (special === "white") {
+            style = `rgba(255, 255, 255, ${alpha * layerAlpha})`;
+          } else if (special === "warm") {
+            style = `rgba(255, 246, 219, ${alpha * layerAlpha})`;
+          }
+
+          ctx.globalCompositeOperation = activeComposite;
+          ctx.strokeStyle = style;
+          ctx.lineWidth = width;
+          ctx.lineCap = profile.cap || "round";
+          ctx.lineJoin = "round";
+          ctx.beginPath();
+
+          for (let mirrorIndex = 0; mirrorIndex < passes; mirrorIndex += 1) {
+            const sx0 = mirrorIndex === 0 ? x0 : 2 * state.cx - x0;
+            const sx1 = mirrorIndex === 0 ? x1 : 2 * state.cx - x1;
+
+            for (let i = 0; i < state.symmetry; i += 1) {
+              const angle = (Math.PI * 2 * i) / state.symmetry;
+              const [rx0, ry0] = rotateAroundCenter(sx0, y0, angle);
+              const [rx1, ry1] = rotateAroundCenter(sx1, y1, angle);
+              ctx.moveTo(rx0, ry0);
+              ctx.lineTo(rx1, ry1);
+            }
+          }
+
+          ctx.stroke();
+        });
+      }
+
       function drawSoftStamp(x, y, radius, hue, alpha, special) {
         const r = Math.max(0.6, radius);
         const gradient = ctx.createRadialGradient(x, y, 0, x, y, r);
@@ -2817,6 +2866,7 @@
           gradient.addColorStop(0.48, hsla(normalizedHue(hue + 8), 94, 56, alpha * 0.34));
           gradient.addColorStop(1, hsla(normalizedHue(hue), 94, 42, 0));
         }
+        ctx.globalCompositeOperation = activeComposite;
         ctx.fillStyle = gradient;
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
@@ -2848,7 +2898,11 @@
         const hue = tendril.blend ? mixHue(tendril.hue, tendril.hue2, age) : tendril.hue;
         const passes = state.mirror ? 2 : 1;
         const renderer = profile.renderer || "line";
-        ctx.globalCompositeOperation = profile.composite || "lighter";
+        activeComposite = profile.composite || "lighter";
+        if (renderer === "ribbon" || renderer === "line") {
+          drawSymmetricLayerPack(x0, y0, x1, y1, profile, hue, alpha, baseWidth);
+          return;
+        }
 
         for (let mirrorIndex = 0; mirrorIndex < passes; mirrorIndex += 1) {
           const sx0 = mirrorIndex === 0 ? x0 : 2 * state.cx - x0;
@@ -2996,15 +3050,17 @@
 
       {
         const CANVAS_CONFIG = {
-          desktopScale: 1.65,
-          mobileScale: 1.35,
-          desktopMaxPixels: 8500000,
-          mobileMaxPixels: 3200000,
-          desktopDprCap: 1.75,
-          mobileDprCap: 1.25,
+          desktopScale: 1.82,
+          mobileScale: 1.45,
+          desktopMaxPixels: 14000000,
+          mobileMaxPixels: 5200000,
+          desktopDprCap: 2.15,
+          mobileDprCap: 1.6,
+          desktopMinDpr: 1.5,
+          mobileMinDpr: 1.25,
           desktopBrushBoost: 1.42,
           mobileBrushBoost: 1.58,
-          maxBrushSize: 42,
+          maxBrushSize: 64,
           desktopHistoryLimit: 8,
           mobileHistoryLimit: 5
         };
@@ -3014,6 +3070,8 @@
         state.panX = state.panX || 0;
         state.panY = state.panY || 0;
         state.gesturing = false;
+        state.holdBloomTimer = null;
+        state.lastMotion = [0.32, 0];
 
         function mobileLike() {
           return isMobileLayout() || window.matchMedia("(pointer: coarse)").matches;
@@ -3038,15 +3096,17 @@
 
         function computeBudgetedDpr(cssWidth, cssHeight) {
           const mobile = mobileLike();
-          const raw = Math.min(window.devicePixelRatio || 1, mobile ? CANVAS_CONFIG.mobileDprCap : CANVAS_CONFIG.desktopDprCap);
+          const cap = mobile ? CANVAS_CONFIG.mobileDprCap : CANVAS_CONFIG.desktopDprCap;
+          const min = mobile ? CANVAS_CONFIG.mobileMinDpr : CANVAS_CONFIG.desktopMinDpr;
+          const raw = clamp(Math.max(window.devicePixelRatio || 1, min), 0.75, cap);
           const maxPixels = mobile ? CANVAS_CONFIG.mobileMaxPixels : CANVAS_CONFIG.desktopMaxPixels;
           const budget = Math.sqrt(maxPixels / Math.max(1, cssWidth * cssHeight));
           return clamp(Math.min(raw, budget), 0.75, raw);
         }
 
         function clampPan() {
-          const cssWidth = canvas.offsetWidth || cssCanvasSize().width;
-          const cssHeight = canvas.offsetHeight || cssCanvasSize().height;
+          const cssWidth = canvasCssWidth() || cssCanvasSize().width;
+          const cssHeight = canvasCssHeight() || cssCanvasSize().height;
           const renderedWidth = cssWidth * state.zoom;
           const renderedHeight = cssHeight * state.zoom;
           const maxX = Math.max(0, (renderedWidth - window.innerWidth) / 2);
@@ -3106,6 +3166,57 @@
           document.head.append(style);
         }
 
+        function clearHoldBloom() {
+          window.clearInterval(state.holdBloomTimer);
+          state.holdBloomTimer = null;
+        }
+
+        function beginHoldBloom(point) {
+          clearHoldBloom();
+          state.lastMotion = [0.48, 0];
+          spawnFan(point[0], point[1], state.lastMotion[0], state.lastMotion[1]);
+          state.holdBloomTimer = window.setInterval(() => {
+            if (!state.painting || state.gesturing || !state.last) {
+              clearHoldBloom();
+              return;
+            }
+            const motion = state.lastMotion || [0.32, 0];
+            const energy = Math.max(0.32, Math.hypot(motion[0], motion[1]) * 0.18);
+            spawnFan(state.last[0], state.last[1], motion[0] || energy, motion[1] || 0);
+          }, 90);
+        }
+
+        function emitSmoothedMove(point) {
+          if (!state.last) return;
+          const start = state.last;
+          const dx = point[0] - start[0];
+          const dy = point[1] - start[1];
+          const distance = Math.hypot(dx, dy);
+          if (distance * distance < 0.45) return;
+
+          const steps = Math.max(1, Math.ceil(distance / 52));
+          let cursor = start;
+          for (let i = 1; i <= steps; i += 1) {
+            const target = [
+              start[0] + dx * (i / steps),
+              start[1] + dy * (i / steps)
+            ];
+            const remaining = Math.hypot(target[0] - cursor[0], target[1] - cursor[1]);
+            const smoothing = clamp(0.46 + Math.min(remaining / 220, 0.18), 0.46, 0.64);
+            const next = [
+              cursor[0] + (target[0] - cursor[0]) * smoothing,
+              cursor[1] + (target[1] - cursor[1]) * smoothing
+            ];
+            if (Math.hypot(next[0] - cursor[0], next[1] - cursor[1]) > 0.35) {
+              spawnAlong(cursor[0], cursor[1], next[0], next[1]);
+            }
+            cursor = next;
+          }
+
+          state.lastMotion = [cursor[0] - start[0], cursor[1] - start[1]];
+          state.last = cursor;
+        }
+
         applyZoom = function patchedExpandedApplyZoom() {
           syncCanvasConfig();
           state.zoom = clamp(Number(state.zoom) || 1, 1 / (state.canvasScale || 1), 2.4);
@@ -3138,9 +3249,7 @@
         };
 
         resize = function patchedExpandedResize() {
-          const previous = canvas.width && canvas.height ? makeSnapshot() : null;
-          const previousWidth = state.width || canvas.width || window.innerWidth;
-          const previousHeight = state.height || canvas.height || window.innerHeight;
+          const previous = state.width && state.height ? makeSnapshot() : null;
 
           syncCanvasConfig();
           const cssSize = cssCanvasSize();
@@ -3150,16 +3259,14 @@
           state.cx = state.width / 2;
           state.cy = state.height / 2;
 
-          canvas.width = state.width;
-          canvas.height = state.height;
+          updateSvgViewport();
           canvas.style.width = `${cssSize.width}px`;
           canvas.style.height = `${cssSize.height}px`;
 
-          clearSurface();
           if (previous) {
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = "high";
-            ctx.drawImage(previous, 0, 0, previousWidth, previousHeight, 0, 0, state.width, state.height);
+            restoreSnapshot(previous);
+          } else {
+            clearSurface();
           }
 
           applyResponsiveMode();
@@ -3169,8 +3276,8 @@
 
         eventPosition = function patchedExpandedEventPosition(event) {
           const rect = canvas.getBoundingClientRect();
-          const cssWidth = canvas.offsetWidth || parseFloat(canvas.style.width) || window.innerWidth;
-          const cssHeight = canvas.offsetHeight || parseFloat(canvas.style.height) || window.innerHeight;
+          const cssWidth = canvasCssWidth();
+          const cssHeight = canvasCssHeight();
           const x = (event.clientX - rect.left) * (cssWidth / Math.max(1, rect.width));
           const y = (event.clientY - rect.top) * (cssHeight / Math.max(1, rect.height));
           return [clamp(x, 0, cssWidth), clamp(y, 0, cssHeight)];
@@ -3241,7 +3348,7 @@
           const distance = Math.hypot(dx, dy);
           const sizeDistanceScale = expandedBrushSpacingScale(state.size);
           const expansionDistanceScale = 0.9 + state.expansion * 0.46;
-          const spacing = clamp(11.8 * sizeDistanceScale * expansionDistanceScale * (profile.spacing || 1), mobileLike() ? 10 : 8, 62);
+          const spacing = clamp(11.8 * sizeDistanceScale * expansionDistanceScale * (profile.spacing || 1), mobileLike() ? 12 : 10, mobileLike() ? 76 : 96);
           const steps = Math.max(1, Math.floor(distance / spacing));
           for (let i = 1; i <= steps; i += 1) {
             const t = i / steps;
@@ -3253,7 +3360,11 @@
         startPainting = function patchedExpandedStartPainting(event) {
           if (state.gesturing) return;
           if (mobileLike()) closeTransientControls(false);
-          return originalStartPainting(event);
+          const result = originalStartPainting(event);
+          if (state.painting && state.last) {
+            beginHoldBloom(state.last);
+          }
+          return result;
         };
 
         continuePainting = function patchedExpandedContinuePainting(event) {
@@ -3264,11 +3375,7 @@
 
           for (const moveEvent of events) {
             const point = eventPosition(moveEvent);
-            const dx = point[0] - state.last[0];
-            const dy = point[1] - state.last[1];
-            if (dx * dx + dy * dy < 0.45) continue;
-            spawnAlong(state.last[0], state.last[1], point[0], point[1]);
-            state.last = point;
+            emitSmoothedMove(point);
           }
 
           event.preventDefault();
@@ -3276,6 +3383,7 @@
 
         const originalStopPainting = stopPainting;
         stopPainting = function patchedExpandedStopPainting(event) {
+          clearHoldBloom();
           if (state.gesturing) {
             state.painting = false;
             state.pointerId = null;
@@ -3326,6 +3434,7 @@
           state.painting = false;
           state.pointerId = null;
           state.last = null;
+          clearHoldBloom();
           gestureStart = {
             cx: metrics.cx,
             cy: metrics.cy,
