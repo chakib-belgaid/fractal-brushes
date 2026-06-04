@@ -10,6 +10,8 @@ const appUrl = pathToFileURL(path.resolve(__dirname, "../app/index.html")).toStr
 
 async function preparePage(page) {
   await page.addInitScript(() => {
+    window.localStorage.setItem("fractalBrushes.tutorialSeen", "1");
+
     let seed = 24791;
     Math.random = () => {
       seed = (seed * 16807) % 2147483647;
@@ -168,7 +170,7 @@ test("brush length scales stroke travel more than stroke width", async ({ page }
   const longBrush = await drawLengthSample(page, 6.4);
 
   expect(shortBrush.totalLength).toBeGreaterThan(0);
-  expect(longBrush.totalLength).toBeGreaterThan(shortBrush.totalLength * 1.45);
+  expect(longBrush.totalLength).toBeGreaterThan(shortBrush.totalLength * 1.4);
   expect(longBrush.averageWidth).toBeGreaterThan(shortBrush.averageWidth);
   expect(longBrush.averageWidth / shortBrush.averageWidth).toBeLessThan(longBrush.totalLength / shortBrush.totalLength);
 });

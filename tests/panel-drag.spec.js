@@ -10,6 +10,8 @@ const appUrl = pathToFileURL(path.resolve(__dirname, "../app/index.html")).toStr
 
 test("mouse can drag panels on touch-capable desktop devices", async ({ page }) => {
   await page.addInitScript(() => {
+    window.localStorage.setItem("fractalBrushes.tutorialSeen", "1");
+
     Object.defineProperty(Navigator.prototype, "maxTouchPoints", {
       configurable: true,
       get: () => 5
