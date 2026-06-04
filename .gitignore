@@ -1,3 +1,4 @@
 .vscode/settings.json
 output/playwright
 test-results/
+POLISH_BACKLOG.md
