@@ -7,6 +7,8 @@ Fractal Brushes is a static canvas drawing toy for symmetry art. It pairs a lumi
 
 The package is designed for GitHub Pages and has no build step or runtime dependencies.
 
+Desktop is recommended for the best experience. The canvases remain usable on mobile, but a desktop browser gives more room for panels, precision strokes, and high-resolution exports.
+
 ## Routes
 
 - `/` - landing page with product overview and launch link.
