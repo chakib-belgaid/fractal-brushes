@@ -721,6 +721,19 @@
       transform: translateX(-50%);
     }
 
+    .status[data-tone="busy"] {
+      color: color-mix(in srgb, var(--active) 72%, white 20%);
+    }
+
+    .status[data-tone="error"] {
+      color: oklch(84% 0.17 28);
+      border-color: oklch(76% 0.18 28 / 0.34);
+    }
+
+    .status[data-tone="success"] {
+      color: color-mix(in srgb, var(--active) 72%, white 20%);
+    }
+
     .tutorial {
       position: fixed;
       inset: 0;
@@ -2223,6 +2236,7 @@
         ui.brushToggle.setAttribute("aria-expanded", String(!ui.brushPanel.hidden));
         ui.colorToggle.setAttribute("aria-expanded", String(!ui.colorPanel.hidden));
         ui.exportToggle.setAttribute("aria-expanded", String(!ui.exportMenu.hidden));
+        ui.exportToggle.setAttribute("aria-busy", String(state.exporting));
         ui.size.value = String(state.size);
         ui.sizeValue.textContent = controlDisplayValue(state.size);
         ui.size.setAttribute("aria-valuetext", `${controlDisplayValue(state.size)} normalized, ${state.size.toFixed(1)} actual`);
@@ -2742,30 +2756,48 @@
         updateUi();
       }
 
-      function paintTutorialDemo() {
-        if (!state.width || !state.height) return;
-        pushHistory();
-        const left = Math.max(90, state.cx - Math.min(220, state.width * 0.28));
-        const right = Math.min(state.width - 90, state.cx + Math.min(220, state.width * 0.28));
-        const midY = state.cy + Math.min(82, state.height * 0.14);
-        const points = [
-          [left, midY],
-          [left + (right - left) * 0.28, midY - 58],
-          [left + (right - left) * 0.58, midY + 34],
-          [right, midY - 24]
+      function demoStrokePoints() {
+        const width = canvasCssWidth();
+        const height = canvasCssHeight();
+        const cx = width / 2;
+        const cy = height / 2;
+        const reach = Math.min(260, width * 0.28);
+        const lift = Math.min(110, height * 0.15);
+        return [
+          [cx - reach, cy + lift * 0.34],
+          [cx - reach * 0.45, cy - lift * 0.62],
+          [cx + reach * 0.12, cy + lift * 0.44],
+          [cx + reach * 0.62, cy - lift * 0.5],
+          [cx + reach, cy + lift * 0.1]
         ];
+      }
+
+      function paintDemoStroke({ saveHistory = false, announce = false } = {}) {
+        if (!state.width || !state.height) return;
+        if (saveHistory) pushHistory();
+        const points = demoStrokePoints();
         for (let i = 1; i < points.length; i += 1) {
           spawnAlong(points[i - 1][0], points[i - 1][1], points[i][0], points[i][1]);
         }
-        showStatus("Drag on the canvas to paint your own stroke.");
+        if (announce) showStatus("Demo stroke painted.", "success");
       }
 
-      function showStatus(message) {
+      function paintTutorialDemo() {
+        paintDemoStroke({ saveHistory: true, announce: true });
+      }
+
+      function showStatus(message, tone = "") {
         window.clearTimeout(state.statusTimer);
         ui.status.textContent = message;
+        if (tone) {
+          ui.status.dataset.tone = tone;
+        } else {
+          ui.status.removeAttribute("data-tone");
+        }
         ui.status.hidden = false;
         state.statusTimer = window.setTimeout(() => {
           ui.status.hidden = true;
+          ui.status.removeAttribute("data-tone");
         }, 2200);
       }
 
@@ -2961,6 +2993,7 @@
         if (!preset) return;
         state.exporting = true;
         updateUi();
+        showStatus("Preparing PNG export...", "busy");
         await new Promise((resolve) => requestAnimationFrame(resolve));
         try {
           const width = preset.width || state.width || Math.round(canvasCssWidth());
@@ -2983,9 +3016,9 @@
             outCtx.drawImage(canvas, dx, dy, drawWidth, drawHeight);
             downloadBlob(await canvasToBlob(out), preset.label, "png");
           }
-          showStatus("PNG export ready.");
+          showStatus("PNG export ready.", "success");
         } catch (error) {
-          showStatus("Export failed in this browser. Try a smaller preset.");
+          showStatus("Export failed in this browser. Try a smaller preset.", "error");
         } finally {
           state.exporting = false;
           updateUi();
