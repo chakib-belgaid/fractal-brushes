@@ -721,6 +721,19 @@
       transform: translateX(-50%);
     }
 
+    .status[data-tone="busy"] {
+      color: color-mix(in srgb, var(--active) 72%, white 20%);
+    }
+
+    .status[data-tone="error"] {
+      color: oklch(84% 0.17 28);
+      border-color: oklch(76% 0.18 28 / 0.34);
+    }
+
+    .status[data-tone="success"] {
+      color: color-mix(in srgb, var(--active) 72%, white 20%);
+    }
+
     .tutorial {
       position: fixed;
       inset: 0;
@@ -1202,6 +1215,13 @@
         display: block;
         z-index: 12;
         opacity: 1;
+        transition: opacity 160ms var(--ease-out), transform 160ms var(--ease-out);
+      }
+
+      body.is-painting .chrome {
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(calc(100% + 12px));
       }
 
       .brand {
@@ -1450,14 +1470,7 @@
       }
 
       .zoom-cluster {
-        left: 10px;
-        right: 10px;
-        bottom: calc(var(--mobile-dock-height) + 10px + env(safe-area-inset-bottom));
-        width: auto;
-        grid-template-columns: minmax(0, 1fr) 60px;
-        padding: 6px 9px;
-        opacity: 0.94;
-        transition: opacity 160ms var(--ease-out), transform 160ms var(--ease-out);
+        display: none;
       }
 
       .aux-drawer-open .zoom-cluster {
@@ -1482,7 +1495,7 @@
       }
 
       .status {
-        bottom: calc(var(--mobile-dock-height) + 62px + env(safe-area-inset-bottom));
+        bottom: calc(var(--mobile-dock-height) + 18px + env(safe-area-inset-bottom));
       }
 
       .tutorial {
@@ -1696,7 +1709,7 @@
 
   <div class="status" id="status" hidden role="status" aria-live="polite"></div>
 
-  <section class="tutorial" id="tutorial" role="dialog" aria-modal="false" aria-labelledby="tutorialTitle" aria-describedby="tutorialCopy" hidden>
+  <section class="tutorial" id="tutorial" role="dialog" aria-modal="true" aria-labelledby="tutorialTitle" aria-describedby="tutorialCopy" hidden>
     <div class="tutorial-spotlight" id="tutorialSpotlight" aria-hidden="true" hidden>
       <div class="spotlight-preview" id="spotlightPreview" hidden></div>
     </div>
@@ -2009,6 +2022,14 @@
       const TUTORIAL_COOKIE = "fractalBrushesTutorialSeen";
       const TUTORIAL_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
       const TUTORIAL_STORAGE_KEY = "fractalBrushes.tutorialSeen";
+      const TUTORIAL_FOCUS_SELECTOR = [
+        "button:not([disabled]):not([hidden])",
+        "[href]",
+        "input:not([disabled]):not([hidden])",
+        "select:not([disabled]):not([hidden])",
+        "textarea:not([disabled]):not([hidden])",
+        "[tabindex]:not([tabindex='-1'])"
+      ].join(",");
       const tutorialSteps = [
         {
           title: "Draw on the canvas",
@@ -2223,6 +2244,7 @@
         ui.brushToggle.setAttribute("aria-expanded", String(!ui.brushPanel.hidden));
         ui.colorToggle.setAttribute("aria-expanded", String(!ui.colorPanel.hidden));
         ui.exportToggle.setAttribute("aria-expanded", String(!ui.exportMenu.hidden));
+        ui.exportToggle.setAttribute("aria-busy", String(state.exporting));
         ui.size.value = String(state.size);
         ui.sizeValue.textContent = controlDisplayValue(state.size);
         ui.size.setAttribute("aria-valuetext", `${controlDisplayValue(state.size)} normalized, ${state.size.toFixed(1)} actual`);
@@ -2742,30 +2764,48 @@
         updateUi();
       }
 
-      function paintTutorialDemo() {
-        if (!state.width || !state.height) return;
-        pushHistory();
-        const left = Math.max(90, state.cx - Math.min(220, state.width * 0.28));
-        const right = Math.min(state.width - 90, state.cx + Math.min(220, state.width * 0.28));
-        const midY = state.cy + Math.min(82, state.height * 0.14);
-        const points = [
-          [left, midY],
-          [left + (right - left) * 0.28, midY - 58],
-          [left + (right - left) * 0.58, midY + 34],
-          [right, midY - 24]
+      function demoStrokePoints() {
+        const width = canvasCssWidth();
+        const height = canvasCssHeight();
+        const cx = width / 2;
+        const cy = height / 2;
+        const reach = Math.min(260, width * 0.28);
+        const lift = Math.min(110, height * 0.15);
+        return [
+          [cx - reach, cy + lift * 0.34],
+          [cx - reach * 0.45, cy - lift * 0.62],
+          [cx + reach * 0.12, cy + lift * 0.44],
+          [cx + reach * 0.62, cy - lift * 0.5],
+          [cx + reach, cy + lift * 0.1]
         ];
+      }
+
+      function paintDemoStroke({ saveHistory = false, announce = false } = {}) {
+        if (!state.width || !state.height) return;
+        if (saveHistory) pushHistory();
+        const points = demoStrokePoints();
         for (let i = 1; i < points.length; i += 1) {
           spawnAlong(points[i - 1][0], points[i - 1][1], points[i][0], points[i][1]);
         }
-        showStatus("Drag on the canvas to paint your own stroke.");
+        if (announce) showStatus("Demo stroke painted.", "success");
       }
 
-      function showStatus(message) {
+      function paintTutorialDemo() {
+        paintDemoStroke({ saveHistory: true, announce: true });
+      }
+
+      function showStatus(message, tone = "") {
         window.clearTimeout(state.statusTimer);
         ui.status.textContent = message;
+        if (tone) {
+          ui.status.dataset.tone = tone;
+        } else {
+          ui.status.removeAttribute("data-tone");
+        }
         ui.status.hidden = false;
         state.statusTimer = window.setTimeout(() => {
           ui.status.hidden = true;
+          ui.status.removeAttribute("data-tone");
         }, 2200);
       }
 
@@ -2845,6 +2885,55 @@
           ui.spotlightPreview.hidden = false;
         }
         ui.tutorialSpotlight.hidden = false;
+      }
+
+      function tutorialFocusTargets() {
+        return Array.from(ui.tutorial.querySelectorAll(TUTORIAL_FOCUS_SELECTOR)).filter((element) => {
+          return element.getClientRects().length > 0;
+        });
+      }
+
+      function focusTutorialControl(preferLast = false) {
+        const targets = tutorialFocusTargets();
+        const target = preferLast ? targets[targets.length - 1] : targets[0];
+        if (target) target.focus({ preventScroll: true });
+      }
+
+      function handleTutorialKeydown(event) {
+        if (ui.tutorial.hidden) return false;
+        if (event.key === "Escape") {
+          event.preventDefault();
+          closeTutorial(true);
+          return true;
+        }
+        if (event.key !== "Tab") {
+          if (!ui.tutorial.contains(document.activeElement)) {
+            event.preventDefault();
+            focusTutorialControl();
+            return true;
+          }
+          return false;
+        }
+
+        const targets = tutorialFocusTargets();
+        if (!targets.length) {
+          event.preventDefault();
+          return true;
+        }
+        const first = targets[0];
+        const last = targets[targets.length - 1];
+        const active = document.activeElement;
+        if (event.shiftKey && (active === first || !ui.tutorial.contains(active))) {
+          event.preventDefault();
+          last.focus({ preventScroll: true });
+          return true;
+        }
+        if (!event.shiftKey && (active === last || !ui.tutorial.contains(active))) {
+          event.preventDefault();
+          first.focus({ preventScroll: true });
+          return true;
+        }
+        return false;
       }
 
       function openTutorial() {
@@ -2961,6 +3050,7 @@
         if (!preset) return;
         state.exporting = true;
         updateUi();
+        showStatus("Preparing PNG export...", "busy");
         await new Promise((resolve) => requestAnimationFrame(resolve));
         try {
           const width = preset.width || state.width || Math.round(canvasCssWidth());
@@ -2983,9 +3073,9 @@
             outCtx.drawImage(canvas, dx, dy, drawWidth, drawHeight);
             downloadBlob(await canvasToBlob(out), preset.label, "png");
           }
-          showStatus("PNG export ready.");
+          showStatus("PNG export ready.", "success");
         } catch (error) {
-          showStatus("Export failed in this browser. Try a smaller preset.");
+          showStatus("Export failed in this browser. Try a smaller preset.", "error");
         } finally {
           state.exporting = false;
           updateUi();
@@ -3670,12 +3760,13 @@
           desktopMinDpr: 1.5,
           mobileMinDpr: 1.25,
           desktopBrushBoost: 1.42,
-          mobileBrushBoost: 1.58,
+          mobileBrushBoost: 1.26,
           maxBrushSize: BRUSH_LENGTH_RANGE.max,
           desktopHistoryLimit: 8,
           mobileHistoryLimit: 5
         };
         const WIDTH_TO_LENGTH_RATIO = 0.08;
+        const MOBILE_TOUCH_RAIL_ALPHA = 0.28;
 
         state.canvasScale = state.canvasScale || 1;
         state.brushBoost = state.brushBoost || 1;
@@ -3688,6 +3779,32 @@
         function mobileLike() {
           return isMobileLayout() || window.matchMedia("(pointer: coarse)").matches;
         }
+
+        const detailedDrawBrushSegment = drawBrushSegment;
+        drawBrushSegment = function patchedMobileDrawBrushSegment(x0, y0, x1, y1, tendril) {
+          if (!mobileLike()) {
+            detailedDrawBrushSegment(x0, y0, x1, y1, tendril);
+            return;
+          }
+
+          const profile = brushProfiles[tendril.brush] || brushProfiles.thunder;
+          const age = 1 - tendril.life / tendril.maxLife;
+          const envelope = Math.sin(Math.PI * clamp(age, 0, 1));
+          if (envelope <= 0.001) return;
+
+          const passCount = Math.max(1, state.symmetry * (state.mirror ? 2 : 1));
+          const symmetryEnergy = 1 / Math.sqrt(passCount);
+          const expansionEnergy = 1 / (0.94 + state.expansion * 0.26);
+          const effectiveSize = legacyEquivalentLength();
+          const sizeEnergy = 1 / Math.sqrt(0.95 + effectiveSize / 13);
+          const alpha = tendril.alpha * envelope * symmetryEnergy * expansionEnergy * sizeEnergy * (profile.energy || 1) * 1.08;
+          if (alpha <= 0.001) return;
+
+          const baseWidth = Math.max(0.12, tendril.width * state.dpr);
+          const hue = tendril.blend ? mixHue(tendril.hue, tendril.hue2, age) : tendril.hue;
+          activeComposite = profile.composite || "lighter";
+          drawSymmetricLayerPack(x0, y0, x1, y1, profile, hue, alpha, baseWidth);
+        };
 
         function syncCanvasConfig() {
           const mobile = mobileLike();
@@ -3795,9 +3912,61 @@
           state.holdBloomTimer = null;
         }
 
+        function strokeMobileRailLayer(x0, y0, x1, y1, style, width) {
+          const passes = state.mirror ? 2 : 1;
+          const px0 = x0 * state.dpr;
+          const py0 = y0 * state.dpr;
+          const px1 = x1 * state.dpr;
+          const py1 = y1 * state.dpr;
+
+          ctx.globalCompositeOperation = activeComposite;
+          ctx.strokeStyle = style;
+          ctx.lineWidth = Math.max(0.4, width);
+          ctx.lineCap = "round";
+          ctx.lineJoin = "round";
+          ctx.beginPath();
+
+          for (let mirrorIndex = 0; mirrorIndex < passes; mirrorIndex += 1) {
+            const sx0 = mirrorIndex === 0 ? px0 : 2 * state.cx - px0;
+            const sx1 = mirrorIndex === 0 ? px1 : 2 * state.cx - px1;
+
+            for (let i = 0; i < state.symmetry; i += 1) {
+              const angle = (Math.PI * 2 * i) / state.symmetry;
+              const [rx0, ry0] = rotateAroundCenter(sx0, py0, angle);
+              const [rx1, ry1] = rotateAroundCenter(sx1, py1, angle);
+              ctx.moveTo(rx0, ry0);
+              ctx.lineTo(rx1, ry1);
+            }
+          }
+
+          ctx.stroke();
+        }
+
+        function drawMobileTouchRail(x0, y0, x1, y1) {
+          if (!mobileLike()) return;
+          const profile = brushProfiles[state.brush] || brushProfiles.thunder;
+          const passCount = Math.max(1, state.symmetry * (state.mirror ? 2 : 1));
+          const energy = 1 / Math.sqrt(passCount);
+          const hue = state.blend ? mixHue(state.hue, state.hue2, 0.28) : state.hue;
+          const width = clamp(expandedBrushWidthScale(state.size) * state.dpr * 0.46, 1.2, 6.8);
+          const alpha = MOBILE_TOUCH_RAIL_ALPHA * energy * (profile.energy || 1);
+
+          activeComposite = profile.composite || "lighter";
+          strokeMobileRailLayer(x0, y0, x1, y1, hsla(hue, 96, 62, alpha * 0.52), width * 3.2);
+          strokeMobileRailLayer(x0, y0, x1, y1, hsla(hue + 14, 98, 76, alpha), width);
+          strokeMobileRailLayer(x0, y0, x1, y1, `rgba(255, 255, 255, ${alpha * 0.34})`, Math.max(0.7, width * 0.34));
+        }
+
+        function drawMobileTouchDot(point) {
+          if (!mobileLike()) return;
+          const width = Math.max(0.8, 1 / state.dpr);
+          drawMobileTouchRail(point[0] - width, point[1], point[0] + width, point[1]);
+        }
+
         function beginHoldBloom(point) {
           clearHoldBloom();
-          state.lastMotion = [0.48, 0];
+          drawMobileTouchDot(point);
+          state.lastMotion = mobileLike() ? [0.34, 0] : [0.48, 0];
           spawnFan(point[0], point[1], state.lastMotion[0], state.lastMotion[1]);
           state.holdBloomTimer = window.setInterval(() => {
             if (!state.painting || state.gesturing || !state.last) {
@@ -3805,9 +3974,9 @@
               return;
             }
             const motion = state.lastMotion || [0.32, 0];
-            const energy = Math.max(0.32, Math.hypot(motion[0], motion[1]) * 0.18);
+            const energy = Math.max(mobileLike() ? 0.24 : 0.32, Math.hypot(motion[0], motion[1]) * (mobileLike() ? 0.13 : 0.18));
             spawnFan(state.last[0], state.last[1], motion[0] || energy, motion[1] || 0);
-          }, 90);
+          }, mobileLike() ? 115 : 90);
         }
 
         function emitSmoothedMove(point) {
@@ -3832,6 +4001,7 @@
               cursor[1] + (target[1] - cursor[1]) * smoothing
             ];
             if (Math.hypot(next[0] - cursor[0], next[1] - cursor[1]) > 0.35) {
+              drawMobileTouchRail(cursor[0], cursor[1], next[0], next[1]);
               spawnAlong(cursor[0], cursor[1], next[0], next[1]);
             }
             cursor = next;
@@ -3988,25 +4158,26 @@
           const profile = brushProfiles[state.brush] || brushProfiles.thunder;
           const speed = Math.hypot(dx, dy);
           const baseAngle = Math.atan2(dy, dx || 0.0001);
+          const mobile = mobileLike();
           const lengthScale = expandedBrushLengthScale(state.size);
           const sizeScale = expandedBrushWidthScale(state.size);
           const expansionScale = clamp(state.expansion, 0.35, 1.6);
-          const spreadScale = 0.64 + expansionScale * 0.38;
-          const perfScale = mobileLike() ? 0.78 : 1;
+          const spreadScale = (0.64 + expansionScale * 0.38) * (mobile ? 0.74 : 1);
+          const perfScale = mobile ? 0.64 : 1;
           const densityScale = clamp(
             (0.66 - Math.max(0, lengthScale - 1) * 0.18 - Math.max(0, expansionScale - 1) * 0.14) * perfScale,
-            mobileLike() ? 0.34 : 0.44,
-            mobileLike() ? 0.78 : 0.94
+            mobile ? 0.28 : 0.44,
+            mobile ? 0.6 : 0.94
           );
           const factorScale = clamp(
             (state.scaleFactor || SCALE_FACTOR_RANGE.default) / SCALE_FACTOR_RANGE.default,
             SCALE_FACTOR_RANGE.min / SCALE_FACTOR_RANGE.default,
             SCALE_FACTOR_RANGE.max / SCALE_FACTOR_RANGE.default
           );
-          const lifeScale = (0.72 + expansionScale * 0.23) * Math.pow(lengthScale, 1.32) * Math.sqrt(factorScale);
-          const velocityScale = (0.82 + expansionScale * 0.22) * Math.pow(lengthScale, 0.68) * factorScale;
+          const lifeScale = (0.72 + expansionScale * 0.23) * Math.pow(lengthScale, 1.32) * Math.sqrt(factorScale) * (mobile ? 0.82 : 1);
+          const velocityScale = (0.82 + expansionScale * 0.22) * Math.pow(lengthScale, 0.68) * factorScale * (mobile ? 0.82 : 1);
           const widthScale = (0.92 + expansionScale * 0.08) * (1 + (factorScale - 1) * WIDTH_TO_LENGTH_RATIO);
-          const motionBoost = clamp(0.72 + Math.sqrt(speed) * 0.105, 0.72, 1.55);
+          const motionBoost = clamp(0.72 + Math.sqrt(speed) * (mobile ? 0.075 : 0.105), 0.72, mobile ? 1.28 : 1.55);
           const count = Math.max(1, Math.round(rand(profile.count[0], profile.count[1]) * densityScale));
 
           for (let i = 0; i < count; i += 1) {
@@ -4040,7 +4211,7 @@
             });
           }
 
-          const mobileTendrilScale = mobileLike() ? 0.72 : 1;
+          const mobileTendrilScale = mobile ? 0.58 : 1;
           const maxTendrils = Math.round((profile.maxTendrils || 720) * (0.78 + expansionScale * 0.14) * mobileTendrilScale);
           if (state.tendrils.length > maxTendrils) {
             state.tendrils.splice(0, state.tendrils.length - maxTendrils);
@@ -4049,12 +4220,13 @@
 
         spawnAlong = function patchedExpandedSpawnAlong(x0, y0, x1, y1) {
           const profile = brushProfiles[state.brush] || brushProfiles.thunder;
+          const mobile = mobileLike();
           const dx = x1 - x0;
           const dy = y1 - y0;
           const distance = Math.hypot(dx, dy);
           const sizeDistanceScale = expandedBrushSpacingScale(state.size);
           const expansionDistanceScale = 0.9 + state.expansion * 0.46;
-          const spacing = clamp(11.8 * sizeDistanceScale * expansionDistanceScale * (profile.spacing || 1), mobileLike() ? 12 : 10, mobileLike() ? 76 : 96);
+          const spacing = clamp(11.8 * sizeDistanceScale * expansionDistanceScale * (profile.spacing || 1), mobile ? 15 : 10, mobile ? 92 : 96);
           const steps = Math.max(1, Math.floor(distance / spacing));
           for (let i = 1; i <= steps; i += 1) {
             const t = i / steps;
@@ -4068,6 +4240,7 @@
           if (mobileLike()) closeTransientControls(false);
           const result = originalStartPainting(event);
           if (state.painting && state.last) {
+            document.body.classList.toggle("is-painting", mobileLike());
             showSymmetryGuide(state.last);
             beginHoldBloom(state.last);
           }
@@ -4093,6 +4266,7 @@
         stopPainting = function patchedExpandedStopPainting(event) {
           clearHoldBloom();
           hideSymmetryGuide();
+          document.body.classList.remove("is-painting");
           if (state.gesturing) {
             state.painting = false;
             state.pointerId = null;
@@ -4158,6 +4332,7 @@
           state.painting = false;
           state.pointerId = null;
           state.last = null;
+          document.body.classList.remove("is-painting");
           clearHoldBloom();
           hideSymmetryGuide();
           gestureStart = {
@@ -4291,11 +4466,7 @@
       });
 
       window.addEventListener("keydown", (event) => {
-        if (event.key === "Escape" && !ui.tutorial.hidden) {
-          event.preventDefault();
-          closeTutorial(true);
-          return;
-        }
+        if (handleTutorialKeydown(event)) return;
         if (event.key === "Escape" && closeTransientControls(true)) {
           event.preventDefault();
           return;

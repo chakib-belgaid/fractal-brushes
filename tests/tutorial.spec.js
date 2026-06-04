@@ -152,6 +152,31 @@ test("walkthrough backdrop blocks clicks from controls underneath", async ({ pag
   await expect(mirror).toHaveAttribute("aria-pressed", "true");
 });
 
+test("walkthrough keeps keyboard focus inside the dialog", async ({ page, context }) => {
+  await context.clearCookies();
+  await page.goto(`${baseUrl}/app/index.html`);
+
+  await expect(page.locator("#tutorial")).toBeVisible();
+  await expect(page.locator("#tutorialNext")).toBeFocused();
+
+  await page.keyboard.press("Tab");
+  await expect(page.locator("#tutorialSkip")).toBeFocused();
+
+  await page.keyboard.press("Shift+Tab");
+  await expect(page.locator("#tutorialNext")).toBeFocused();
+
+  const mirror = page.locator("#mirror");
+  await expect(mirror).toHaveAttribute("aria-pressed", "true");
+  await mirror.focus();
+  await expect(mirror).toBeFocused();
+
+  await page.keyboard.press("Space");
+
+  await expect(page.locator("#tutorial")).toBeVisible();
+  await expect(mirror).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#tutorialSkip")).toBeFocused();
+});
+
 test("walkthrough backdrop keeps tutorial-opened mobile controls stable", async ({ page, context }) => {
   await context.clearCookies();
   await page.setViewportSize({ width: 390, height: 844 });
