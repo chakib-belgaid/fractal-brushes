@@ -13,6 +13,7 @@ Desktop is recommended for the best experience. The canvases remain usable on mo
 
 - `/` - landing page with product overview and launch link.
 - `/app/` - interactive Fractal Brushes canvas app.
+- `/app/mobile/` - lightweight touch-first canvas served automatically to phones and small tablets. `/app/?desktop=1` opts back into the desktop app for the session.
 - `/white/` - Fractal Brushes Ink, a white-paper black-ink canvas app.
 
 ## Local Usage

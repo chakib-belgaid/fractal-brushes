@@ -1,0 +1,1334 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <link rel="icon" href="data:,">
+  <title>Fractal Brushes | Mobile Canvas</title>
+  <meta name="description" content="Touch-first Fractal Brushes canvas tuned for phones: light rendering, big controls, mirrored luminous brushes, and PNG export.">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg-deep: #04050c;
+      --surface: rgba(16, 20, 34, 0.94);
+      --surface-strong: rgba(22, 27, 44, 0.97);
+      --line: rgba(148, 195, 226, 0.18);
+      --line-strong: rgba(160, 210, 240, 0.32);
+      --text: #eef3fa;
+      --muted: #9fb0c8;
+      --cyan: #46e0ff;
+      --focus: rgba(70, 224, 255, 0.6);
+      --active: hsl(326 100% 62%);
+      --radius: 12px;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      overscroll-behavior: none;
+      background: var(--bg-deep);
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+
+    button {
+      font: inherit;
+      color: inherit;
+      border: none;
+      background: none;
+      padding: 0;
+    }
+
+    button:focus-visible, a:focus-visible, input:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 2px;
+      border-radius: 8px;
+    }
+
+    #stage {
+      position: fixed;
+      inset: 0;
+      touch-action: none;
+      cursor: crosshair;
+    }
+
+    #canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .hint {
+      position: fixed;
+      left: 50%;
+      top: 38%;
+      transform: translate(-50%, -50%);
+      padding: 12px 18px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(8, 10, 20, 0.72);
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 640;
+      pointer-events: none;
+      transition: opacity 400ms ease;
+      white-space: nowrap;
+    }
+
+    .hint.hidden { opacity: 0; }
+
+    .topbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 8;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: calc(8px + var(--safe-top)) 10px 8px;
+      pointer-events: none;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px 6px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(8, 10, 20, 0.7);
+      font-size: 13px;
+      font-weight: 740;
+      pointer-events: auto;
+    }
+
+    .brand-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 34% 32%, #fff 0 18%, var(--active) 42%, transparent 78%);
+      box-shadow: 0 0 12px var(--active);
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 6px;
+      pointer-events: auto;
+    }
+
+    .icon-button {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      touch-action: manipulation;
+    }
+
+    .icon-button:active { transform: scale(0.94); }
+    .icon-button:disabled { opacity: 0.38; }
+
+    .icon-button svg {
+      width: 20px;
+      height: 20px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .dock {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 8;
+      display: grid;
+      gap: 8px;
+      padding: 10px 10px calc(10px + var(--safe-bottom));
+      background: linear-gradient(180deg, transparent, rgba(4, 5, 12, 0.88) 34%);
+    }
+
+    .brush-strip {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 4px 2px;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .brush-strip::-webkit-scrollbar { display: none; }
+
+    .chip {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 46px;
+      padding: 0 14px 0 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 680;
+      white-space: nowrap;
+      touch-action: manipulation;
+    }
+
+    .chip[aria-pressed="true"] {
+      border-color: var(--line-strong);
+      color: var(--text);
+      background: var(--surface-strong);
+      box-shadow: 0 0 18px rgba(70, 224, 255, 0.16), inset 0 0 0 1px var(--line-strong);
+    }
+
+    .chip-dot {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 32% 30%, var(--dot-c) 0 22%, transparent 34%),
+        radial-gradient(circle at 68% 66%, var(--dot-b) 0 40%, transparent 66%),
+        radial-gradient(circle at 46% 50%, var(--dot-a), rgba(0, 0, 0, 0.4) 88%);
+      box-shadow: 0 0 10px var(--dot-a);
+    }
+
+    .dock-row {
+      display: flex;
+      gap: 8px;
+      align-items: stretch;
+    }
+
+    .dock-button {
+      flex: 1 1 0;
+      min-height: 48px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 700;
+      touch-action: manipulation;
+    }
+
+    .dock-button:active { transform: scale(0.97); }
+
+    .dock-button[aria-pressed="true"], .dock-button[aria-expanded="true"] {
+      border-color: var(--line-strong);
+      background: var(--surface-strong);
+      box-shadow: inset 0 0 0 1px var(--line-strong);
+    }
+
+    .color-dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--active) 50%, var(--secondary, var(--active)) 50%);
+      box-shadow: 0 0 10px var(--active);
+    }
+
+    .dock-button svg {
+      width: 18px;
+      height: 18px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .desktop-link {
+      align-self: center;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 640;
+      text-decoration: none;
+      padding: 6px 10px;
+      justify-self: center;
+    }
+
+    .sheet {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 12;
+      padding: 14px 16px calc(18px + var(--safe-bottom));
+      border-top: 1px solid var(--line-strong);
+      border-radius: 18px 18px 0 0;
+      background: var(--surface-strong);
+      box-shadow: 0 -18px 48px rgba(0, 0, 0, 0.55);
+      transform: translateY(102%);
+      transition: transform 220ms cubic-bezier(0.23, 1, 0.32, 1);
+    }
+
+    .sheet.open { transform: translateY(0); }
+
+    .sheet-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .sheet-head h2 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 780;
+    }
+
+    .sheet-close {
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      border-radius: 10px;
+      color: var(--muted);
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+      padding: 8px 0;
+    }
+
+    .field-label {
+      display: flex;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: 12.5px;
+      font-weight: 700;
+    }
+
+    .field-label output {
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      height: 34px;
+      margin: 0;
+      appearance: none;
+      -webkit-appearance: none;
+      background: transparent;
+      touch-action: pan-x;
+    }
+
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 10px;
+      border-radius: 999px;
+      background: var(--track, rgba(148, 195, 226, 0.22));
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 26px;
+      height: 26px;
+      margin-top: -8px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.85);
+      background: var(--thumb, var(--cyan));
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+    }
+
+    input[type="range"]::-moz-range-track {
+      height: 10px;
+      border-radius: 999px;
+      background: var(--track, rgba(148, 195, 226, 0.22));
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.85);
+      background: var(--thumb, var(--cyan));
+    }
+
+    .hue-range {
+      --track: linear-gradient(90deg,
+        hsl(0 100% 58%), hsl(60 100% 58%), hsl(120 100% 58%),
+        hsl(180 100% 58%), hsl(240 100% 58%), hsl(300 100% 58%), hsl(360 100% 58%));
+    }
+
+    #hueRange { --thumb: var(--active); }
+    #hue2Range { --thumb: var(--secondary, #a77dff); }
+
+    .mode-row {
+      display: flex;
+      gap: 8px;
+      padding: 4px 0 8px;
+    }
+
+    .mode-row .dock-button { min-height: 44px; }
+
+    .field.disabled { opacity: 0.4; pointer-events: none; }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: calc(140px + var(--safe-bottom));
+      z-index: 20;
+      transform: translateX(-50%);
+      padding: 10px 16px;
+      border: 1px solid var(--line-strong);
+      border-radius: 999px;
+      background: var(--surface-strong);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 700;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 200ms ease;
+      white-space: nowrap;
+    }
+
+    .toast.show { opacity: 1; }
+
+    .scrim {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      background: rgba(2, 3, 8, 0.4);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 200ms ease;
+    }
+
+    .scrim.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  </style>
+</head>
+<body>
+  <main id="stage" aria-label="Drawing canvas. Drag with one finger to paint.">
+    <canvas id="canvas"></canvas>
+  </main>
+
+  <p class="hint" id="hint">Draw with one finger</p>
+
+  <header class="topbar">
+    <span class="brand"><span class="brand-dot" aria-hidden="true"></span>Fractal Brushes</span>
+    <div class="top-actions">
+      <button class="icon-button" id="undo" type="button" aria-label="Undo" disabled>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
+      </button>
+      <button class="icon-button" id="redo" type="button" aria-label="Redo" disabled>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg>
+      </button>
+      <button class="icon-button" id="clear" type="button" aria-label="Clear canvas">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
+      </button>
+      <button class="icon-button" id="save" type="button" aria-label="Save PNG">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11"/><path d="m7 9 5 5 5-5"/><path d="M5 19h14"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="scrim" id="scrim"></div>
+
+  <div class="dock" id="dock">
+    <div class="brush-strip" id="brushStrip" role="group" aria-label="Brushes"></div>
+    <div class="dock-row">
+      <button class="dock-button" id="colorToggle" type="button" aria-expanded="false" aria-controls="colorSheet">
+        <span class="color-dot" aria-hidden="true"></span>Color
+      </button>
+      <button class="dock-button" id="tuneToggle" type="button" aria-expanded="false" aria-controls="tuneSheet">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10"/><path d="M18 7h2"/><circle cx="16" cy="7" r="2"/><path d="M4 17h2"/><path d="M10 17h10"/><circle cx="8" cy="17" r="2"/></svg>Tune
+      </button>
+      <button class="dock-button" id="mirror" type="button" aria-pressed="true">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16"/><path d="M4 8l5 4-5 4V8Z"/><path d="M20 8l-5 4 5 4V8Z"/></svg>Mirror
+      </button>
+    </div>
+    <a class="desktop-link" href="../index.html?desktop=1" id="desktopLink">Switch to desktop version</a>
+  </div>
+
+  <section class="sheet" id="colorSheet" aria-label="Color controls" hidden>
+    <div class="sheet-head">
+      <h2>Color</h2>
+      <button class="sheet-close" type="button" data-close aria-label="Close color controls">&times;</button>
+    </div>
+    <div class="mode-row" role="group" aria-label="Color mode">
+      <button class="dock-button" data-mode="single" type="button" aria-pressed="false">Single</button>
+      <button class="dock-button" data-mode="blend" type="button" aria-pressed="true">Blend</button>
+    </div>
+    <label class="field">
+      <span class="field-label">Primary hue <output id="hueValue">326</output></span>
+      <input class="hue-range" id="hueRange" type="range" min="0" max="359" step="1" value="326">
+    </label>
+    <label class="field" id="hue2Field">
+      <span class="field-label">Blend hue <output id="hue2Value">196</output></span>
+      <input class="hue-range" id="hue2Range" type="range" min="0" max="359" step="1" value="196">
+    </label>
+  </section>
+
+  <section class="sheet" id="tuneSheet" aria-label="Brush tuning" hidden>
+    <div class="sheet-head">
+      <h2>Tune</h2>
+      <button class="sheet-close" type="button" data-close aria-label="Close tuning controls">&times;</button>
+    </div>
+    <label class="field">
+      <span class="field-label">Brush size <output id="sizeValue">5</output></span>
+      <input id="sizeRange" type="range" min="1" max="10" step="0.5" value="5">
+    </label>
+    <label class="field">
+      <span class="field-label">Expansion <output id="expansionValue">85%</output></span>
+      <input id="expansionRange" type="range" min="35" max="160" step="5" value="85">
+    </label>
+    <label class="field">
+      <span class="field-label">Symmetry points <output id="symmetryValue">6</output></span>
+      <input id="symmetryRange" type="range" min="1" max="12" step="1" value="6">
+    </label>
+  </section>
+
+  <p class="toast" id="toast" role="status" aria-live="polite"></p>
+
+  <script>
+    (() => {
+      "use strict";
+
+      /* ------------------------------------------------------------------
+         Brush profiles.
+         Tuned so each brush reads as its name:
+         fairy flutters and sparkles, flame rises warm, thunder snaps in
+         jagged bolts, silk glides, comet streaks straight with a bright
+         head, nebula billows slowly, crystal grows sharp facets, water
+         flows downward in waves, ember sparks upward, frost branches icy,
+         plasma writhes. maxTendrils values are phone budgets.
+      ------------------------------------------------------------------ */
+      const brushProfiles = {
+        fairy: {
+          name: "Fairy", hues: [292, 188], dot: ["#f8a7ff", "#9ff8ff", "#f7f2bf"],
+          count: [2, 4], spread: 1.15, velocity: [0.18, 1.0], life: [24, 60],
+          width: [0.16, 0.4], jitter: 0.28, curl: 0.24, branch: 0.002, drag: 0.962,
+          lift: [0.02, 0.12], alpha: 0.42, hueShift: [-34, 42], cap: "round",
+          composite: "lighter", maxTendrils: 300, spacing: 1.5, energy: 1.8,
+          layers: [[1.55, 0, 74, 0.35], [0.42, 0, 96, 0.7, "white"]],
+          accent: { type: "spark", chance: 0.07 }
+        },
+        flame: {
+          name: "Flame", hues: [22, 46], dot: ["#ffb13d", "#ff4a3d", "#f7efc8"],
+          count: [2, 3], spread: 0.46, velocity: [0.3, 1.3], life: [22, 50],
+          width: [0.28, 0.7], jitter: 0.16, curl: 0.09, branch: 0.0015, drag: 0.952,
+          lift: [0.32, 0.95], alpha: 0.34, hueShift: [-8, 20], cap: "round",
+          composite: "lighter", maxTendrils: 340, spacing: 1.4, energy: 1.7,
+          layers: [[2.4, -10, 42, 0.16], [1.05, 8, 56, 0.34], [0.32, 26, 72, 0.46]],
+          accent: { type: "warm", chance: 0.12 }
+        },
+        thunder: {
+          name: "Thunder", hues: [195, 264], dot: ["#38e8ff", "#a77dff", "#f7fbff"],
+          count: [1, 3], spread: 0.34, velocity: [1.35, 3.0], life: [16, 42],
+          width: [0.18, 0.55], jitter: 0.44, curl: 0.02, branch: 0.05, drag: 0.964,
+          lift: [0, 0], alpha: 0.44, hueShift: [-14, 22], angular: 0.33, cap: "butt",
+          composite: "lighter", maxTendrils: 380, spacing: 1.3, energy: 1.5,
+          layers: [[2.6, -24, 52, 0.2], [0.78, 10, 68, 0.62], [0.14, 0, 98, 0.9, "white"]]
+        },
+        silk: {
+          name: "Silk Ribbon", hues: [326, 196], dot: ["#ff6fd8", "#77f5ff", "#f7fbff"],
+          count: [1, 1], spread: 0.55, velocity: [0.9, 2.1], life: [110, 190],
+          width: [0.34, 0.78], jitter: 0.018, curl: 0.13, branch: 0.0002, drag: 0.989,
+          lift: [-0.02, 0.02], alpha: 0.28, hueShift: [-16, 30], cap: "round",
+          composite: "screen", maxTendrils: 140, spacing: 3.2, energy: 1.48,
+          layers: [[3.2, -12, 54, 0.18], [1.1, 14, 70, 0.5], [0.22, 0, 92, 0.86, "white"]]
+        },
+        comet: {
+          name: "Comet Trail", hues: [205], dot: ["#6de7ff", "#ffd166", "#f7fbff"],
+          count: [1, 2], spread: 0.14, velocity: [1.6, 3.4], life: [42, 88],
+          width: [0.08, 0.6], jitter: 0.03, curl: 0.01, branch: 0.003, drag: 0.962,
+          lift: [0, 0.02], alpha: 0.42, hueShift: [-12, 20], cap: "round",
+          composite: "screen", maxTendrils: 300, spacing: 1.8, energy: 1.9,
+          layers: [[3.8, -12, 50, 0.1], [1.0, 18, 66, 0.26], [0.22, 0, 88, 0.48], [0.06, 0, 98, 0.18, "white"]],
+          accent: { type: "head", chance: 0.5 }
+        },
+        nebula: {
+          name: "Nebula Smoke", hues: [268, 178], dot: ["#b98bff", "#6ef8d4", "#ff8adf"],
+          count: [1, 3], spread: 1.0, velocity: [0.05, 0.38], life: [62, 132],
+          width: [0.9, 1.8], jitter: 0.11, curl: 0.22, branch: 0.0008, drag: 0.986,
+          lift: [-0.04, 0.06], alpha: 0.2, hueShift: [-48, 58], cap: "round",
+          composite: "screen", maxTendrils: 200, spacing: 2.7, energy: 0.75,
+          layers: [[1.2, 0, 64, 0.1]],
+          accent: { type: "smoke", chance: 0.55 }
+        },
+        crystal: {
+          name: "Crystal Filament", hues: [188, 238], dot: ["#aefcff", "#8da2ff", "#f7fbff"],
+          count: [1, 2], spread: 0.26, velocity: [0.68, 1.9], life: [34, 74],
+          width: [0.12, 0.36], jitter: 0.025, curl: 0.005, branch: 0.03, drag: 0.965,
+          lift: [0, 0], alpha: 0.46, hueShift: [-10, 26], angular: 0.5, cap: "butt",
+          composite: "lighter", maxTendrils: 340, spacing: 1.45, energy: 1.6,
+          layers: [[2.0, -8, 58, 0.18], [0.56, 16, 74, 0.62], [0.12, 0, 98, 0.88, "white"]]
+        },
+        water: {
+          name: "Water", hues: [196, 226], dot: ["#38e8ff", "#386dff", "#d8fbff"],
+          count: [2, 4], spread: 0.55, velocity: [0.26, 1.2], life: [48, 104],
+          width: [0.34, 0.9], jitter: 0.06, curl: 0.27, branch: 0.0008, drag: 0.975,
+          lift: [-0.12, -0.03], alpha: 0.3, hueShift: [-18, 14], cap: "round",
+          composite: "screen", maxTendrils: 380, spacing: 1.7, energy: 1.35,
+          layers: [[3.0, -18, 48, 0.13], [1.05, 8, 64, 0.35], [0.28, 0, 86, 0.52], [0.08, 0, 98, 0.22, "white"]],
+          accent: { type: "glint", chance: 0.08 }
+        },
+        ember: {
+          name: "Ember", hues: [22, 48], dot: ["#ff5b2f", "#ffd166", "#6d1a00"],
+          count: [2, 4], spread: 0.8, velocity: [0.38, 1.7], life: [16, 40],
+          width: [0.1, 0.36], jitter: 0.3, curl: 0.08, branch: 0.009, drag: 0.94,
+          lift: [0.22, 0.66], alpha: 0.5, hueShift: [-8, 32], cap: "round",
+          composite: "lighter", maxTendrils: 340, spacing: 1.45, energy: 1.9,
+          layers: [[1.6, -10, 40, 0.22], [0.52, 12, 60, 0.62], [0.12, 0, 94, 0.5, "warm"]],
+          accent: { type: "warm", chance: 0.18 }
+        },
+        frost: {
+          name: "Frost", hues: [188, 214], dot: ["#d8fbff", "#77c8ff", "#f7fbff"],
+          count: [1, 3], spread: 0.4, velocity: [0.48, 1.55], life: [38, 82],
+          width: [0.12, 0.42], jitter: 0.07, curl: 0.01, branch: 0.042, drag: 0.962,
+          lift: [0, 0], alpha: 0.5, hueShift: [-16, 18], angular: 0.5, cap: "butt",
+          composite: "lighter", maxTendrils: 340, spacing: 1.55, energy: 1.7,
+          layers: [[2.2, -6, 70, 0.16], [0.62, 8, 82, 0.56], [0.13, 0, 98, 0.9, "white"]]
+        },
+        plasma: {
+          name: "Plasma", hues: [310, 188], dot: ["#ff38d8", "#38e8ff", "#f7fbff"],
+          count: [3, 5], spread: 0.72, velocity: [0.48, 1.9], life: [34, 80],
+          width: [0.28, 0.8], jitter: 0.36, curl: 0.3, branch: 0.01, drag: 0.954,
+          lift: [-0.02, 0.02], alpha: 0.32, hueShift: [-34, 38], cap: "round",
+          composite: "lighter", maxTendrils: 400, spacing: 1.4, energy: 1.0,
+          layers: [[3.3, -28, 48, 0.16], [1.05, 24, 64, 0.42], [0.25, 0, 86, 0.65], [0.08, 0, 98, 0.42, "white"]]
+        }
+      };
+      const brushOrder = ["fairy", "flame", "thunder", "silk", "comet", "nebula", "crystal", "water", "ember", "frost", "plasma"];
+
+      const DPR_CAP = 1.5;
+      const PIXEL_BUDGET = 2600000;
+      const HISTORY_LIMIT = 4;
+      const HOLD_BLOOM_MS = 150;
+
+      const stage = document.getElementById("stage");
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+
+      const ui = {
+        hint: document.getElementById("hint"),
+        undo: document.getElementById("undo"),
+        redo: document.getElementById("redo"),
+        clear: document.getElementById("clear"),
+        save: document.getElementById("save"),
+        brushStrip: document.getElementById("brushStrip"),
+        colorToggle: document.getElementById("colorToggle"),
+        tuneToggle: document.getElementById("tuneToggle"),
+        mirror: document.getElementById("mirror"),
+        colorSheet: document.getElementById("colorSheet"),
+        tuneSheet: document.getElementById("tuneSheet"),
+        scrim: document.getElementById("scrim"),
+        modes: Array.from(document.querySelectorAll("[data-mode]")),
+        hueRange: document.getElementById("hueRange"),
+        hueValue: document.getElementById("hueValue"),
+        hue2Field: document.getElementById("hue2Field"),
+        hue2Range: document.getElementById("hue2Range"),
+        hue2Value: document.getElementById("hue2Value"),
+        sizeRange: document.getElementById("sizeRange"),
+        sizeValue: document.getElementById("sizeValue"),
+        expansionRange: document.getElementById("expansionRange"),
+        expansionValue: document.getElementById("expansionValue"),
+        symmetryRange: document.getElementById("symmetryRange"),
+        symmetryValue: document.getElementById("symmetryValue"),
+        toast: document.getElementById("toast")
+      };
+
+      const state = {
+        width: 0,
+        height: 0,
+        dpr: 1,
+        cx: 0,
+        cy: 0,
+        brush: "silk",
+        hue: 326,
+        hue2: 196,
+        blend: true,
+        size: 5,
+        expansion: 0.85,
+        symmetry: 6,
+        mirror: true,
+        painting: false,
+        pointerId: null,
+        last: null,
+        lastMotion: [0.3, 0],
+        tendrils: [],
+        history: [],
+        redo: [],
+        holdTimer: null,
+        rafId: 0,
+        hinted: false
+      };
+
+      const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+      const rand = (min, max) => min + Math.random() * (max - min);
+      const normalizedHue = (hue) => ((Number(hue) % 360) + 360) % 360;
+
+      let activeComposite = "lighter";
+      let toastTimer = 0;
+
+      function hsla(hue, saturation, lightness, alpha) {
+        const h = Math.round(normalizedHue(hue) / 4) * 4;
+        const a = clamp(Math.round(alpha * 50) / 50, 0, 1);
+        return `hsla(${h}, ${saturation}%, ${lightness}%, ${a})`;
+      }
+
+      function mixHue(from, to, amount) {
+        const delta = ((((to - from) % 360) + 540) % 360) - 180;
+        return (from + delta * amount + 360) % 360;
+      }
+
+      /* ---------------------------------------------------------------
+         Canvas + rendering
+      --------------------------------------------------------------- */
+
+      function clearSurface(targetCtx = ctx, width = state.width, height = state.height) {
+        targetCtx.globalCompositeOperation = "source-over";
+        const gradient = targetCtx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, Math.max(width, height) * 0.78);
+        gradient.addColorStop(0, "#050713");
+        gradient.addColorStop(0.72, "#04050a");
+        gradient.addColorStop(1, "#020308");
+        targetCtx.fillStyle = gradient;
+        targetCtx.fillRect(0, 0, width, height);
+      }
+
+      function resize() {
+        const previous = state.width && state.height ? makeSnapshot() : null;
+        const cssWidth = window.innerWidth;
+        const cssHeight = window.innerHeight;
+        const raw = clamp(window.devicePixelRatio || 1, 1, DPR_CAP);
+        const budget = Math.sqrt(PIXEL_BUDGET / Math.max(1, cssWidth * cssHeight));
+        state.dpr = clamp(Math.min(raw, budget), 0.75, DPR_CAP);
+        state.width = Math.max(1, Math.floor(cssWidth * state.dpr));
+        state.height = Math.max(1, Math.floor(cssHeight * state.dpr));
+        state.cx = state.width / 2;
+        state.cy = state.height / 2;
+        canvas.width = state.width;
+        canvas.height = state.height;
+        if (previous) {
+          restoreSnapshot(previous);
+        } else {
+          clearSurface();
+        }
+      }
+
+      function rotateAroundCenter(x, y, angle) {
+        const dx = x - state.cx;
+        const dy = y - state.cy;
+        const ca = Math.cos(angle);
+        const sa = Math.sin(angle);
+        return [state.cx + dx * ca - dy * sa, state.cy + dx * sa + dy * ca];
+      }
+
+      function layerStyle(hue, lightness, layerAlpha, alpha, hueOffset, special) {
+        if (special === "white") return `rgba(255, 255, 255, ${clamp(alpha * layerAlpha, 0, 1)})`;
+        if (special === "warm") return `rgba(255, 246, 219, ${clamp(alpha * layerAlpha, 0, 1)})`;
+        return hsla(hue + hueOffset, 96, lightness, alpha * layerAlpha);
+      }
+
+      // One stroked path per layer covering every symmetry/mirror copy.
+      function drawSymmetricLayers(x0, y0, x1, y1, profile, hue, alpha, baseWidth) {
+        const passes = state.mirror ? 2 : 1;
+        for (const [scale, hueOffset, lightness, layerAlpha, special] of profile.layers) {
+          ctx.globalCompositeOperation = activeComposite;
+          ctx.strokeStyle = layerStyle(hue, lightness, layerAlpha, alpha, hueOffset, special);
+          ctx.lineWidth = Math.max(0.12, baseWidth * scale);
+          ctx.lineCap = profile.cap || "round";
+          ctx.lineJoin = "round";
+          ctx.beginPath();
+          for (let mirrorIndex = 0; mirrorIndex < passes; mirrorIndex += 1) {
+            const sx0 = mirrorIndex === 0 ? x0 : 2 * state.cx - x0;
+            const sx1 = mirrorIndex === 0 ? x1 : 2 * state.cx - x1;
+            for (let i = 0; i < state.symmetry; i += 1) {
+              const angle = (Math.PI * 2 * i) / state.symmetry;
+              const [rx0, ry0] = rotateAroundCenter(sx0, y0, angle);
+              const [rx1, ry1] = rotateAroundCenter(sx1, y1, angle);
+              ctx.moveTo(rx0, ry0);
+              ctx.lineTo(rx1, ry1);
+            }
+          }
+          ctx.stroke();
+        }
+      }
+
+      function drawSymmetricStamp(x, y, radius, hue, alpha, special) {
+        const r = Math.max(0.6, radius);
+        const passes = state.mirror ? 2 : 1;
+        for (let mirrorIndex = 0; mirrorIndex < passes; mirrorIndex += 1) {
+          const sx = mirrorIndex === 0 ? x : 2 * state.cx - x;
+          for (let i = 0; i < state.symmetry; i += 1) {
+            const angle = (Math.PI * 2 * i) / state.symmetry;
+            const [rx, ry] = rotateAroundCenter(sx, y, angle);
+            const gradient = ctx.createRadialGradient(rx, ry, 0, rx, ry, r);
+            if (special === "white") {
+              gradient.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
+              gradient.addColorStop(0.34, `rgba(225, 248, 255, ${alpha * 0.34})`);
+              gradient.addColorStop(1, "rgba(225, 248, 255, 0)");
+            } else if (special === "warm") {
+              gradient.addColorStop(0, `rgba(255, 248, 218, ${alpha})`);
+              gradient.addColorStop(0.38, hsla(hue + 12, 96, 62, alpha * 0.42));
+              gradient.addColorStop(1, hsla(hue - 8, 96, 42, 0));
+            } else {
+              gradient.addColorStop(0, hsla(hue, 96, 72, alpha));
+              gradient.addColorStop(0.48, hsla(hue + 8, 94, 56, alpha * 0.34));
+              gradient.addColorStop(1, hsla(hue, 94, 42, 0));
+            }
+            ctx.globalCompositeOperation = activeComposite;
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(rx, ry, r, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
+
+      function drawAccent(profile, x1, y1, hue, alpha, baseWidth) {
+        const accent = profile.accent;
+        if (!accent || Math.random() >= accent.chance) return;
+        if (accent.type === "spark") {
+          const r = baseWidth * rand(2.4, 4.6);
+          const style = `rgba(255, 255, 255, ${clamp(alpha * 0.85, 0, 1)})`;
+          ctx.globalCompositeOperation = activeComposite;
+          ctx.strokeStyle = style;
+          ctx.lineWidth = Math.max(0.4, r * 0.1);
+          ctx.lineCap = "round";
+          ctx.beginPath();
+          ctx.moveTo(x1 - r, y1);
+          ctx.lineTo(x1 + r, y1);
+          ctx.moveTo(x1, y1 - r);
+          ctx.lineTo(x1, y1 + r);
+          ctx.stroke();
+        } else if (accent.type === "smoke") {
+          drawSymmetricStamp(x1, y1, baseWidth * 6.4, hue, alpha * 0.34);
+        } else if (accent.type === "warm") {
+          drawSymmetricStamp(x1, y1, baseWidth * 2.3, hue + 14, alpha * 0.4, "warm");
+        } else if (accent.type === "head") {
+          drawSymmetricStamp(x1, y1, baseWidth * 2.1, hue, alpha * 0.4, "white");
+        } else if (accent.type === "glint") {
+          drawSymmetricStamp(x1, y1, baseWidth * rand(1.6, 3.0), hue + 10, alpha * 0.3, "white");
+        }
+      }
+
+      function drawBrushSegment(x0, y0, x1, y1, tendril) {
+        const profile = brushProfiles[tendril.brush] || brushProfiles.silk;
+        const age = 1 - tendril.life / tendril.maxLife;
+        const envelope = Math.sin(Math.PI * clamp(age, 0, 1));
+        if (envelope <= 0.001) return;
+
+        const passCount = Math.max(1, state.symmetry * (state.mirror ? 2 : 1));
+        const symmetryEnergy = 1 / Math.sqrt(passCount);
+        const expansionEnergy = 1 / (0.94 + state.expansion * 0.26);
+        const alpha = tendril.alpha * envelope * symmetryEnergy * expansionEnergy * (profile.energy || 1) * 1.08;
+        if (alpha <= 0.001) return;
+
+        const baseWidth = Math.max(0.12, tendril.width * state.dpr);
+        const hue = tendril.blend ? mixHue(tendril.hue, tendril.hue2, age) : tendril.hue;
+        activeComposite = profile.composite || "lighter";
+        drawSymmetricLayers(x0, y0, x1, y1, profile, hue, alpha, baseWidth);
+        drawAccent(profile, x1, y1, hue, alpha, baseWidth);
+      }
+
+      /* ---------------------------------------------------------------
+         Simulation. The rAF loop only runs while tendrils are alive.
+      --------------------------------------------------------------- */
+
+      function quantizeVelocity(tendril, amount) {
+        if (!amount) return;
+        const speed = Math.hypot(tendril.vx, tendril.vy);
+        if (speed < 0.001) return;
+        const angle = Math.atan2(tendril.vy, tendril.vx);
+        const stepAngle = Math.PI * amount;
+        const snapped = Math.round(angle / stepAngle) * stepAngle;
+        tendril.vx = Math.cos(snapped) * speed;
+        tendril.vy = Math.sin(snapped) * speed;
+      }
+
+      function branchFrom(tendril, speed) {
+        const splitAngle = Math.atan2(tendril.vy, tendril.vx) + (Math.random() > 0.5 ? 1 : -1) * rand(0.45, tendril.angular ? 0.92 : 1.18);
+        const splitLife = tendril.life * rand(0.28, 0.58);
+        state.tendrils.push({
+          x: tendril.x, y: tendril.y,
+          vx: Math.cos(splitAngle) * speed * rand(0.48, 0.92),
+          vy: Math.sin(splitAngle) * speed * rand(0.48, 0.92),
+          life: splitLife, maxLife: splitLife,
+          hue: tendril.hue + rand(-20, 38),
+          hue2: tendril.hue2 + rand(-20, 38),
+          blend: tendril.blend,
+          width: tendril.width * rand(0.42, 0.76),
+          jitter: tendril.jitter * 1.08,
+          curl: tendril.curl, drag: tendril.drag, lift: tendril.lift,
+          alpha: tendril.alpha * 0.74,
+          branch: tendril.branch * 0.18,
+          seed: Math.random() * Math.PI * 2,
+          angular: tendril.angular,
+          brush: tendril.brush
+        });
+      }
+
+      function advanceFrame() {
+        for (let i = state.tendrils.length - 1; i >= 0; i -= 1) {
+          const tendril = state.tendrils[i];
+          const ox = tendril.x;
+          const oy = tendril.y;
+          const speed = Math.max(0.001, Math.hypot(tendril.vx, tendril.vy));
+          const nx = -tendril.vy / speed;
+          const ny = tendril.vx / speed;
+          const curl = Math.sin((tendril.maxLife - tendril.life) * 0.16 + tendril.seed) * tendril.curl;
+
+          tendril.vx += nx * curl * state.dpr;
+          tendril.vy += ny * curl * state.dpr;
+          tendril.vx += rand(-tendril.jitter, tendril.jitter) * state.dpr;
+          tendril.vy += rand(-tendril.jitter, tendril.jitter) * state.dpr;
+          tendril.vy -= tendril.lift * state.dpr * (1 + tendril.width);
+          quantizeVelocity(tendril, tendril.angular);
+
+          const tx = tendril.x + tendril.vx;
+          const ty = tendril.y + tendril.vy;
+          drawBrushSegment(ox, oy, tx, ty, tendril);
+
+          tendril.x = tx;
+          tendril.y = ty;
+          tendril.vx *= tendril.drag;
+          tendril.vy *= tendril.drag;
+          tendril.life -= 1;
+
+          const profile = brushProfiles[tendril.brush] || brushProfiles.silk;
+          if (tendril.life > 12 && Math.random() < tendril.branch && state.tendrils.length < (profile.maxTendrils || 300)) {
+            branchFrom(tendril, speed);
+          }
+
+          if (
+            tendril.life <= 0 ||
+            Math.abs(tendril.vx) + Math.abs(tendril.vy) < 0.015 ||
+            tendril.x < -state.width * 0.1 || tendril.x > state.width * 1.1 ||
+            tendril.y < -state.height * 0.1 || tendril.y > state.height * 1.1
+          ) {
+            state.tendrils.splice(i, 1);
+          }
+        }
+      }
+
+      function frame() {
+        state.rafId = 0;
+        if (document.hidden) return;
+        advanceFrame();
+        if (state.tendrils.length > 0 || state.painting) {
+          state.rafId = requestAnimationFrame(frame);
+        }
+      }
+
+      function wakeLoop() {
+        if (!state.rafId && !document.hidden) {
+          state.rafId = requestAnimationFrame(frame);
+        }
+      }
+
+      /* ---------------------------------------------------------------
+         Spawning
+      --------------------------------------------------------------- */
+
+      function sizeScales() {
+        const lengthScale = clamp(state.size / 5, 0.2, 2);
+        return {
+          width: 1.9 * Math.pow(lengthScale, 0.6),
+          velocity: 0.9 * Math.pow(lengthScale, 0.68),
+          life: Math.pow(lengthScale, 1.15),
+          spacing: 0.7 + lengthScale * 0.5
+        };
+      }
+
+      function spawnFan(x, y, dx, dy) {
+        const profile = brushProfiles[state.brush] || brushProfiles.silk;
+        const speed = Math.hypot(dx, dy);
+        const baseAngle = Math.atan2(dy, dx || 0.0001);
+        const scales = sizeScales();
+        const expansionScale = clamp(state.expansion, 0.35, 1.6);
+        const spreadScale = 0.52 + expansionScale * 0.34;
+        const densityScale = clamp(0.62 - Math.max(0, expansionScale - 1) * 0.14, 0.34, 0.62);
+        const lifeScale = (0.72 + expansionScale * 0.23) * scales.life;
+        const velocityScale = (0.82 + expansionScale * 0.22) * scales.velocity;
+        const motionBoost = clamp(0.72 + Math.sqrt(speed) * 0.08, 0.72, 1.3);
+        const count = Math.max(1, Math.round(rand(profile.count[0], profile.count[1]) * densityScale));
+
+        for (let i = 0; i < count; i += 1) {
+          const angle = baseAngle + rand(-profile.spread, profile.spread) * spreadScale;
+          const velocity = rand(profile.velocity[0], profile.velocity[1]) * velocityScale * motionBoost;
+          const life = rand(profile.life[0], profile.life[1]) * lifeScale;
+          const lift = rand(profile.lift[0], profile.lift[1]) * state.dpr;
+          const hue = state.hue + rand(profile.hueShift[0], profile.hueShift[1]);
+          const hue2 = state.blend ? state.hue2 + rand(profile.hueShift[0], profile.hueShift[1]) : hue;
+
+          state.tendrils.push({
+            x: x * state.dpr,
+            y: y * state.dpr,
+            vx: Math.cos(angle) * velocity * state.dpr,
+            vy: Math.sin(angle) * velocity * state.dpr - lift,
+            life,
+            maxLife: life,
+            hue,
+            hue2,
+            blend: state.blend,
+            width: rand(profile.width[0], profile.width[1]) * scales.width,
+            jitter: profile.jitter,
+            curl: profile.curl,
+            drag: profile.drag,
+            lift: (profile.lift[0] + profile.lift[1]) * 0.006,
+            alpha: profile.alpha,
+            branch: profile.branch,
+            seed: Math.random() * Math.PI * 2,
+            angular: profile.angular || 0,
+            brush: state.brush
+          });
+        }
+
+        const maxTendrils = Math.round((profile.maxTendrils || 300) * (0.85 + expansionScale * 0.15));
+        if (state.tendrils.length > maxTendrils) {
+          state.tendrils.splice(0, state.tendrils.length - maxTendrils);
+        }
+        wakeLoop();
+      }
+
+      function spawnAlong(x0, y0, x1, y1) {
+        const profile = brushProfiles[state.brush] || brushProfiles.silk;
+        const dx = x1 - x0;
+        const dy = y1 - y0;
+        const distance = Math.hypot(dx, dy);
+        const scales = sizeScales();
+        const expansionDistanceScale = 0.9 + state.expansion * 0.46;
+        const spacing = clamp(12 * scales.spacing * expansionDistanceScale * (profile.spacing || 1), 12, 88);
+        const steps = Math.max(1, Math.floor(distance / spacing));
+        for (let i = 1; i <= steps; i += 1) {
+          const t = i / steps;
+          spawnFan(x0 + dx * t, y0 + dy * t, dx / steps, dy / steps);
+        }
+      }
+
+      /* ---------------------------------------------------------------
+         History / export
+      --------------------------------------------------------------- */
+
+      function makeSnapshot() {
+        const shot = document.createElement("canvas");
+        shot.width = canvas.width;
+        shot.height = canvas.height;
+        shot.getContext("2d", { alpha: false }).drawImage(canvas, 0, 0);
+        return shot;
+      }
+
+      function restoreSnapshot(shot) {
+        if (!shot) return;
+        ctx.globalCompositeOperation = "source-over";
+        ctx.drawImage(shot, 0, 0, shot.width, shot.height, 0, 0, state.width, state.height);
+      }
+
+      function pushHistory() {
+        state.history.push(makeSnapshot());
+        if (state.history.length > HISTORY_LIMIT) {
+          state.history.splice(0, state.history.length - HISTORY_LIMIT);
+        }
+        state.redo = [];
+        updateUi();
+      }
+
+      function undo() {
+        if (!state.history.length) return;
+        state.redo.push(makeSnapshot());
+        state.tendrils = [];
+        restoreSnapshot(state.history.pop());
+        updateUi();
+      }
+
+      function redo() {
+        if (!state.redo.length) return;
+        state.history.push(makeSnapshot());
+        state.tendrils = [];
+        restoreSnapshot(state.redo.pop());
+        updateUi();
+      }
+
+      function clearArt() {
+        pushHistory();
+        state.tendrils = [];
+        clearSurface();
+      }
+
+      function showToast(message) {
+        ui.toast.textContent = message;
+        ui.toast.classList.add("show");
+        window.clearTimeout(toastTimer);
+        toastTimer = window.setTimeout(() => ui.toast.classList.remove("show"), 2200);
+      }
+
+      function exportPng() {
+        const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+        const name = `fractal-brushes-${stamp}.png`;
+        const finish = (url, revoke) => {
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = name;
+          document.body.append(link);
+          link.click();
+          link.remove();
+          if (revoke) window.setTimeout(() => URL.revokeObjectURL(url), 4000);
+          showToast("PNG saved");
+        };
+        if (canvas.toBlob) {
+          canvas.toBlob((blob) => {
+            if (blob) {
+              finish(URL.createObjectURL(blob), true);
+            } else {
+              finish(canvas.toDataURL("image/png"), false);
+            }
+          }, "image/png");
+        } else {
+          finish(canvas.toDataURL("image/png"), false);
+        }
+      }
+
+      /* ---------------------------------------------------------------
+         UI
+      --------------------------------------------------------------- */
+
+      const root = document.documentElement;
+
+      function updateUi() {
+        root.style.setProperty("--active", `hsl(${Math.round(state.hue)} 100% 62%)`);
+        root.style.setProperty("--secondary", `hsl(${Math.round(state.hue2)} 100% 62%)`);
+        ui.undo.disabled = state.history.length === 0;
+        ui.redo.disabled = state.redo.length === 0;
+        ui.mirror.setAttribute("aria-pressed", String(state.mirror));
+        ui.hueValue.textContent = String(Math.round(state.hue));
+        ui.hue2Value.textContent = String(Math.round(state.hue2));
+        ui.hueRange.value = String(Math.round(state.hue));
+        ui.hue2Range.value = String(Math.round(state.hue2));
+        ui.hue2Field.classList.toggle("disabled", !state.blend);
+        ui.modes.forEach((button) => {
+          button.setAttribute("aria-pressed", String((button.dataset.mode === "blend") === state.blend));
+        });
+        ui.sizeValue.textContent = String(state.size);
+        ui.expansionValue.textContent = `${Math.round(state.expansion * 100)}%`;
+        ui.symmetryValue.textContent = String(state.symmetry);
+        Array.from(ui.brushStrip.children).forEach((chip) => {
+          chip.setAttribute("aria-pressed", String(chip.dataset.brush === state.brush));
+        });
+      }
+
+      function createBrushChips() {
+        brushOrder.forEach((id) => {
+          const profile = brushProfiles[id];
+          const chip = document.createElement("button");
+          chip.type = "button";
+          chip.className = "chip";
+          chip.dataset.brush = id;
+          chip.setAttribute("aria-pressed", "false");
+          chip.style.setProperty("--dot-a", profile.dot[0]);
+          chip.style.setProperty("--dot-b", profile.dot[1]);
+          chip.style.setProperty("--dot-c", profile.dot[2]);
+          chip.innerHTML = `<span class="chip-dot" aria-hidden="true"></span>${profile.name}`;
+          chip.addEventListener("click", () => setBrush(id));
+          ui.brushStrip.append(chip);
+        });
+      }
+
+      function setBrush(id) {
+        const profile = brushProfiles[id];
+        if (!profile) return;
+        state.brush = id;
+        state.hue = normalizedHue(profile.hues[0]);
+        state.hue2 = normalizedHue(profile.hues[1] ?? profile.hues[0] + 120);
+        state.blend = profile.hues.length > 1;
+        updateUi();
+        const chip = ui.brushStrip.querySelector(`[data-brush="${id}"]`);
+        if (chip && chip.scrollIntoView) chip.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
+      }
+
+      function openSheet(sheet, toggle) {
+        closeSheets();
+        sheet.hidden = false;
+        // Force a layout pass so the open transition plays from the hidden state.
+        void sheet.offsetHeight;
+        sheet.classList.add("open");
+        toggle.setAttribute("aria-expanded", "true");
+        ui.scrim.classList.add("show");
+      }
+
+      function closeSheets() {
+        [[ui.colorSheet, ui.colorToggle], [ui.tuneSheet, ui.tuneToggle]].forEach(([sheet, toggle]) => {
+          sheet.classList.remove("open");
+          sheet.hidden = true;
+          toggle.setAttribute("aria-expanded", "false");
+        });
+        ui.scrim.classList.remove("show");
+      }
+
+      function toggleSheet(sheet, toggle) {
+        if (sheet.hidden) {
+          openSheet(sheet, toggle);
+        } else {
+          closeSheets();
+        }
+      }
+
+      /* ---------------------------------------------------------------
+         Pointer input (single finger paints, extra touches ignored)
+      --------------------------------------------------------------- */
+
+      function eventPosition(event) {
+        const rect = canvas.getBoundingClientRect();
+        return [
+          clamp(event.clientX - rect.left, 0, rect.width),
+          clamp(event.clientY - rect.top, 0, rect.height)
+        ];
+      }
+
+      function clearHoldBloom() {
+        window.clearInterval(state.holdTimer);
+        state.holdTimer = null;
+      }
+
+      function startPainting(event) {
+        if (event.button !== undefined && event.button !== 0) return;
+        if (state.painting || (event.pointerType === "touch" && event.isPrimary === false)) return;
+        closeSheets();
+        if (!state.hinted) {
+          state.hinted = true;
+          ui.hint.classList.add("hidden");
+        }
+        pushHistory();
+        state.painting = true;
+        state.pointerId = event.pointerId ?? "mouse";
+        state.last = eventPosition(event);
+        state.lastMotion = [0.32, 0];
+        spawnFan(state.last[0], state.last[1], 0.32, 0);
+        clearHoldBloom();
+        state.holdTimer = window.setInterval(() => {
+          if (!state.painting || !state.last) {
+            clearHoldBloom();
+            return;
+          }
+          const motion = state.lastMotion || [0.3, 0];
+          spawnFan(state.last[0], state.last[1], motion[0] || 0.26, motion[1] || 0);
+        }, HOLD_BLOOM_MS);
+        if (event.pointerId !== undefined && stage.setPointerCapture) {
+          try { stage.setPointerCapture(event.pointerId); } catch (_) { /* synthetic pointers */ }
+        }
+        event.preventDefault();
+      }
+
+      function continuePainting(event) {
+        const pointerId = event.pointerId ?? "mouse";
+        if (!state.painting || pointerId !== state.pointerId || !state.last) return;
+        const coalesced = typeof event.getCoalescedEvents === "function" ? event.getCoalescedEvents() : null;
+        const events = coalesced && coalesced.length ? coalesced : [event];
+        for (const moveEvent of events) {
+          const point = eventPosition(moveEvent);
+          const dx = point[0] - state.last[0];
+          const dy = point[1] - state.last[1];
+          if (dx * dx + dy * dy < 1) continue;
+          spawnAlong(state.last[0], state.last[1], point[0], point[1]);
+          state.lastMotion = [dx, dy];
+          state.last = point;
+        }
+        event.preventDefault();
+      }
+
+      function stopPainting(event) {
+        const pointerId = event.pointerId ?? "mouse";
+        if (!state.painting || pointerId !== state.pointerId) return;
+        clearHoldBloom();
+        state.painting = false;
+        state.pointerId = null;
+        state.last = null;
+        if (event.pointerId !== undefined && stage.releasePointerCapture) {
+          try { stage.releasePointerCapture(event.pointerId); } catch (_) { /* already released */ }
+        }
+        updateUi();
+      }
+
+      /* ---------------------------------------------------------------
+         Wiring
+      --------------------------------------------------------------- */
+
+      stage.addEventListener("pointerdown", startPainting);
+      stage.addEventListener("pointermove", continuePainting);
+      window.addEventListener("pointerup", stopPainting);
+      stage.addEventListener("pointercancel", stopPainting);
+
+      ui.undo.addEventListener("click", undo);
+      ui.redo.addEventListener("click", redo);
+      ui.clear.addEventListener("click", clearArt);
+      ui.save.addEventListener("click", exportPng);
+      ui.mirror.addEventListener("click", () => {
+        state.mirror = !state.mirror;
+        updateUi();
+      });
+      ui.colorToggle.addEventListener("click", () => toggleSheet(ui.colorSheet, ui.colorToggle));
+      ui.tuneToggle.addEventListener("click", () => toggleSheet(ui.tuneSheet, ui.tuneToggle));
+      ui.scrim.addEventListener("pointerdown", closeSheets);
+      document.querySelectorAll("[data-close]").forEach((button) => {
+        button.addEventListener("click", closeSheets);
+      });
+      ui.modes.forEach((button) => {
+        button.addEventListener("click", () => {
+          state.blend = button.dataset.mode === "blend";
+          updateUi();
+        });
+      });
+      ui.hueRange.addEventListener("input", (event) => {
+        state.hue = normalizedHue(event.target.value);
+        updateUi();
+      });
+      ui.hue2Range.addEventListener("input", (event) => {
+        state.hue2 = normalizedHue(event.target.value);
+        updateUi();
+      });
+      ui.sizeRange.addEventListener("input", (event) => {
+        state.size = clamp(Number(event.target.value) || 5, 1, 10);
+        updateUi();
+      });
+      ui.expansionRange.addEventListener("input", (event) => {
+        state.expansion = clamp(Number(event.target.value) / 100, 0.35, 1.6);
+        updateUi();
+      });
+      ui.symmetryRange.addEventListener("input", (event) => {
+        state.symmetry = clamp(Math.round(Number(event.target.value)) || 6, 1, 12);
+        updateUi();
+      });
+
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) wakeLoop();
+      });
+
+      let resizeTimer = 0;
+      window.addEventListener("resize", () => {
+        window.clearTimeout(resizeTimer);
+        resizeTimer = window.setTimeout(resize, 120);
+      });
+
+      createBrushChips();
+      setBrush(state.brush);
+      resize();
+      updateUi();
+    })();
+  </script>
+</body>
+</html>

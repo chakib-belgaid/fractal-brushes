@@ -6,7 +6,9 @@ const playwrightTestPath = require.resolve("playwright/test", {
 });
 const { test, expect } = require(playwrightTestPath);
 
-const appUrl = pathToFileURL(path.resolve(__dirname, "../app/index.html")).toString();
+// ?desktop=1 keeps the desktop app (with its responsive drawer fallback) instead
+// of redirecting touch devices to the dedicated mobile page.
+const appUrl = `${pathToFileURL(path.resolve(__dirname, "../app/index.html")).toString()}?desktop=1`;
 
 test.use({
   hasTouch: true,
