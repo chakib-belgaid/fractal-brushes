@@ -278,6 +278,29 @@
       box-shadow: 0 -18px 48px rgba(0, 0, 0, 0.55);
       transform: translateY(102%);
       transition: transform 220ms cubic-bezier(0.23, 1, 0.32, 1);
+      max-height: 72vh;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .custom-tune {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--line-strong);
+    }
+
+    .custom-tune-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+
+    .custom-tune-head h2 {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 780;
     }
 
     .sheet.open { transform: translateY(0); }
@@ -501,6 +524,13 @@
       <span class="field-label">Symmetry points <output id="symmetryValue">6</output></span>
       <input id="symmetryRange" type="range" min="1" max="12" step="1" value="6">
     </label>
+    <div class="custom-tune" id="customTune" hidden>
+      <div class="custom-tune-head">
+        <h2>Custom brush</h2>
+        <button class="dock-button" id="copyBrushToCustom" type="button" aria-label="Copy settings from the last preset brush">Copy last brush</button>
+      </div>
+      <div id="customTuneFields"></div>
+    </div>
   </section>
 
   <p class="toast" id="toast" role="status" aria-live="polite"></p>
@@ -522,18 +552,18 @@
         fairy: {
           name: "Fairy", hues: [292, 188], dot: ["#f8a7ff", "#9ff8ff", "#f7f2bf"],
           count: [2, 4], spread: 1.15, velocity: [0.18, 1.0], life: [24, 60],
-          width: [0.16, 0.4], jitter: 0.28, curl: 0.24, branch: 0.002, drag: 0.962,
-          lift: [0.02, 0.12], alpha: 0.42, hueShift: [-34, 42], cap: "round",
-          composite: "lighter", maxTendrils: 300, spacing: 1.5, energy: 1.8,
-          layers: [[1.55, 0, 74, 0.35], [0.42, 0, 96, 0.7, "white"]],
-          accent: { type: "spark", chance: 0.07 }
+          width: [0.16, 0.4], jitter: 0.22, curl: 0.24, branch: 0.002, drag: 0.962,
+          lift: [0.02, 0.12], alpha: 0.3, hueShift: [-34, 42], cap: "round",
+          composite: "lighter", maxTendrils: 300, spacing: 1.5, energy: 1.1,
+          layers: [[1.55, 0, 74, 0.3], [0.42, 0, 96, 0.55, "white"]],
+          accent: { type: "spark", chance: 0.05 }
         },
         flame: {
           name: "Flame", hues: [22, 46], dot: ["#ffb13d", "#ff4a3d", "#f7efc8"],
           count: [2, 3], spread: 0.46, velocity: [0.3, 1.3], life: [22, 50],
           width: [0.28, 0.7], jitter: 0.16, curl: 0.09, branch: 0.0015, drag: 0.952,
-          lift: [0.32, 0.95], alpha: 0.34, hueShift: [-8, 20], cap: "round",
-          composite: "lighter", maxTendrils: 340, spacing: 1.4, energy: 1.7,
+          lift: [0.26, 0.72], alpha: 0.26, hueShift: [-8, 20], cap: "round",
+          composite: "lighter", maxTendrils: 340, spacing: 1.4, energy: 1.0,
           layers: [[2.4, -10, 42, 0.16], [1.05, 8, 56, 0.34], [0.32, 26, 72, 0.46]],
           accent: { type: "warm", chance: 0.12 }
         },
@@ -541,33 +571,33 @@
           name: "Thunder", hues: [195, 264], dot: ["#38e8ff", "#a77dff", "#f7fbff"],
           count: [1, 3], spread: 0.34, velocity: [1.35, 3.0], life: [16, 42],
           width: [0.18, 0.55], jitter: 0.44, curl: 0.02, branch: 0.05, drag: 0.964,
-          lift: [0, 0], alpha: 0.44, hueShift: [-14, 22], angular: 0.33, cap: "butt",
-          composite: "lighter", maxTendrils: 380, spacing: 1.3, energy: 1.5,
-          layers: [[2.6, -24, 52, 0.2], [0.78, 10, 68, 0.62], [0.14, 0, 98, 0.9, "white"]]
+          lift: [0, 0], alpha: 0.3, hueShift: [-14, 22], angular: 0.33, cap: "butt",
+          composite: "lighter", maxTendrils: 380, spacing: 1.3, energy: 0.95,
+          layers: [[2.6, -24, 52, 0.18], [0.78, 10, 68, 0.56], [0.14, 0, 98, 0.6, "white"]]
         },
         silk: {
           name: "Silk Ribbon", hues: [326, 196], dot: ["#ff6fd8", "#77f5ff", "#f7fbff"],
           count: [1, 1], spread: 0.55, velocity: [0.9, 2.1], life: [110, 190],
           width: [0.34, 0.78], jitter: 0.018, curl: 0.13, branch: 0.0002, drag: 0.989,
-          lift: [-0.02, 0.02], alpha: 0.28, hueShift: [-16, 30], cap: "round",
-          composite: "screen", maxTendrils: 140, spacing: 3.2, energy: 1.48,
-          layers: [[3.2, -12, 54, 0.18], [1.1, 14, 70, 0.5], [0.22, 0, 92, 0.86, "white"]]
+          lift: [-0.02, 0.02], alpha: 0.22, hueShift: [-16, 30], cap: "round",
+          composite: "screen", maxTendrils: 140, spacing: 3.2, energy: 1.05,
+          layers: [[3.2, -12, 54, 0.16], [1.1, 14, 70, 0.46], [0.22, 0, 92, 0.6, "white"]]
         },
         comet: {
           name: "Comet Trail", hues: [205], dot: ["#6de7ff", "#ffd166", "#f7fbff"],
           count: [1, 2], spread: 0.14, velocity: [1.6, 3.4], life: [42, 88],
           width: [0.08, 0.6], jitter: 0.03, curl: 0.01, branch: 0.003, drag: 0.962,
-          lift: [0, 0.02], alpha: 0.42, hueShift: [-12, 20], cap: "round",
-          composite: "screen", maxTendrils: 300, spacing: 1.8, energy: 1.9,
+          lift: [0, 0.02], alpha: 0.3, hueShift: [-12, 20], cap: "round",
+          composite: "screen", maxTendrils: 300, spacing: 1.8, energy: 1.15,
           layers: [[3.8, -12, 50, 0.1], [1.0, 18, 66, 0.26], [0.22, 0, 88, 0.48], [0.06, 0, 98, 0.18, "white"]],
-          accent: { type: "head", chance: 0.5 }
+          accent: { type: "head", chance: 0.35 }
         },
         nebula: {
           name: "Nebula Smoke", hues: [268, 178], dot: ["#b98bff", "#6ef8d4", "#ff8adf"],
-          count: [1, 3], spread: 1.0, velocity: [0.05, 0.38], life: [62, 132],
-          width: [0.9, 1.8], jitter: 0.11, curl: 0.22, branch: 0.0008, drag: 0.986,
-          lift: [-0.04, 0.06], alpha: 0.2, hueShift: [-48, 58], cap: "round",
-          composite: "screen", maxTendrils: 200, spacing: 2.7, energy: 0.75,
+          count: [1, 3], spread: 1.0, velocity: [0.04, 0.3], life: [62, 132],
+          width: [0.9, 1.8], jitter: 0.09, curl: 0.22, branch: 0.0008, drag: 0.986,
+          lift: [-0.04, 0.06], alpha: 0.16, hueShift: [-48, 58], cap: "round",
+          composite: "screen", maxTendrils: 200, spacing: 2.7, energy: 0.6,
           layers: [[1.2, 0, 64, 0.1]],
           accent: { type: "smoke", chance: 0.55 }
         },
@@ -575,46 +605,54 @@
           name: "Crystal Filament", hues: [188, 238], dot: ["#aefcff", "#8da2ff", "#f7fbff"],
           count: [1, 2], spread: 0.26, velocity: [0.68, 1.9], life: [34, 74],
           width: [0.12, 0.36], jitter: 0.025, curl: 0.005, branch: 0.03, drag: 0.965,
-          lift: [0, 0], alpha: 0.46, hueShift: [-10, 26], angular: 0.5, cap: "butt",
-          composite: "lighter", maxTendrils: 340, spacing: 1.45, energy: 1.6,
-          layers: [[2.0, -8, 58, 0.18], [0.56, 16, 74, 0.62], [0.12, 0, 98, 0.88, "white"]]
+          lift: [0, 0], alpha: 0.3, hueShift: [-10, 26], angular: 0.5, cap: "butt",
+          composite: "lighter", maxTendrils: 340, spacing: 1.45, energy: 1.0,
+          layers: [[2.0, -8, 58, 0.16], [0.56, 16, 74, 0.56], [0.12, 0, 98, 0.6, "white"]]
         },
         water: {
           name: "Water", hues: [196, 226], dot: ["#38e8ff", "#386dff", "#d8fbff"],
           count: [2, 4], spread: 0.55, velocity: [0.26, 1.2], life: [48, 104],
-          width: [0.34, 0.9], jitter: 0.06, curl: 0.27, branch: 0.0008, drag: 0.975,
-          lift: [-0.12, -0.03], alpha: 0.3, hueShift: [-18, 14], cap: "round",
-          composite: "screen", maxTendrils: 380, spacing: 1.7, energy: 1.35,
+          width: [0.34, 0.9], jitter: 0.06, curl: 0.3, branch: 0.0008, drag: 0.975,
+          lift: [-0.12, -0.03], alpha: 0.24, hueShift: [-18, 14], cap: "round",
+          composite: "screen", maxTendrils: 380, spacing: 1.7, energy: 0.95,
           layers: [[3.0, -18, 48, 0.13], [1.05, 8, 64, 0.35], [0.28, 0, 86, 0.52], [0.08, 0, 98, 0.22, "white"]],
           accent: { type: "glint", chance: 0.08 }
         },
         ember: {
           name: "Ember", hues: [22, 48], dot: ["#ff5b2f", "#ffd166", "#6d1a00"],
-          count: [2, 4], spread: 0.8, velocity: [0.38, 1.7], life: [16, 40],
-          width: [0.1, 0.36], jitter: 0.3, curl: 0.08, branch: 0.009, drag: 0.94,
-          lift: [0.22, 0.66], alpha: 0.5, hueShift: [-8, 32], cap: "round",
-          composite: "lighter", maxTendrils: 340, spacing: 1.45, energy: 1.9,
-          layers: [[1.6, -10, 40, 0.22], [0.52, 12, 60, 0.62], [0.12, 0, 94, 0.5, "warm"]],
-          accent: { type: "warm", chance: 0.18 }
+          count: [2, 4], spread: 0.8, velocity: [0.38, 1.6], life: [16, 40],
+          width: [0.1, 0.36], jitter: 0.26, curl: 0.08, branch: 0.007, drag: 0.94,
+          lift: [0.16, 0.5], alpha: 0.3, hueShift: [-8, 32], cap: "round",
+          composite: "lighter", maxTendrils: 340, spacing: 1.45, energy: 1.0,
+          layers: [[1.6, -10, 40, 0.2], [0.52, 12, 60, 0.56], [0.12, 0, 94, 0.4, "warm"]],
+          accent: { type: "warm", chance: 0.12 }
         },
         frost: {
           name: "Frost", hues: [188, 214], dot: ["#d8fbff", "#77c8ff", "#f7fbff"],
           count: [1, 3], spread: 0.4, velocity: [0.48, 1.55], life: [38, 82],
           width: [0.12, 0.42], jitter: 0.07, curl: 0.01, branch: 0.042, drag: 0.962,
-          lift: [0, 0], alpha: 0.5, hueShift: [-16, 18], angular: 0.5, cap: "butt",
-          composite: "lighter", maxTendrils: 340, spacing: 1.55, energy: 1.7,
-          layers: [[2.2, -6, 70, 0.16], [0.62, 8, 82, 0.56], [0.13, 0, 98, 0.9, "white"]]
+          lift: [0, 0], alpha: 0.3, hueShift: [-16, 18], angular: 0.5, cap: "butt",
+          composite: "lighter", maxTendrils: 340, spacing: 1.55, energy: 1.0,
+          layers: [[2.2, -6, 70, 0.14], [0.62, 8, 82, 0.5], [0.13, 0, 98, 0.6, "white"]]
         },
         plasma: {
           name: "Plasma", hues: [310, 188], dot: ["#ff38d8", "#38e8ff", "#f7fbff"],
-          count: [3, 5], spread: 0.72, velocity: [0.48, 1.9], life: [34, 80],
-          width: [0.28, 0.8], jitter: 0.36, curl: 0.3, branch: 0.01, drag: 0.954,
-          lift: [-0.02, 0.02], alpha: 0.32, hueShift: [-34, 38], cap: "round",
-          composite: "lighter", maxTendrils: 400, spacing: 1.4, energy: 1.0,
-          layers: [[3.3, -28, 48, 0.16], [1.05, 24, 64, 0.42], [0.25, 0, 86, 0.65], [0.08, 0, 98, 0.42, "white"]]
+          count: [2, 4], spread: 0.72, velocity: [0.48, 1.8], life: [34, 80],
+          width: [0.28, 0.8], jitter: 0.26, curl: 0.3, branch: 0.008, drag: 0.954,
+          lift: [-0.02, 0.02], alpha: 0.24, hueShift: [-34, 38], cap: "round",
+          composite: "lighter", maxTendrils: 400, spacing: 1.4, energy: 0.8,
+          layers: [[3.3, -28, 48, 0.14], [1.05, 24, 64, 0.38], [0.25, 0, 86, 0.56], [0.08, 0, 98, 0.3, "white"]]
+        },
+        custom: {
+          name: "Custom", hues: [326, 196], dot: ["#ffd166", "#77f5ff", "#f7fbff"],
+          count: [1, 3], spread: 0.6, velocity: [0.3, 1.4], life: [45, 100],
+          width: [0.3, 0.75], jitter: 0.08, curl: 0.18, branch: 0.003, drag: 0.975,
+          lift: [0, 0], alpha: 0.24, hueShift: [-24, 30], cap: "round",
+          composite: "lighter", maxTendrils: 300, spacing: 1.6, energy: 1.0,
+          layers: [[3.7, -14, 50, 0.11], [1.2, 10, 66, 0.3], [0.16, 0, 96, 0.45, "white"]]
         }
       };
-      const brushOrder = ["fairy", "flame", "thunder", "silk", "comet", "nebula", "crystal", "water", "ember", "frost", "plasma"];
+      const brushOrder = ["fairy", "flame", "thunder", "silk", "comet", "nebula", "crystal", "water", "ember", "frost", "plasma", "custom"];
 
       const DPR_CAP = 1.5;
       const PIXEL_BUDGET = 2600000;
@@ -650,6 +688,9 @@
         expansionValue: document.getElementById("expansionValue"),
         symmetryRange: document.getElementById("symmetryRange"),
         symmetryValue: document.getElementById("symmetryValue"),
+        customTune: document.getElementById("customTune"),
+        customTuneFields: document.getElementById("customTuneFields"),
+        copyBrushToCustom: document.getElementById("copyBrushToCustom"),
         toast: document.getElementById("toast")
       };
 
@@ -892,12 +933,19 @@
           const speed = Math.max(0.001, Math.hypot(tendril.vx, tendril.vy));
           const nx = -tendril.vy / speed;
           const ny = tendril.vx / speed;
-          const curl = Math.sin((tendril.maxLife - tendril.life) * 0.16 + tendril.seed) * tendril.curl;
+          const phase = tendril.maxLife - tendril.life;
+          const curl = Math.sin(phase * 0.16 + tendril.seed) * tendril.curl;
 
           tendril.vx += nx * curl * state.dpr;
           tendril.vy += ny * curl * state.dpr;
-          tendril.vx += rand(-tendril.jitter, tendril.jitter) * state.dpr;
-          tendril.vy += rand(-tendril.jitter, tendril.jitter) * state.dpr;
+          // Angular brushes keep a share of white noise for electric texture;
+          // the rest wander on smooth per-tendril sine phases for silky lines.
+          const noiseShare = tendril.angular ? 0.42 : 0.12;
+          const seed2 = tendril.seed * 2.618;
+          const wanderX = Math.sin(phase * 0.21 + tendril.seed) * Math.cos(phase * 0.057 + seed2);
+          const wanderY = Math.cos(phase * 0.17 + seed2) * Math.sin(phase * 0.049 + tendril.seed);
+          tendril.vx += tendril.jitter * (wanderX * (1 - noiseShare) * 0.62 + rand(-1, 1) * noiseShare) * state.dpr;
+          tendril.vy += tendril.jitter * (wanderY * (1 - noiseShare) * 0.62 + rand(-1, 1) * noiseShare) * state.dpr;
           tendril.vy -= tendril.lift * state.dpr * (1 + tendril.width);
           quantizeVelocity(tendril, tendril.angular);
 
@@ -966,12 +1014,16 @@
         const densityScale = clamp(0.62 - Math.max(0, expansionScale - 1) * 0.14, 0.34, 0.62);
         const lifeScale = (0.72 + expansionScale * 0.23) * scales.life;
         const velocityScale = (0.82 + expansionScale * 0.22) * scales.velocity;
-        const motionBoost = clamp(0.72 + Math.sqrt(speed) * 0.08, 0.72, 1.3);
-        const count = Math.max(1, Math.round(rand(profile.count[0], profile.count[1]) * densityScale));
+        const motionBoost = clamp(0.5 + Math.sqrt(speed) * 0.1, 0.5, 1.3);
+        // Strokes bloom in over their first ~60 css px instead of detonating on touch.
+        const strokeRamp = clamp((state.strokeDistance ?? 999) / 60, 0, 1);
+        const rampAlpha = 0.42 + strokeRamp * 0.58;
+        const rampVelocity = 0.6 + strokeRamp * 0.4;
+        const count = Math.max(1, Math.round(rand(profile.count[0], profile.count[1]) * densityScale * (0.7 + strokeRamp * 0.3)));
 
         for (let i = 0; i < count; i += 1) {
           const angle = baseAngle + rand(-profile.spread, profile.spread) * spreadScale;
-          const velocity = rand(profile.velocity[0], profile.velocity[1]) * velocityScale * motionBoost;
+          const velocity = rand(profile.velocity[0], profile.velocity[1]) * velocityScale * motionBoost * rampVelocity;
           const life = rand(profile.life[0], profile.life[1]) * lifeScale;
           const lift = rand(profile.lift[0], profile.lift[1]) * state.dpr;
           const hue = state.hue + rand(profile.hueShift[0], profile.hueShift[1]);
@@ -992,7 +1044,7 @@
             curl: profile.curl,
             drag: profile.drag,
             lift: (profile.lift[0] + profile.lift[1]) * 0.006,
-            alpha: profile.alpha,
+            alpha: profile.alpha * rampAlpha,
             branch: profile.branch,
             seed: Math.random() * Math.PI * 2,
             angular: profile.angular || 0,
@@ -1012,6 +1064,7 @@
         const dx = x1 - x0;
         const dy = y1 - y0;
         const distance = Math.hypot(dx, dy);
+        state.strokeDistance = (state.strokeDistance || 0) + distance;
         const scales = sizeScales();
         const expansionDistanceScale = 0.9 + state.expansion * 0.46;
         const spacing = clamp(12 * scales.spacing * expansionDistanceScale * (profile.spacing || 1), 12, 88);
@@ -1130,6 +1183,7 @@
         Array.from(ui.brushStrip.children).forEach((chip) => {
           chip.setAttribute("aria-pressed", String(chip.dataset.brush === state.brush));
         });
+        ui.customTune.hidden = state.brush !== "custom";
       }
 
       function createBrushChips() {
@@ -1152,6 +1206,7 @@
       function setBrush(id) {
         const profile = brushProfiles[id];
         if (!profile) return;
+        if (id !== "custom") state.lastPresetBrush = id;
         state.brush = id;
         state.hue = normalizedHue(profile.hues[0]);
         state.hue2 = normalizedHue(profile.hues[1] ?? profile.hues[0] + 120);
@@ -1218,6 +1273,7 @@
         state.pointerId = event.pointerId ?? "mouse";
         state.last = eventPosition(event);
         state.lastMotion = [0.32, 0];
+        state.strokeDistance = 0;
         spawnFan(state.last[0], state.last[1], 0.32, 0);
         clearHoldBloom();
         state.holdTimer = window.setInterval(() => {
@@ -1263,6 +1319,143 @@
         }
         updateUi();
       }
+
+      /* ---------------------------------------------------------------
+         Custom brush tuning. Sliders write straight into
+         brushProfiles.custom; tuned values persist in localStorage.
+      --------------------------------------------------------------- */
+
+      const CUSTOM_BRUSH_STORAGE_KEY = "fractalBrushes.mobileCustomBrush";
+      const customProfile = brushProfiles.custom;
+      const customInputs = new Map();
+
+      function buildCustomLayers(glow) {
+        return [
+          [2.6 + glow * 2.2, -14, 50, 0.08 + glow * 0.06],
+          [0.9 + glow * 0.6, 10, 66, 0.42 - glow * 0.24],
+          [0.16, 0, 96, 0.75 - glow * 0.6, "white"]
+        ];
+      }
+
+      const customFields = [
+        { id: "intensity", label: "Intensity", min: 0.06, max: 0.5, step: 0.01, display: (v) => (v * 100).toFixed(0),
+          apply: (p, v) => { p.alpha = v; }, read: (p) => p.alpha },
+        { id: "density", label: "Density", min: 1, max: 6, step: 1, display: (v) => String(Math.round(v)),
+          apply: (p, v) => { p.count = [Math.max(1, Math.round(v * 0.55)), Math.round(v)]; }, read: (p) => p.count[1] },
+        { id: "spread", label: "Spread", min: 0.05, max: 1.4, step: 0.05, display: (v) => v.toFixed(2),
+          apply: (p, v) => { p.spread = v; }, read: (p) => p.spread },
+        { id: "speed", label: "Speed", min: 0.3, max: 3.4, step: 0.05, display: (v) => v.toFixed(2),
+          apply: (p, v) => { p.velocity = [v * 0.22, v]; }, read: (p) => p.velocity[1] },
+        { id: "flow", label: "Flow length", min: 20, max: 200, step: 5, display: (v) => String(Math.round(v)),
+          apply: (p, v) => { p.life = [v * 0.45, v]; }, read: (p) => p.life[1] },
+        { id: "width", label: "Width", min: 0.1, max: 1.4, step: 0.05, display: (v) => v.toFixed(2),
+          apply: (p, v) => { p.width = [v * 0.4, v]; }, read: (p) => p.width[1] },
+        { id: "chaos", label: "Chaos", min: 0, max: 0.5, step: 0.01, display: (v) => v.toFixed(2),
+          apply: (p, v) => { p.jitter = v; }, read: (p) => p.jitter },
+        { id: "swirl", label: "Swirl", min: 0, max: 0.4, step: 0.01, display: (v) => v.toFixed(2),
+          apply: (p, v) => { p.curl = v; }, read: (p) => p.curl },
+        { id: "branching", label: "Branching", min: 0, max: 0.05, step: 0.001, display: (v) => (v * 1000).toFixed(0),
+          apply: (p, v) => { p.branch = v; }, read: (p) => p.branch },
+        { id: "glide", label: "Glide", min: 0.93, max: 0.992, step: 0.002, display: (v) => v.toFixed(3),
+          apply: (p, v) => { p.drag = v; }, read: (p) => p.drag },
+        { id: "snap", label: "Angular snap", min: 0, max: 0.6, step: 0.01, display: (v) => v.toFixed(2),
+          apply: (p, v) => { p.angular = v; p.cap = v > 0.05 ? "butt" : "round"; }, read: (p) => p.angular || 0 },
+        { id: "glow", label: "Glow softness", min: 0, max: 1, step: 0.05, display: (v) => v.toFixed(2),
+          apply: (p, v) => { p.glowSoftness = v; p.layers = buildCustomLayers(v); },
+          read: (p) => p.glowSoftness ?? clamp(1 - (p.layers?.[p.layers.length - 1]?.[3] ?? 0.4) * 1.3, 0, 1) }
+      ];
+
+      function persistCustomBrush() {
+        const values = {};
+        customFields.forEach((field) => {
+          values[field.id] = Number(customInputs.get(field.id).value);
+        });
+        try {
+          window.localStorage.setItem(CUSTOM_BRUSH_STORAGE_KEY, JSON.stringify({
+            version: 1,
+            values,
+            hues: customProfile.hues
+          }));
+        } catch (_) {
+          // Storage may be unavailable (private mode); tuning still works for the session.
+        }
+      }
+
+      function syncCustomFieldDisplay(field) {
+        const input = customInputs.get(field.id);
+        input.closest(".field").querySelector("output").textContent = field.display(Number(input.value));
+      }
+
+      function applyCustomField(field, value) {
+        const input = customInputs.get(field.id);
+        input.value = String(clamp(value, field.min, field.max));
+        field.apply(customProfile, Number(input.value));
+        syncCustomFieldDisplay(field);
+      }
+
+      customFields.forEach((field) => {
+        const wrap = document.createElement("label");
+        wrap.className = "field";
+        const label = document.createElement("span");
+        label.className = "field-label";
+        const output = document.createElement("output");
+        label.textContent = `${field.label} `;
+        label.append(output);
+        const input = document.createElement("input");
+        input.type = "range";
+        input.id = `custom-${field.id}`;
+        input.min = String(field.min);
+        input.max = String(field.max);
+        input.step = String(field.step);
+        input.value = String(field.read(customProfile));
+        input.setAttribute("aria-label", `Custom brush ${field.label.toLowerCase()}`);
+        wrap.append(label, input);
+        ui.customTuneFields.append(wrap);
+        customInputs.set(field.id, input);
+        syncCustomFieldDisplay(field);
+        input.addEventListener("input", () => {
+          field.apply(customProfile, Number(input.value));
+          syncCustomFieldDisplay(field);
+          persistCustomBrush();
+        });
+      });
+
+      function restoreCustomBrush() {
+        let saved = null;
+        try {
+          saved = JSON.parse(window.localStorage.getItem(CUSTOM_BRUSH_STORAGE_KEY) || "null");
+        } catch (_) {
+          saved = null;
+        }
+        if (!saved || !saved.values) return;
+        customFields.forEach((field) => {
+          const value = Number(saved.values[field.id]);
+          if (Number.isFinite(value)) applyCustomField(field, value);
+        });
+        if (Array.isArray(saved.hues) && saved.hues.length) {
+          customProfile.hues = saved.hues.map(normalizedHue);
+        }
+      }
+
+      function copyPresetIntoCustom() {
+        const source = brushProfiles[state.lastPresetBrush || "silk"];
+        if (!source || source === customProfile) return;
+        customFields.forEach((field) => {
+          applyCustomField(field, field.read(source));
+        });
+        // Keep the preset's exact layer pack; the glow slider rebuilds it when moved.
+        customProfile.layers = source.layers.map((layer) => layer.slice());
+        delete customProfile.glowSoftness;
+        customProfile.composite = source.composite;
+        customProfile.energy = source.energy;
+        customProfile.hues = Array.isArray(source.hues) ? source.hues.slice() : customProfile.hues;
+        customProfile.accent = source.accent;
+        persistCustomBrush();
+        if (state.brush === "custom") setBrush("custom");
+      }
+
+      ui.copyBrushToCustom.addEventListener("click", copyPresetIntoCustom);
+      restoreCustomBrush();
 
       /* ---------------------------------------------------------------
          Wiring
