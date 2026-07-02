@@ -506,6 +506,45 @@
       font-weight: 680;
     }
 
+    .custom-tune {
+      display: grid;
+      gap: 9px;
+      margin-top: 10px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(190, 215, 255, 0.14);
+    }
+
+    .custom-tune-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .copy-brush {
+      padding: 5px 10px;
+      border: 1px solid rgba(190, 215, 255, 0.18);
+      border-radius: 9px;
+      color: color-mix(in srgb, var(--active) 76%, white 16%);
+      background: rgba(255, 255, 255, 0.05);
+      font-size: 11px;
+      font-weight: 680;
+      cursor: pointer;
+    }
+
+    .copy-brush:hover {
+      border-color: color-mix(in srgb, var(--active) 62%, white 10%);
+      background: color-mix(in srgb, var(--active) 12%, transparent);
+    }
+
+    .custom-tune-fields {
+      display: grid;
+      gap: 8px;
+      max-height: min(38vh, 340px);
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
     .field {
       display: grid;
       gap: 7px;
@@ -1696,6 +1735,13 @@
       </button>
     </div>
     <div class="brush-list" id="brushList"></div>
+    <div class="custom-tune" id="customTune" hidden>
+      <div class="custom-tune-head">
+        <span class="field-label">Tune custom brush</span>
+        <button class="copy-brush" id="copyBrushToCustom" type="button" title="Copy settings from the last preset brush" aria-label="Copy settings from the last preset brush">Copy last brush</button>
+      </div>
+      <div class="custom-tune-fields" id="customTuneFields"></div>
+    </div>
   </aside>
 
   <aside class="panel color-panel" id="colorPanel" aria-label="Color menu">
@@ -2031,10 +2077,29 @@
           hueShift: [-38, 42],
           cap: "round",
           layers: [[5.7, -30, 48, 0.11], [1.8, 24, 62, 0.32], [0.42, 0, 84, 0.5], [0.16, 0, 98, 0.34, "white"]]
+        },
+        custom: {
+          name: "Custom",
+          hues: [326, 196],
+          dot: ["#ffd166", "#77f5ff", "#f7fbff"],
+          count: [2, 4],
+          spread: 0.6,
+          velocity: [0.28, 1.3],
+          life: [55, 120],
+          width: [0.4, 1.0],
+          jitter: 0.1,
+          curl: 0.18,
+          branch: 0.004,
+          drag: 0.975,
+          lift: [0, 0],
+          alpha: 0.09,
+          hueShift: [-24, 30],
+          cap: "round",
+          layers: [[5.0, -16, 50, 0.07], [1.9, 12, 64, 0.2], [0.5, 0, 80, 0.31], [0.14, 0, 94, 0.33, "white"]]
         }
       };
 
-      const brushOrder = ["fairy", "flame", "thunder", "silk", "comet", "nebula", "crystal", "water", "ember", "frost", "plasma"];
+      const brushOrder = ["fairy", "flame", "thunder", "silk", "comet", "nebula", "crystal", "water", "ember", "frost", "plasma", "custom"];
       const exportPresets = {
         current: { label: "current", width: 0, height: 0 },
         wide4k: { label: "4k-16-9", width: 3840, height: 2160 },
@@ -4430,6 +4495,171 @@
           state.size = BRUSH_LENGTH_RANGE.default;
         }
         state.zoom = clamp(state.zoom, 1 / (state.canvasScale || 1), 2.4);
+      }
+
+      /* ========================================================================
+         Custom brush mode
+
+         Adds a live tuning panel for the "custom" brush profile. Sliders write
+         straight into brushProfiles.custom so changes apply to the next stroke.
+         The tuned values persist in localStorage.
+      ======================================================================== */
+
+      {
+        const CUSTOM_BRUSH_STORAGE_KEY = "fractalBrushes.customBrush";
+        const customProfile = brushProfiles.custom;
+
+        ui.customTune = document.getElementById("customTune");
+        ui.customTuneFields = document.getElementById("customTuneFields");
+        ui.copyBrushToCustom = document.getElementById("copyBrushToCustom");
+
+        function buildCustomLayers(glow) {
+          return [
+            [4.2 + glow * 3.4, -16, 50, 0.045 + glow * 0.05],
+            [1.6 + glow * 1.3, 12, 64, 0.3 - glow * 0.18],
+            [0.44 + glow * 0.28, 0, 80, 0.42 - glow * 0.2],
+            [0.14, 0, 94, 0.6 - glow * 0.48, "white"]
+          ];
+        }
+
+        const customFields = [
+          { id: "intensity", label: "Intensity", min: 0.02, max: 0.3, step: 0.005, display: (v) => (v * 100).toFixed(1),
+            apply: (p, v) => { p.alpha = v; }, read: (p) => p.alpha },
+          { id: "density", label: "Density", min: 1, max: 8, step: 1, display: (v) => String(Math.round(v)),
+            apply: (p, v) => { p.count = [Math.max(1, Math.round(v * 0.55)), Math.round(v)]; }, read: (p) => p.count[1] },
+          { id: "spread", label: "Spread", min: 0.05, max: 1.4, step: 0.05, display: (v) => v.toFixed(2),
+            apply: (p, v) => { p.spread = v; }, read: (p) => p.spread },
+          { id: "speed", label: "Speed", min: 0.3, max: 3.2, step: 0.05, display: (v) => v.toFixed(2),
+            apply: (p, v) => { p.velocity = [v * 0.22, v]; }, read: (p) => p.velocity[1] },
+          { id: "flow", label: "Flow length", min: 30, max: 220, step: 5, display: (v) => String(Math.round(v)),
+            apply: (p, v) => { p.life = [v * 0.45, v]; }, read: (p) => p.life[1] },
+          { id: "width", label: "Width", min: 0.2, max: 1.8, step: 0.05, display: (v) => v.toFixed(2),
+            apply: (p, v) => { p.width = [v * 0.4, v]; }, read: (p) => p.width[1] },
+          { id: "chaos", label: "Chaos", min: 0, max: 0.5, step: 0.01, display: (v) => v.toFixed(2),
+            apply: (p, v) => { p.jitter = v; }, read: (p) => p.jitter },
+          { id: "swirl", label: "Swirl", min: 0, max: 0.4, step: 0.01, display: (v) => v.toFixed(2),
+            apply: (p, v) => { p.curl = v; }, read: (p) => p.curl },
+          { id: "branching", label: "Branching", min: 0, max: 0.04, step: 0.001, display: (v) => (v * 1000).toFixed(0),
+            apply: (p, v) => { p.branch = v; }, read: (p) => p.branch },
+          { id: "glide", label: "Glide", min: 0.93, max: 0.992, step: 0.002, display: (v) => v.toFixed(3),
+            apply: (p, v) => { p.drag = v; }, read: (p) => p.drag },
+          { id: "snap", label: "Angular snap", min: 0, max: 0.6, step: 0.01, display: (v) => v.toFixed(2),
+            apply: (p, v) => { p.angular = v; p.cap = v > 0.05 ? "butt" : "round"; }, read: (p) => p.angular || 0 },
+          { id: "glow", label: "Glow softness", min: 0, max: 1, step: 0.05, display: (v) => v.toFixed(2),
+            apply: (p, v) => { p.glowSoftness = v; p.layers = buildCustomLayers(v); },
+            read: (p) => p.glowSoftness ?? clamp(1 - (p.layers?.[p.layers.length - 1]?.[3] ?? 0.3) * 1.5, 0, 1) }
+        ];
+        const customInputs = new Map();
+
+        function persistCustomBrush() {
+          const values = {};
+          customFields.forEach((field) => {
+            values[field.id] = Number(customInputs.get(field.id).value);
+          });
+          try {
+            window.localStorage.setItem(CUSTOM_BRUSH_STORAGE_KEY, JSON.stringify({
+              version: 1,
+              values,
+              hues: customProfile.hues
+            }));
+          } catch (_) {
+            // Storage may be unavailable (private mode); tuning still works for the session.
+          }
+        }
+
+        function syncCustomFieldDisplay(field) {
+          const input = customInputs.get(field.id);
+          const valueLabel = input.closest(".slider-row").querySelector(".value");
+          valueLabel.textContent = field.display(Number(input.value));
+        }
+
+        function applyCustomField(field, value) {
+          const input = customInputs.get(field.id);
+          input.value = String(clamp(value, field.min, field.max));
+          field.apply(customProfile, Number(input.value));
+          syncCustomFieldDisplay(field);
+        }
+
+        customFields.forEach((field) => {
+          const wrap = document.createElement("div");
+          wrap.className = "field";
+          const label = document.createElement("span");
+          label.className = "field-label";
+          label.textContent = field.label;
+          const row = document.createElement("div");
+          row.className = "slider-row";
+          const input = document.createElement("input");
+          input.type = "range";
+          input.id = `custom-${field.id}`;
+          input.min = String(field.min);
+          input.max = String(field.max);
+          input.step = String(field.step);
+          input.value = String(field.read(customProfile));
+          input.setAttribute("aria-label", `Custom brush ${field.label.toLowerCase()}`);
+          const valueLabel = document.createElement("span");
+          valueLabel.className = "value";
+          row.append(input, valueLabel);
+          wrap.append(label, row);
+          ui.customTuneFields.append(wrap);
+          customInputs.set(field.id, input);
+          syncCustomFieldDisplay(field);
+          input.addEventListener("input", () => {
+            field.apply(customProfile, Number(input.value));
+            syncCustomFieldDisplay(field);
+            persistCustomBrush();
+          });
+        });
+
+        function restoreCustomBrush() {
+          let saved = null;
+          try {
+            saved = JSON.parse(window.localStorage.getItem(CUSTOM_BRUSH_STORAGE_KEY) || "null");
+          } catch (_) {
+            saved = null;
+          }
+          if (!saved || !saved.values) return;
+          customFields.forEach((field) => {
+            const value = Number(saved.values[field.id]);
+            if (Number.isFinite(value)) applyCustomField(field, value);
+          });
+          if (Array.isArray(saved.hues) && saved.hues.length) {
+            customProfile.hues = saved.hues.map(normalizedHue);
+          }
+        }
+
+        function copyPresetIntoCustom() {
+          const sourceId = state.lastPresetBrush || "silk";
+          const source = brushProfiles[sourceId];
+          if (!source || source === customProfile) return;
+          customFields.forEach((field) => {
+            applyCustomField(field, field.read(source));
+          });
+          // Keep the preset's exact layer pack; the glow slider rebuilds it when moved.
+          customProfile.layers = source.layers.map((layer) => layer.slice());
+          delete customProfile.glowSoftness;
+          customProfile.composite = source.composite;
+          customProfile.hues = Array.isArray(source.hues) ? source.hues.slice() : customProfile.hues;
+          persistCustomBrush();
+          if (state.brush === "custom") setBrush("custom");
+        }
+
+        const customBaseSetBrush = setBrush;
+        setBrush = function customAwareSetBrush(brush) {
+          if (brush && brush !== "custom" && brushProfiles[brush]) {
+            state.lastPresetBrush = brush;
+          }
+          return customBaseSetBrush(brush);
+        };
+
+        const customBaseUpdateUi = updateUi;
+        updateUi = function customAwareUpdateUi() {
+          customBaseUpdateUi();
+          ui.customTune.hidden = state.brush !== "custom";
+        };
+
+        ui.copyBrushToCustom.addEventListener("click", copyPresetIntoCustom);
+        restoreCustomBrush();
+        updateUi();
       }
 
       stage.addEventListener("pointerdown", startPainting);
