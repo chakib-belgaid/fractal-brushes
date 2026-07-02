@@ -6,6 +6,7 @@ Fractal Brushes is a static GitHub Pages package.
 
 - Root landing page: `index.html`
 - Interactive app: `app/index.html`
+- Mobile app: `app/mobile/index.html` (coarse-pointer small screens are redirected here from `/app/`; `?desktop=1` opts out)
 
 ## Constraints
 
