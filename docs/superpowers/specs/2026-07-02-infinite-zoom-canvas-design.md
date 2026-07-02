@@ -93,9 +93,26 @@ Both bound replay cost at extreme zoom in either direction.
 ## 3. Navigation, tools & export
 
 **Desktop:** wheel / trackpad-pinch zooms about the cursor (world point under
-cursor stays fixed). Pan via space-drag or middle-button drag. The zoom
-cluster becomes unbounded: buttons step ×1.25, the readout shows absolute zoom
-(×0.1 … ×47,000 …), and a reset affordance returns to origin at ×1.
+cursor stays fixed). The zoom cluster becomes unbounded: buttons step ×1.25,
+the readout shows absolute zoom (×0.1 … ×47,000 …), and a reset affordance
+returns to origin at ×1.
+
+**Hand tool:** a toolbar toggle (hand icon) switches the pointer from drawing
+to navigation. While active, the cursor shows `grab`/`grabbing`, click-drag
+pans the view, and drawing is suspended. Keyboard shortcut `H` toggles it,
+`B`/`Esc` returns to the brush; holding Space temporarily activates it
+(pan-while-held, release returns to the brush), and middle-button drag pans
+regardless of tool. The active tool is reflected in the toolbar
+(`aria-pressed`) and the tutorial copy mentions it.
+
+**Page-zoom override:** the browser's own pinch-zoom must never fire over the
+canvas. Trackpad pinches arrive as `wheel` events with `ctrlKey: true` — the
+stage's wheel listener is registered with `{ passive: false }` and calls
+`preventDefault()`, routing the delta into our view zoom instead. Safari's
+proprietary `gesturestart`/`gesturechange`/`gestureend` events are likewise
+prevented and mapped to view zoom. `touch-action: none` on the stage (already
+the drawing surface) keeps touch pinches ours on mobile. Page zoom keeps
+working over the UI panels — only the stage captures these gestures.
 
 **Mobile:** existing two-finger pan/pinch stays, clamps removed. One finger
 draws, two fingers navigate.
@@ -126,7 +143,10 @@ re-animating strokes on replay, the `white/` variant.
 
 - **New Playwright spec (`tests/infinite-zoom.spec.js`):** draw at ×1, zoom in
   ~×20, draw again, zoom back out; assert both strokes render via pixel
-  sampling; no console errors. Repeat core flow on the mobile app.
+  sampling; no console errors. Repeat core flow on the mobile app. Also cover:
+  hand tool toggles pan mode (drag moves the view, no stroke painted), Space
+  hold pans temporarily, and a ctrl+wheel event over the stage is
+  `defaultPrevented` and changes our zoom readout.
 - **Determinism test:** replay the same stroke log twice; assert identical
   pixels.
 - **Regression:** existing suites (brush-density, silk-feel, render-qa,
