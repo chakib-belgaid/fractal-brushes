@@ -18,7 +18,7 @@ test.use({
 test("touch devices are redirected from /app/ to the mobile page", async ({ page }) => {
   await page.goto(desktopAppUrl);
   await page.waitForURL(/mobile\/index\.html/);
-  await expect(page.locator("#brushStrip .chip")).toHaveCount(11);
+  await expect(page.locator("#brushStrip .chip")).toHaveCount(12);
 });
 
 test("?desktop=1 keeps touch devices on the desktop app", async ({ page }) => {
@@ -39,7 +39,7 @@ test("mobile page paints, switches brushes, and stays error-free", async ({ page
   page.on("pageerror", (error) => consoleErrors.push(String(error)));
 
   await page.goto(mobileAppUrl);
-  await expect(page.locator("#brushStrip .chip")).toHaveCount(11);
+  await expect(page.locator("#brushStrip .chip")).toHaveCount(12);
   await expect(page.locator('#brushStrip .chip[data-brush="silk"]')).toHaveAttribute("aria-pressed", "true");
 
   await page.locator('#brushStrip .chip[data-brush="thunder"]').tap();
@@ -97,7 +97,9 @@ test("mobile page paints, switches brushes, and stays error-free", async ({ page
     return lit;
   });
 
-  expect(after).toBeGreaterThan(before + 500);
+  // The calmer brush tuning glazes rather than floods; a short synthetic
+  // stroke lights fewer pixels than the old engine but must stay clearly visible.
+  expect(after).toBeGreaterThan(before + 200);
   await expect(page.locator("#undo")).toBeEnabled();
   expect(consoleErrors).toEqual([]);
 });

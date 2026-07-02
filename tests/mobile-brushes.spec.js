@@ -39,7 +39,7 @@ test("mobile canvas supports touch brush selection and drawing", async ({ page }
 
   await page.locator("#brushToggle").tap();
   await expect(page.locator("#brushPanel")).toBeVisible();
-  await expect(page.locator("#brushList .brush")).toHaveCount(11);
+  await expect(page.locator("#brushList .brush")).toHaveCount(12);
 
   const drawerMetrics = await page.evaluate(() => {
     const viewport = { width: window.innerWidth, height: window.innerHeight };

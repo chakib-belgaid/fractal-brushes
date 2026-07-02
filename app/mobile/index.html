@@ -554,7 +554,7 @@
           count: [2, 4], spread: 1.15, velocity: [0.18, 1.0], life: [24, 60],
           width: [0.16, 0.4], jitter: 0.22, curl: 0.24, branch: 0.002, drag: 0.962,
           lift: [0.02, 0.12], alpha: 0.3, hueShift: [-34, 42], cap: "round",
-          composite: "lighter", maxTendrils: 300, spacing: 1.5, energy: 1.1,
+          composite: "lighter", maxTendrils: 300, spacing: 1.5, energy: 1.2,
           layers: [[1.55, 0, 74, 0.3], [0.42, 0, 96, 0.55, "white"]],
           accent: { type: "spark", chance: 0.05 }
         },
@@ -572,7 +572,7 @@
           count: [1, 3], spread: 0.34, velocity: [1.35, 3.0], life: [16, 42],
           width: [0.18, 0.55], jitter: 0.44, curl: 0.02, branch: 0.05, drag: 0.964,
           lift: [0, 0], alpha: 0.3, hueShift: [-14, 22], angular: 0.33, cap: "butt",
-          composite: "lighter", maxTendrils: 380, spacing: 1.3, energy: 0.95,
+          composite: "lighter", maxTendrils: 380, spacing: 1.3, energy: 1.1,
           layers: [[2.6, -24, 52, 0.18], [0.78, 10, 68, 0.56], [0.14, 0, 98, 0.6, "white"]]
         },
         silk: {
@@ -606,7 +606,7 @@
           count: [1, 2], spread: 0.26, velocity: [0.68, 1.9], life: [34, 74],
           width: [0.12, 0.36], jitter: 0.025, curl: 0.005, branch: 0.03, drag: 0.965,
           lift: [0, 0], alpha: 0.3, hueShift: [-10, 26], angular: 0.5, cap: "butt",
-          composite: "lighter", maxTendrils: 340, spacing: 1.45, energy: 1.0,
+          composite: "lighter", maxTendrils: 340, spacing: 1.45, energy: 1.15,
           layers: [[2.0, -8, 58, 0.16], [0.56, 16, 74, 0.56], [0.12, 0, 98, 0.6, "white"]]
         },
         water: {
@@ -622,8 +622,8 @@
           name: "Ember", hues: [22, 48], dot: ["#ff5b2f", "#ffd166", "#6d1a00"],
           count: [2, 4], spread: 0.8, velocity: [0.38, 1.6], life: [16, 40],
           width: [0.1, 0.36], jitter: 0.26, curl: 0.08, branch: 0.007, drag: 0.94,
-          lift: [0.16, 0.5], alpha: 0.3, hueShift: [-8, 32], cap: "round",
-          composite: "lighter", maxTendrils: 340, spacing: 1.45, energy: 1.0,
+          lift: [0.16, 0.5], alpha: 0.4, hueShift: [-8, 32], cap: "round",
+          composite: "lighter", maxTendrils: 340, spacing: 1.45, energy: 1.25,
           layers: [[1.6, -10, 40, 0.2], [0.52, 12, 60, 0.56], [0.12, 0, 94, 0.4, "warm"]],
           accent: { type: "warm", chance: 0.12 }
         },
@@ -632,7 +632,7 @@
           count: [1, 3], spread: 0.4, velocity: [0.48, 1.55], life: [38, 82],
           width: [0.12, 0.42], jitter: 0.07, curl: 0.01, branch: 0.042, drag: 0.962,
           lift: [0, 0], alpha: 0.3, hueShift: [-16, 18], angular: 0.5, cap: "butt",
-          composite: "lighter", maxTendrils: 340, spacing: 1.55, energy: 1.0,
+          composite: "lighter", maxTendrils: 340, spacing: 1.55, energy: 1.15,
           layers: [[2.2, -6, 70, 0.14], [0.62, 8, 82, 0.5], [0.13, 0, 98, 0.6, "white"]]
         },
         plasma: {
@@ -878,7 +878,7 @@
         const passCount = Math.max(1, state.symmetry * (state.mirror ? 2 : 1));
         const symmetryEnergy = 1 / Math.sqrt(passCount);
         const expansionEnergy = 1 / (0.94 + state.expansion * 0.26);
-        const alpha = tendril.alpha * envelope * symmetryEnergy * expansionEnergy * (profile.energy || 1) * 1.08;
+        const alpha = tendril.alpha * envelope * symmetryEnergy * expansionEnergy * (profile.energy || 1) * 1.3;
         if (alpha <= 0.001) return;
 
         const baseWidth = Math.max(0.12, tendril.width * state.dpr);
