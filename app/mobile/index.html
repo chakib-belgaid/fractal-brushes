@@ -2107,6 +2107,8 @@
       stage.addEventListener("pointermove", continuePainting);
       window.addEventListener("pointerup", stopPainting);
       stage.addEventListener("pointercancel", stopPainting);
+      // Replaces old unconditional gesture-cleanup unstick: commits the live stroke properly
+      stage.addEventListener("pointerleave", stopPainting);
 
       ui.undo.addEventListener("click", undo);
       ui.redo.addEventListener("click", redo);
