@@ -525,6 +525,48 @@ test("single-finger touch stroke on desktop is not dropped by the gesture-cleanu
   expect(errors).toEqual([]);
 });
 
+test("pressing 0 mid-stroke does not reset the view or corrupt the live stroke; pressing 0 with no stroke down does reset", async ({ page }) => {
+  const errors = await setupPage(page);
+
+  // Zoom in first so a mid-stroke reset would be observable.
+  await page.evaluate(() => {
+    window.__fractal.previewZoomAt(480, 360, 2);
+    window.__fractal.commitViewPreview();
+  });
+  const startScale = await page.evaluate(() => window.__fractal.state.view.scale);
+  expect(startScale).toBeCloseTo(2, 5);
+
+  const stage = page.locator("#stage");
+  const opts = { pointerId: 1, pointerType: "mouse", button: 0, buttons: 1, bubbles: true };
+  await stage.dispatchEvent("pointerdown", { ...opts, clientX: 400, clientY: 300 });
+  await stage.dispatchEvent("pointermove", { ...opts, clientX: 440, clientY: 320 });
+
+  // Mid-stroke reset attempt via the "0" key must be refused.
+  await page.keyboard.press("0");
+
+  const midScale = await page.evaluate(() => window.__fractal.state.view.scale);
+  expect(midScale).toBeCloseTo(startScale, 5);
+
+  await stage.dispatchEvent("pointermove", { ...opts, clientX: 480, clientY: 340 });
+  await stage.dispatchEvent("pointerup", { ...opts, buttons: 0, clientX: 480, clientY: 340 });
+  await page.waitForTimeout(300);
+
+  const log = await page.evaluate(() => window.__fractal.state.strokeLog.map((s) => ({ drawScale: s.drawScale })));
+  expect(log.length).toBe(1);
+  expect(log[0].drawScale).toBeCloseTo(startScale, 5);
+
+  const scaleAfterStroke = await page.evaluate(() => window.__fractal.state.view.scale);
+  expect(scaleAfterStroke).toBeCloseTo(startScale, 5);
+
+  // With no stroke in progress, pressing 0 DOES reset the view.
+  await page.keyboard.press("0");
+  await page.waitForTimeout(300);
+  const view = await page.evaluate(() => window.__fractal.state.view);
+  expect(view).toEqual({ x: 0, y: 0, scale: 1 });
+
+  expect(errors).toEqual([]);
+});
+
 const mobileUrl = pathToFileURL(path.resolve(__dirname, "../app/mobile/index.html")).toString();
 
 test.describe("mobile infinite zoom", () => {
@@ -553,7 +595,12 @@ test.describe("mobile infinite zoom", () => {
     expect(errors).toEqual([]);
   });
 
-  async function drawMobileStroke(page) {
+  // Distinct name from the plain drawMobileStroke() below: two same-named
+  // function declarations in one scope used to silently shadow each other
+  // (the later one always won), so this test's beforeZoom snapshot was
+  // actually taken with the unsettled helper. Named separately so both
+  // helpers are reachable and this test keeps its settle guarantee.
+  async function drawSettledMobileStroke(page) {
     // "thunder" settles (tendrils die out) much faster than the default
     // "silk" brush, so the raster is stable by the time we snapshot it.
     await page.locator('#brushStrip .chip[data-brush="thunder"]').tap();
@@ -588,7 +635,7 @@ test.describe("mobile infinite zoom", () => {
   test("tapping the zoom chip after a committed pinch carries the raster back to identity", async ({ page }) => {
     const errors = await setupMobile(page);
 
-    await drawMobileStroke(page);
+    await drawSettledMobileStroke(page);
     const beforeZoom = await page.evaluate(() => document.getElementById("canvas").toDataURL());
 
     await page.evaluate(() => window.__fractal.previewZoomAt(195, 360, 2));

@@ -4615,6 +4615,11 @@
         }
 
         function resetView() {
+          // Mirrors mobile's resetView guard: mid-stroke (or mid-gesture, or
+          // mid-pan) this would wipe the live raster via renderWorldSync()
+          // while the live stroke keeps recording in the pre-reset view
+          // frame, so the committed stroke replays misplaced.
+          if (state.painting || state.gesturing || state.panning) return;
           state.view = { x: 0, y: 0, scale: 1 };
           state.zoom = 1;
           state.panX = 0;
