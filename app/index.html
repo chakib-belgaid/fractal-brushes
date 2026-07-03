@@ -5211,8 +5211,8 @@
             const stroke = state.strokeLog.pop();
             state.redoStack.push({ type: "stroke", stroke });
           } else if (action.type === "clear") {
-            state.strokeLog = action.strokes;
-            state.redoStack.push({ type: "clear", strokes: action.strokes });
+            state.strokeLog = action.strokes.slice();
+            state.redoStack.push({ type: "clear", strokes: action.strokes.slice() });
           }
           renderWorldSync();
           updateUi();
@@ -5227,7 +5227,7 @@
             state.undoStack.push({ type: "stroke" });
           } else if (action.type === "clear") {
             state.strokeLog = [];
-            state.undoStack.push({ type: "clear", strokes: action.strokes });
+            state.undoStack.push({ type: "clear", strokes: action.strokes.slice() });
           }
           renderWorldSync();
           updateUi();
@@ -5238,7 +5238,7 @@
           commitLiveStroke();
           state.tendrils.length = 0;
           if (state.strokeLog.length) {
-            state.undoStack.push({ type: "clear", strokes: state.strokeLog });
+            state.undoStack.push({ type: "clear", strokes: state.strokeLog.slice() });
             state.strokeLog = [];
             state.redoStack = [];
           }

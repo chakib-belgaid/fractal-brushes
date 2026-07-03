@@ -404,6 +404,61 @@ test("undo/redo/clear operate on the stroke log", async ({ page }) => {
   expect(await count()).toBe(2);
 });
 
+test("clear history entry does not alias the live strokeLog: undo/undo/redo sequence preserves clear entry's strokes array", async ({ page }) => {
+  await setupPage(page);
+  await drawStroke(page, 360);
+  await page.waitForTimeout(300);
+  await drawStroke(page, 250);
+  await page.waitForTimeout(300);
+
+  const before = await page.evaluate(() => window.__fractal.state.strokeLog.length);
+  expect(before).toBe(2);
+
+  // Clear the canvas
+  await page.keyboard.press("c");
+  await page.waitForTimeout(200);
+
+  const afterClear = await page.evaluate(() => window.__fractal.state.strokeLog.length);
+  expect(afterClear).toBe(0);
+
+  // Undo the clear (should restore 2 strokes)
+  await page.locator("#undo").click();
+  await page.waitForTimeout(200);
+
+  const afterFirstUndo = await page.evaluate(() => window.__fractal.state.strokeLog.length);
+  expect(afterFirstUndo).toBe(2);
+
+  // Undo again (should remove the second stroke, log length becomes 1)
+  await page.locator("#undo").click();
+  await page.waitForTimeout(200);
+
+  const afterSecondUndo = await page.evaluate(() => window.__fractal.state.strokeLog.length);
+  expect(afterSecondUndo).toBe(1);
+
+  // The key assertion: the clear entry in redoStack must still have strokes.length === 2
+  // (not 1, which would indicate aliasing with the live log)
+  const clearEntryStrokes = await page.evaluate(() => {
+    const redoStack = window.__fractal.state.redoStack;
+    const clearEntry = redoStack.find(entry => entry.type === "clear");
+    return clearEntry ? clearEntry.strokes.length : -1;
+  });
+  expect(clearEntryStrokes).toBe(2);
+
+  // Verify final redo sequence: redo the stroke removal (log becomes 2 again)
+  await page.locator("#redo").click();
+  await page.waitForTimeout(200);
+
+  const afterFirstRedo = await page.evaluate(() => window.__fractal.state.strokeLog.length);
+  expect(afterFirstRedo).toBe(2);
+
+  // Redo the clear (log becomes 0 again)
+  await page.locator("#redo").click();
+  await page.waitForTimeout(200);
+
+  const afterSecondRedo = await page.evaluate(() => window.__fractal.state.strokeLog.length);
+  expect(afterSecondRedo).toBe(0);
+});
+
 test("world render is deterministic: two replays produce identical pixels", async ({ page }) => {
   await setupPage(page);
   await drawStroke(page, 360);
