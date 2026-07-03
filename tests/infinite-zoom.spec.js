@@ -510,3 +510,32 @@ test("4K export re-renders crisply at target resolution", async ({ page }) => {
   expect(dimensions.width).toBe(3840);
   expect(dimensions.height).toBe(2160);
 });
+
+const mobileUrl = pathToFileURL(path.resolve(__dirname, "../app/mobile/index.html")).toString();
+
+test.describe("mobile infinite zoom", () => {
+  test.use({ hasTouch: true });
+
+  async function setupMobile(page) {
+    const errors = [];
+    page.on("pageerror", (err) => errors.push(String(err)));
+    page.on("console", (msg) => { if (msg.type() === "error") errors.push(msg.text()); });
+    await page.setViewportSize({ width: 390, height: 720 });
+    await page.goto(mobileUrl);
+    return errors;
+  }
+
+  test("two-finger pinch zooms the view unbounded", async ({ page }) => {
+    const errors = await setupMobile(page);
+    await page.evaluate(() => {
+      window.__fractal.previewZoomAt(195, 360, 30);
+      window.__fractal.commitViewPreview();
+    });
+    const scale = await page.evaluate(() => window.__fractal.state.view.scale);
+    expect(scale).toBeCloseTo(30, 3);
+    await expect(page.locator("#zoomChip")).toBeVisible();
+    await page.locator("#zoomChip").tap();
+    expect(await page.evaluate(() => window.__fractal.state.view.scale)).toBe(1);
+    expect(errors).toEqual([]);
+  });
+});

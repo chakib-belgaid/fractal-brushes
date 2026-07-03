@@ -63,6 +63,20 @@
       height: 100%;
     }
 
+    #zoomChip {
+      position: fixed;
+      top: calc(env(safe-area-inset-top, 0px) + 10px);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 30;
+      padding: 4px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: rgba(10, 14, 22, 0.72);
+      color: #dfe8ff;
+      font: 600 12px/1.4 system-ui, sans-serif;
+    }
+
     .hint {
       position: fixed;
       left: 50%;
@@ -450,6 +464,8 @@
     <canvas id="canvas"></canvas>
   </main>
 
+  <button id="zoomChip" type="button" hidden aria-label="Reset zoom">×1.0</button>
+
   <p class="hint" id="hint">Draw with one finger</p>
 
   <header class="topbar">
@@ -686,6 +702,7 @@
         sizeValue: document.getElementById("sizeValue"),
         expansionRange: document.getElementById("expansionRange"),
         expansionValue: document.getElementById("expansionValue"),
+        zoomChip: document.getElementById("zoomChip"),
         symmetryRange: document.getElementById("symmetryRange"),
         symmetryValue: document.getElementById("symmetryValue"),
         customTune: document.getElementById("customTune"),
@@ -706,6 +723,11 @@
         blend: true,
         size: 5,
         expansion: 0.85,
+        view: { x: 0, y: 0, scale: 1 },
+        zoom: 1,
+        panX: 0,
+        panY: 0,
+        gesturing: false,
         symmetry: 6,
         mirror: true,
         painting: false,
@@ -1261,6 +1283,8 @@
       }
 
       function startPainting(event) {
+        commitViewPreviewNow();
+        if (state.gesturing) return;
         if (event.button !== undefined && event.button !== 0) return;
         if (state.painting || (event.pointerType === "touch" && event.isPrimary === false)) return;
         closeSheets();
@@ -1458,8 +1482,198 @@
       restoreCustomBrush();
 
       /* ---------------------------------------------------------------
+         Infinite view model + two-finger pan/zoom
+      --------------------------------------------------------------- */
+
+      const REBUILD_DEBOUNCE_MS = 150;
+
+      function viewCssWidth() { return state.width / (state.dpr || 1); }
+      function viewCssHeight() { return state.height / (state.dpr || 1); }
+
+      function screenToWorld(sx, sy) {
+        return [
+          state.view.x + (sx - viewCssWidth() / 2) / state.view.scale,
+          state.view.y + (sy - viewCssHeight() / 2) / state.view.scale
+        ];
+      }
+
+      function worldToScreen(wx, wy) {
+        return [
+          (wx - state.view.x) * state.view.scale + viewCssWidth() / 2,
+          (wy - state.view.y) * state.view.scale + viewCssHeight() / 2
+        ];
+      }
+
+      // v1 (soft): carry the raster across the view change by scaling it.
+      let rebuildView = function softRebuildView(zoom, panX, panY) {
+        const shot = makeSnapshot();
+        clearSurface();
+        ctx.globalCompositeOperation = "source-over";
+        ctx.setTransform(
+          zoom, 0, 0, zoom,
+          canvas.width / 2 - zoom * (canvas.width / 2) + panX * state.dpr,
+          canvas.height / 2 - zoom * (canvas.height / 2) + panY * state.dpr
+        );
+        ctx.drawImage(shot, 0, 0);
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+      };
+
+      function updateZoomChip() {
+        const total = state.view.scale * (state.zoom || 1);
+        ui.zoomChip.hidden = Math.abs(total - 1) < 0.001;
+        ui.zoomChip.textContent = total >= 100 ? `×${Math.round(total)}`
+          : total >= 10 ? `×${total.toFixed(1)}` : `×${total.toFixed(2)}`;
+      }
+
+      function applyViewPreview() {
+        state.zoom = Math.max(Number(state.zoom) || 1, 1e-9);
+        canvas.style.transformOrigin = "50% 50%";
+        canvas.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
+        updateZoomChip();
+      }
+
+      let previewCommitTimer = null;
+
+      function commitViewPreview() {
+        if (previewCommitTimer) {
+          window.clearTimeout(previewCommitTimer);
+          previewCommitTimer = null;
+        }
+        if (state.painting || state.gesturing) return;
+        const zoom = Number(state.zoom) || 1;
+        const panX = state.panX || 0;
+        const panY = state.panY || 0;
+        if (zoom === 1 && panX === 0 && panY === 0) return;
+        const nextScale = state.view.scale * zoom;
+        state.view.x -= panX / nextScale;
+        state.view.y -= panY / nextScale;
+        state.view.scale = nextScale;
+        rebuildView(zoom, panX, panY);
+        state.zoom = 1;
+        state.panX = 0;
+        state.panY = 0;
+        applyViewPreview();
+        updateZoomChip();
+      }
+
+      function previewZoomAt(clientX, clientY, factor) {
+        if (state.painting) return;
+        const cx = window.innerWidth / 2;
+        const cy = window.innerHeight / 2;
+        state.panX = clientX - cx - (clientX - cx - state.panX) * factor;
+        state.panY = clientY - cy - (clientY - cy - state.panY) * factor;
+        state.zoom = (Number(state.zoom) || 1) * factor;
+        applyViewPreview();
+        if (previewCommitTimer) window.clearTimeout(previewCommitTimer);
+        previewCommitTimer = window.setTimeout(() => {
+          previewCommitTimer = null;
+          commitViewPreview();
+        }, REBUILD_DEBOUNCE_MS);
+      }
+
+      function commitViewPreviewNow() {
+        if (previewCommitTimer) {
+          window.clearTimeout(previewCommitTimer);
+          previewCommitTimer = null;
+        }
+        if (state.zoom !== 1 || state.panX !== 0 || state.panY !== 0) {
+          commitViewPreview();
+        }
+      }
+
+      function resetView() {
+        state.view = { x: 0, y: 0, scale: 1 };
+        state.zoom = 1;
+        state.panX = 0;
+        state.panY = 0;
+        applyViewPreview();
+      }
+
+      ui.zoomChip.addEventListener("click", () => resetView());
+
+      /* ---- Two-finger pinch/pan gesture -------------------------------- */
+
+      const activeTouchPointers = new Map();
+      let gestureStart = null;
+
+      function gestureMetrics() {
+        const points = Array.from(activeTouchPointers.values());
+        if (points.length < 2) return null;
+        const a = points[0];
+        const b = points[1];
+        return {
+          cx: (a.x + b.x) / 2,
+          cy: (a.y + b.y) / 2,
+          distance: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y))
+        };
+      }
+
+      function beginGestureIfNeeded(event) {
+        if (event.pointerType !== "touch") return;
+        activeTouchPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        if (activeTouchPointers.size < 2) return;
+
+        const metrics = gestureMetrics();
+        if (!metrics) return;
+        state.gesturing = true;
+        state.painting = false;
+        state.pointerId = null;
+        state.last = null;
+        clearHoldBloom();
+        gestureStart = {
+          cx: metrics.cx,
+          cy: metrics.cy,
+          distance: metrics.distance,
+          zoom: state.zoom,
+          panX: state.panX,
+          panY: state.panY
+        };
+        event.preventDefault();
+        event.stopPropagation();
+      }
+
+      function updateGesture(event) {
+        if (event.pointerType !== "touch" || !activeTouchPointers.has(event.pointerId)) return;
+        activeTouchPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        if (!state.gesturing || !gestureStart || activeTouchPointers.size < 2) return;
+
+        const metrics = gestureMetrics();
+        if (!metrics) return;
+        const ratio = metrics.distance / gestureStart.distance;
+        state.zoom = gestureStart.zoom * ratio;
+        state.panX = gestureStart.panX + metrics.cx - gestureStart.cx;
+        state.panY = gestureStart.panY + metrics.cy - gestureStart.cy;
+        applyViewPreview();
+        event.preventDefault();
+        event.stopPropagation();
+      }
+
+      function endGesturePointer(event) {
+        if (event.pointerType !== "touch") return;
+        activeTouchPointers.delete(event.pointerId);
+        if (activeTouchPointers.size < 2) {
+          const wasGesturing = state.gesturing;
+          state.gesturing = false;
+          gestureStart = null;
+          state.painting = false;
+          state.pointerId = null;
+          state.last = null;
+          if (wasGesturing) commitViewPreview();
+          updateUi();
+        }
+      }
+
+      window.__fractal = { state, previewZoomAt, commitViewPreview, resetView };
+
+      /* ---------------------------------------------------------------
          Wiring
       --------------------------------------------------------------- */
+
+      stage.addEventListener("pointerdown", beginGestureIfNeeded, { capture: true });
+      stage.addEventListener("pointermove", updateGesture, { capture: true });
+      window.addEventListener("pointerup", endGesturePointer, { capture: true });
+      stage.addEventListener("pointercancel", endGesturePointer, { capture: true });
+      stage.addEventListener("pointerleave", endGesturePointer, { capture: true });
 
       stage.addEventListener("pointerdown", startPainting);
       stage.addEventListener("pointermove", continuePainting);
