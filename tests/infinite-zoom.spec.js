@@ -167,6 +167,36 @@ test("touch pinch zooms while hand tool active", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+async function drawStroke(page, y = 360, xStart = 190, xEnd = 610) {
+  const stage = page.locator("#stage");
+  await stage.dispatchEvent("pointerdown", { clientX: xStart, clientY: y, pointerId: 1, pointerType: "mouse", button: 0, buttons: 1, bubbles: true });
+  for (let x = xStart + 60; x <= xEnd; x += 60) {
+    await stage.dispatchEvent("pointermove", { clientX: x, clientY: y, pointerId: 1, pointerType: "mouse", button: 0, buttons: 1, bubbles: true });
+    await page.waitForTimeout(30);
+  }
+  await stage.dispatchEvent("pointerup", { clientX: xEnd, clientY: y, pointerId: 1, pointerType: "mouse", button: 0, buttons: 0, bubbles: true });
+}
+
+test("strokes are recorded into the stroke log with replay data", async ({ page }) => {
+  await setupPage(page);
+  await drawStroke(page);
+  await page.waitForTimeout(200);
+  const log = await page.evaluate(() => window.__fractal.state.strokeLog.map((s) => ({
+    seed: s.seed, segs: s.segments.length, drawScale: s.drawScale,
+    symCenter: s.symCenter, brush: s.brush, maxR: s.maxR
+  })));
+  expect(log.length).toBe(1);
+  expect(log[0].segs).toBeGreaterThan(0);
+  expect(log[0].drawScale).toBe(1);
+  expect(log[0].symCenter).toEqual({ x: 0, y: 0 });
+  expect(log[0].maxR).toBeGreaterThan(0);
+  await drawStroke(page, 250);
+  await page.waitForTimeout(200);
+  const seeds = await page.evaluate(() => window.__fractal.state.strokeLog.map((s) => s.seed));
+  expect(seeds.length).toBe(2);
+  expect(seeds[0]).not.toBe(seeds[1]);
+});
+
 test("H toggles hand tool, Escape returns to brush, Space pans while held", async ({ page }) => {
   await setupPage(page);
   await page.keyboard.press("h");
