@@ -295,3 +295,28 @@ test("H toggles hand tool, Escape returns to brush, Space pans while held", asyn
   const painting = await page.evaluate(() => window.__fractal.state.painting);
   expect(painting).toBe(false);
 });
+
+test("stroke started during zoom debounce records post-commit view", async ({ page }) => {
+  const errors = await setupPage(page);
+  const result = await page.evaluate(() => {
+    const stage = document.getElementById("stage");
+    window.__fractal.previewZoomAt(480, 360, 2);
+
+    const opts = { pointerId: 1, pointerType: "mouse", button: 0, buttons: 1, bubbles: true, cancelable: true };
+    stage.dispatchEvent(new PointerEvent("pointerdown", { ...opts, clientX: 400, clientY: 300 }));
+    stage.dispatchEvent(new PointerEvent("pointermove", { ...opts, clientX: 450, clientY: 320 }));
+    stage.dispatchEvent(new PointerEvent("pointermove", { ...opts, clientX: 500, clientY: 340 }));
+    stage.dispatchEvent(new PointerEvent("pointerup", { ...opts, buttons: 0, clientX: 500, clientY: 340 }));
+    return window.__fractal.state.strokeLog.length;
+  });
+  await page.waitForTimeout(400);
+  const log = await page.evaluate(() => window.__fractal.state.strokeLog.map((s) => ({
+    drawScale: s.drawScale,
+    symCenter: s.symCenter
+  })));
+  expect(result).toBe(1);
+  expect(log[0].drawScale).toBe(2);
+  expect(log[0].symCenter.x).toBeCloseTo(0, 3);
+  expect(log[0].symCenter.y).toBeCloseTo(0, 3);
+  expect(errors).toEqual([]);
+});

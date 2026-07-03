@@ -4798,6 +4798,8 @@
 
         const recordedStartPainting = startPainting;
         startPainting = function recordingStartPainting(event) {
+          // Commit any pending zoom preview first, so stroke record snapshots the post-commit view.
+          commitViewPreviewNow();
           const wasPainting = state.painting;
           // Built BEFORE calling the patched handler: patchedExpandedStartPainting
           // synchronously fires the hold-bloom spawnFan burst before returning, so
