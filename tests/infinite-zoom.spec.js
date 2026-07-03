@@ -538,4 +538,66 @@ test.describe("mobile infinite zoom", () => {
     expect(await page.evaluate(() => window.__fractal.state.view.scale)).toBe(1);
     expect(errors).toEqual([]);
   });
+
+  async function drawMobileStroke(page) {
+    // "thunder" settles (tendrils die out) much faster than the default
+    // "silk" brush, so the raster is stable by the time we snapshot it.
+    await page.locator('#brushStrip .chip[data-brush="thunder"]').tap();
+    await page.evaluate(async () => {
+      const stage = document.getElementById("stage");
+      const rect = stage.getBoundingClientRect();
+      const dispatch = (type, x, y) => {
+        stage.dispatchEvent(new PointerEvent(type, {
+          pointerId: 7,
+          pointerType: "touch",
+          isPrimary: true,
+          clientX: x,
+          clientY: y,
+          bubbles: true,
+          cancelable: true
+        }));
+      };
+      const startX = rect.width * 0.3;
+      const startY = rect.height * 0.4;
+      dispatch("pointerdown", startX, startY);
+      for (let i = 1; i <= 10; i += 1) {
+        dispatch("pointermove", startX + i * 8, startY + Math.sin(i * 0.6) * 20);
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+      window.dispatchEvent(new PointerEvent("pointerup", { pointerId: 7, pointerType: "touch", bubbles: true }));
+    });
+    // Wait for the tendril animation to fully settle so toDataURL()
+    // snapshots are deterministic and not just catching mid-animation frames.
+    await page.waitForFunction(() => window.__fractal.state.tendrils.length === 0, null, { timeout: 5000 });
+  }
+
+  test("tapping the zoom chip after a committed pinch carries the raster back to identity", async ({ page }) => {
+    const errors = await setupMobile(page);
+
+    await drawMobileStroke(page);
+    const beforeZoom = await page.evaluate(() => document.getElementById("canvas").toDataURL());
+
+    await page.evaluate(() => window.__fractal.previewZoomAt(195, 360, 2));
+    await page.waitForTimeout(400); // let the debounced commit fire
+    await page.waitForFunction(() => window.__fractal.state.tendrils.length === 0, null, { timeout: 5000 });
+
+    const zoomedScale = await page.evaluate(() => window.__fractal.state.view.scale);
+    expect(zoomedScale).toBeCloseTo(2, 3);
+    const zoomedDataUrl = await page.evaluate(() => document.getElementById("canvas").toDataURL());
+    expect(zoomedDataUrl).not.toBe(beforeZoom);
+
+    await expect(page.locator("#zoomChip")).toBeVisible();
+    await page.locator("#zoomChip").tap();
+    await page.waitForFunction(() => window.__fractal.state.tendrils.length === 0, null, { timeout: 5000 });
+
+    const view = await page.evaluate(() => window.__fractal.state.view);
+    expect(view).toEqual({ x: 0, y: 0, scale: 1 });
+
+    const afterResetDataUrl = await page.evaluate(() => document.getElementById("canvas").toDataURL());
+    // Soft-carry raster reset is lossy, so we only assert it moved away from
+    // the zoomed-in framing, not that it matches the original pixel-for-pixel.
+    expect(afterResetDataUrl).not.toBe(zoomedDataUrl);
+
+    expect(errors).toEqual([]);
+  });
 });

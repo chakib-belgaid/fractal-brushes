@@ -1582,11 +1582,21 @@
       }
 
       function resetView() {
-        state.view = { x: 0, y: 0, scale: 1 };
-        state.zoom = 1;
-        state.panX = 0;
-        state.panY = 0;
-        applyViewPreview();
+        if (state.painting || state.gesturing) return;
+        if (state.view.x === 0 && state.view.y === 0 && state.view.scale === 1 &&
+            state.zoom === 1 && state.panX === 0 && state.panY === 0) return;
+        // Fold an inverse preview through commitViewPreview so the raster is
+        // carried back to identity instead of just resetting the numbers:
+        //   nextScale = view.scale * zoom = 1  =>  zoom = 1 / view.scale
+        //   0 = view.x - panX / nextScale      =>  panX = view.x (nextScale === 1)
+        // This overwrites any uncommitted pinch/pan preview the user is
+        // mid-gesture-free but hasn't seen committed yet; that preview was
+        // never baked into the raster, so dropping it back to the committed
+        // framing before resetting is correct for a reset control.
+        state.zoom = 1 / state.view.scale;
+        state.panX = state.view.x;
+        state.panY = state.view.y;
+        commitViewPreview();
       }
 
       ui.zoomChip.addEventListener("click", () => resetView());
