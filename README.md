@@ -33,6 +33,7 @@ The luminous `/app/` route includes the full color and 4K export toolset:
 - Draw on the canvas with pointer, mouse, or touch input.
 - Use the main toolbar for undo, redo, export, clear, mirror, brush menu, color menu, and random brush selection.
 - Use the bottom-right zoom slider to adjust zoom and inspect the current zoom percentage. Double-click the slider to reset to 100%.
+- Infinite canvas: scroll/pinch to zoom without limit, hand tool (H/Space) to pan, strokes re-render crisp at any scale, unlimited undo.
 - Open the brush and color panels independently. Panels are intended to be draggable and clamped within the viewport.
 - Use the bottom-left parameter panel for Brush Length, Scale Factor, Expansion, and Symmetry. The luminous route opens on Silk Ribbon at actual length `0.5` and actual scale `3`. The UI shows normalized control values by multiplying both numbers by `10`, so the defaults display as length `5` and scale `30`. Brush Length ranges from `0.1` to `6.4`; Scale Factor ranges from `0.1` to `15`. Scale Factor multiplies the effective brush length before the renderer derives tendril travel, spacing, and width. Brush Length primarily extends tendril travel; stroke width follows at a smaller fixed ratio. A live symmetry guide shows the mirrored/rotated drawing points while hovering or painting.
 - Keyboard shortcuts for core drawing actions should remain available when supported by the app.
