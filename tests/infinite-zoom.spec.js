@@ -480,7 +480,7 @@ test("4K export re-renders crisply at target resolution", async ({ page }) => {
   await page.evaluate(() => {
     const originalCreateObjectURL = URL.createObjectURL.bind(URL);
     URL.createObjectURL = (blob) => {
-      if (blob.type === "image/png") window.__lastPngExport = { size: blob.size };
+      if (blob.type === "image/png") window.__lastPngExport = blob;
       return originalCreateObjectURL(blob);
     };
     HTMLAnchorElement.prototype.click = function () { window.__lastDownloadName = this.download; };
@@ -490,10 +490,23 @@ test("4K export re-renders crisply at target resolution", async ({ page }) => {
   await page.locator("#exportToggle").click();
   await page.locator("[data-export='wide4k']").click();
   await expect.poll(() => page.evaluate(() => window.__lastPngExport?.size), { timeout: 20000 }).toBeGreaterThan(1000);
+
+  // Parse PNG header to verify dimensions: width and height are big-endian uint32s at bytes 16 and 20
+  const dimensions = await page.evaluate(async () => {
+    const blob = window.__lastPngExport;
+    const buf = new Uint8Array(await blob.arrayBuffer());
+    const view = new DataView(buf.buffer);
+    const width = view.getUint32(16);
+    const height = view.getUint32(20);
+    return { width, height };
+  });
+
   const restored = await page.evaluate(() => ({
     exportedVia: window.__fractal.lastExportPath || null,
     w: document.getElementById("art").width
   }));
   expect(restored.exportedVia).toBe("replay"); // set by the new export path
   expect(restored.w).toBeLessThan(3840); // canvas restored after export
+  expect(dimensions.width).toBe(3840);
+  expect(dimensions.height).toBe(2160);
 });
