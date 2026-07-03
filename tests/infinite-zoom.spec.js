@@ -600,4 +600,56 @@ test.describe("mobile infinite zoom", () => {
 
     expect(errors).toEqual([]);
   });
+
+  async function drawMobileStroke(page, y = 400) {
+    const stage = page.locator("#stage");
+    await stage.dispatchEvent("pointerdown", { clientX: 80, clientY: y, pointerId: 3, pointerType: "touch", isPrimary: true, button: 0, buttons: 1, bubbles: true });
+    for (let x = 120; x <= 320; x += 40) {
+      await stage.dispatchEvent("pointermove", { clientX: x, clientY: y, pointerId: 3, pointerType: "touch", isPrimary: true, button: 0, buttons: 1, bubbles: true });
+      await page.waitForTimeout(30);
+    }
+    await stage.dispatchEvent("pointerup", { clientX: 320, clientY: y, pointerId: 3, pointerType: "touch", isPrimary: true, button: 0, buttons: 0, bubbles: true });
+  }
+
+  test("mobile strokes are recorded, survive zoom, and replay deterministically", async ({ page }) => {
+    const errors = await setupMobile(page);
+    await drawMobileStroke(page);
+    await page.waitForTimeout(500);
+    expect(await page.evaluate(() => window.__fractal.state.strokeLog.length)).toBe(1);
+    const [a, b] = await page.evaluate(() => {
+      const canvas = document.querySelector("canvas");
+      window.__fractal.renderWorldSync();
+      const first = canvas.toDataURL();
+      window.__fractal.renderWorldSync();
+      return [first, canvas.toDataURL()];
+    });
+    expect(a).toBe(b);
+    await page.evaluate(() => {
+      window.__fractal.previewZoomAt(195, 360, 6);
+      window.__fractal.commitViewPreview();
+      window.__fractal.flushRenderJob();
+    });
+    const lit = await page.evaluate(() => {
+      const canvas = document.querySelector("canvas");
+      const { data } = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height);
+      let count = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i] + data[i + 1] + data[i + 2] > 60) count += 1;
+      }
+      return count;
+    });
+    expect(lit).toBeGreaterThan(200);
+    expect(errors).toEqual([]);
+  });
+
+  test("mobile undo/clear use the stroke log", async ({ page }) => {
+    await setupMobile(page);
+    await drawMobileStroke(page, 380);
+    await page.waitForTimeout(400);
+    await drawMobileStroke(page, 300);
+    await page.waitForTimeout(400);
+    expect(await page.evaluate(() => window.__fractal.state.strokeLog.length)).toBe(2);
+    await page.locator("#undo").click();
+    expect(await page.evaluate(() => window.__fractal.state.strokeLog.length)).toBe(1);
+  });
 });

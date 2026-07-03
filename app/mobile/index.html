@@ -672,7 +672,6 @@
 
       const DPR_CAP = 1.5;
       const PIXEL_BUDGET = 2600000;
-      const HISTORY_LIMIT = 4;
       const HOLD_BLOOM_MS = 150;
 
       const stage = document.getElementById("stage");
@@ -735,8 +734,10 @@
         last: null,
         lastMotion: [0.3, 0],
         tendrils: [],
-        history: [],
-        redo: [],
+        strokeLog: [],
+        liveStroke: null,
+        undoStack: [],
+        redoStack: [],
         holdTimer: null,
         rafId: 0,
         hinted: false
@@ -787,7 +788,9 @@
         state.cy = state.height / 2;
         canvas.width = state.width;
         canvas.height = state.height;
-        if (previous) {
+        if (state.strokeLog.length) {
+          renderWorldSync();
+        } else if (previous) {
           restoreSnapshot(previous);
         } else {
           clearSurface();
@@ -947,54 +950,79 @@
         });
       }
 
-      function advanceFrame() {
-        for (let i = state.tendrils.length - 1; i >= 0; i -= 1) {
-          const tendril = state.tendrils[i];
-          const ox = tendril.x;
-          const oy = tendril.y;
-          const speed = Math.max(0.001, Math.hypot(tendril.vx, tendril.vy));
-          const nx = -tendril.vy / speed;
-          const ny = tendril.vx / speed;
-          const phase = tendril.maxLife - tendril.life;
-          const curl = Math.sin(phase * 0.16 + tendril.seed) * tendril.curl;
+      // Mirrors the old advanceFrame body, refactored to operate on an
+      // arbitrary tendril list so replayStroke() can drive it too, plus:
+      // per-tendril seeded RNG streams, branch-child rng tagging, and
+      // per-stroke max reach tracking (`maxR`) via each tendril's
+      // `strokeRef` (see "Deterministic stroke recording" below).
+      function stepTendrils(list) {
+        for (let i = list.length - 1; i >= 0; i -= 1) {
+          const tendril = list[i];
+          try {
+            if (tendril.rng) Math.random = tendril.rng;
+            const ox = tendril.x;
+            const oy = tendril.y;
+            const speed = Math.max(0.001, Math.hypot(tendril.vx, tendril.vy));
+            const nx = -tendril.vy / speed;
+            const ny = tendril.vx / speed;
+            const phase = tendril.maxLife - tendril.life;
+            const curl = Math.sin(phase * 0.16 + tendril.seed) * tendril.curl;
 
-          tendril.vx += nx * curl * state.dpr;
-          tendril.vy += ny * curl * state.dpr;
-          // Angular brushes keep a share of white noise for electric texture;
-          // the rest wander on smooth per-tendril sine phases for silky lines.
-          const noiseShare = tendril.angular ? 0.42 : 0.12;
-          const seed2 = tendril.seed * 2.618;
-          const wanderX = Math.sin(phase * 0.21 + tendril.seed) * Math.cos(phase * 0.057 + seed2);
-          const wanderY = Math.cos(phase * 0.17 + seed2) * Math.sin(phase * 0.049 + tendril.seed);
-          tendril.vx += tendril.jitter * (wanderX * (1 - noiseShare) * 0.62 + rand(-1, 1) * noiseShare) * state.dpr;
-          tendril.vy += tendril.jitter * (wanderY * (1 - noiseShare) * 0.62 + rand(-1, 1) * noiseShare) * state.dpr;
-          tendril.vy -= tendril.lift * state.dpr * (1 + tendril.width);
-          quantizeVelocity(tendril, tendril.angular);
+            tendril.vx += nx * curl * state.dpr;
+            tendril.vy += ny * curl * state.dpr;
+            // Angular brushes keep a share of white noise for electric texture;
+            // the rest wander on smooth per-tendril sine phases for silky lines.
+            const noiseShare = tendril.angular ? 0.42 : 0.12;
+            const seed2 = tendril.seed * 2.618;
+            const wanderX = Math.sin(phase * 0.21 + tendril.seed) * Math.cos(phase * 0.057 + seed2);
+            const wanderY = Math.cos(phase * 0.17 + seed2) * Math.sin(phase * 0.049 + tendril.seed);
+            tendril.vx += tendril.jitter * (wanderX * (1 - noiseShare) * 0.62 + rand(-1, 1) * noiseShare) * state.dpr;
+            tendril.vy += tendril.jitter * (wanderY * (1 - noiseShare) * 0.62 + rand(-1, 1) * noiseShare) * state.dpr;
+            tendril.vy -= tendril.lift * state.dpr * (1 + tendril.width);
+            quantizeVelocity(tendril, tendril.angular);
 
-          const tx = tendril.x + tendril.vx;
-          const ty = tendril.y + tendril.vy;
-          drawBrushSegment(ox, oy, tx, ty, tendril);
+            const tx = tendril.x + tendril.vx;
+            const ty = tendril.y + tendril.vy;
+            drawBrushSegment(ox, oy, tx, ty, tendril);
 
-          tendril.x = tx;
-          tendril.y = ty;
-          tendril.vx *= tendril.drag;
-          tendril.vy *= tendril.drag;
-          tendril.life -= 1;
+            tendril.x = tx;
+            tendril.y = ty;
+            tendril.vx *= tendril.drag;
+            tendril.vy *= tendril.drag;
+            tendril.life -= 1;
 
-          const profile = brushProfiles[tendril.brush] || brushProfiles.silk;
-          if (tendril.life > 12 && Math.random() < tendril.branch && state.tendrils.length < (profile.maxTendrils || 300)) {
-            branchFrom(tendril, speed);
-          }
+            if (tendril.strokeRef) {
+              const reach = Math.hypot(tendril.x - state.cx, tendril.y - state.cy) + tendril.width * 3;
+              if (reach > tendril.strokeRef.maxR) tendril.strokeRef.maxR = reach;
+            }
 
-          if (
-            tendril.life <= 0 ||
-            Math.abs(tendril.vx) + Math.abs(tendril.vy) < 0.015 ||
-            tendril.x < -state.width * 0.1 || tendril.x > state.width * 1.1 ||
-            tendril.y < -state.height * 0.1 || tendril.y > state.height * 1.1
-          ) {
-            state.tendrils.splice(i, 1);
+            const profile = brushProfiles[tendril.brush] || brushProfiles.silk;
+            if (tendril.life > 12 && Math.random() < tendril.branch && list.length < (profile.maxTendrils || 300)) {
+              branchFrom(tendril, speed);
+              const child = list[list.length - 1];
+              if (child && !child.rng && tendril.rng) {
+                child.rng = mulberry32(Math.floor(tendril.rng() * 4294967296));
+                child.strokeRef = tendril.strokeRef;
+              }
+            }
+
+            if (
+              tendril.life <= 0 ||
+              Math.abs(tendril.vx) + Math.abs(tendril.vy) < 0.015 ||
+              tendril.x < -state.width * 0.1 || tendril.x > state.width * 1.1 ||
+              tendril.y < -state.height * 0.1 || tendril.y > state.height * 1.1
+            ) {
+              list.splice(i, 1);
+            }
+          } finally {
+            Math.random = nativeRandom;
           }
         }
+      }
+
+      function advanceFrame() {
+        stepTendrils(state.tendrils);
+        if (state.liveStroke) state.liveStroke.stepCount += 1;
       }
 
       function frame() {
@@ -1013,6 +1041,69 @@
       }
 
       /* ---------------------------------------------------------------
+         Deterministic stroke recording. A live stroke seeds a per-tendril
+         RNG stream (state.liveStroke.rng) that every spawn call and branch
+         draws from instead of the native Math.random; replayStroke() later
+         re-seeds the same stream to reproduce the exact spawn/branch
+         sequence and settle to identical pixels.
+      --------------------------------------------------------------- */
+
+      const nativeRandom = Math.random;
+      let strokeIdCounter = 0;
+
+      function mulberry32(seed) {
+        let a = seed >>> 0;
+        return function seededRandom() {
+          a = (a + 0x6D2B79F5) >>> 0;
+          let t = a;
+          t = Math.imul(t ^ (t >>> 15), t | 1);
+          t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      function tagNewTendrils(stroke) {
+        for (const tendril of state.tendrils) {
+          if (!tendril.rng) {
+            tendril.rng = mulberry32(Math.floor(stroke.rng() * 4294967296));
+            tendril.strokeRef = stroke;
+          }
+        }
+      }
+
+      // Tag any tendril spawned with no live stroke (should not normally
+      // happen on mobile, but stays defensive/symmetric with desktop) so a
+      // later stroke's tagNewTendrils cannot adopt it and consume RNG draws
+      // replay will never make.
+      function tagOrphanTendrils() {
+        for (const tendril of state.tendrils) {
+          if (!tendril.rng) tendril.rng = nativeRandom;
+        }
+      }
+
+      function commitLiveStroke() {
+        const stroke = state.liveStroke;
+        if (!stroke) return;
+        state.liveStroke = null;
+        if (!stroke.segments.length) return;
+        delete stroke.rng; // transient; seed is what matters
+        state.strokeLog.push(stroke);
+        state.undoStack.push({ type: "stroke" });
+        state.redoStack = [];
+        updateUi();
+      }
+
+      // Set by replayStroke while it is synchronously re-simulating a
+      // stroke, so the recording wrappers below stand down and call the
+      // raw spawn functions directly instead of trying to record replayed
+      // segments as new ones. insideSpawnAlong marks the nested spawnFan
+      // calls rawSpawnAlong makes so they aren't recorded as separate
+      // top-level fan segments (rawSpawnAlong's own call is already the
+      // recorded segment, and Math.random is already swapped for it).
+      let replayingStroke = false;
+      let insideSpawnAlong = false;
+
+      /* ---------------------------------------------------------------
          Spawning
       --------------------------------------------------------------- */
 
@@ -1026,7 +1117,7 @@
         };
       }
 
-      function spawnFan(x, y, dx, dy) {
+      function rawSpawnFan(x, y, dx, dy) {
         const profile = brushProfiles[state.brush] || brushProfiles.silk;
         const speed = Math.hypot(dx, dy);
         const baseAngle = Math.atan2(dy, dx || 0.0001);
@@ -1078,10 +1169,36 @@
         if (state.tendrils.length > maxTendrils) {
           state.tendrils.splice(0, state.tendrils.length - maxTendrils);
         }
-        wakeLoop();
+        // Replay drives its own render loop; waking the live rAF loop here
+        // would step the replay's borrowed state.tendrils array a second
+        // time on the next frame after replayStroke() has already restored
+        // the live state, so skip it while replaying.
+        if (!replayingStroke) wakeLoop();
       }
 
-      function spawnAlong(x0, y0, x1, y1) {
+      function spawnFan(x, y, dx, dy) {
+        if (replayingStroke) {
+          rawSpawnFan(x, y, dx, dy);
+          return;
+        }
+        const stroke = state.liveStroke;
+        if (!stroke || insideSpawnAlong) {
+          rawSpawnFan(x, y, dx, dy);
+          if (!stroke) tagOrphanTendrils();
+          return;
+        }
+        // Direct call outside spawnAlong (initial burst / hold-bloom): record as a fan event.
+        stroke.segments.push({ fan: true, x, y, dx, dy, step: stroke.stepCount });
+        try {
+          Math.random = stroke.rng;
+          rawSpawnFan(x, y, dx, dy);
+        } finally {
+          Math.random = nativeRandom;
+        }
+        tagNewTendrils(stroke);
+      }
+
+      function rawSpawnAlong(x0, y0, x1, y1) {
         const profile = brushProfiles[state.brush] || brushProfiles.silk;
         const dx = x1 - x0;
         const dy = y1 - y0;
@@ -1095,6 +1212,29 @@
           const t = i / steps;
           spawnFan(x0 + dx * t, y0 + dy * t, dx / steps, dy / steps);
         }
+      }
+
+      function spawnAlong(x0, y0, x1, y1) {
+        if (replayingStroke) {
+          rawSpawnAlong(x0, y0, x1, y1);
+          return;
+        }
+        const stroke = state.liveStroke;
+        if (!stroke) {
+          rawSpawnAlong(x0, y0, x1, y1);
+          tagOrphanTendrils();
+          return;
+        }
+        stroke.segments.push({ x0, y0, x1, y1, step: stroke.stepCount });
+        insideSpawnAlong = true;
+        try {
+          Math.random = stroke.rng;
+          rawSpawnAlong(x0, y0, x1, y1);
+        } finally {
+          Math.random = nativeRandom;
+          insideSpawnAlong = false;
+        }
+        tagNewTendrils(stroke);
       }
 
       /* ---------------------------------------------------------------
@@ -1115,35 +1255,54 @@
         ctx.drawImage(shot, 0, 0, shot.width, shot.height, 0, 0, state.width, state.height);
       }
 
-      function pushHistory() {
-        state.history.push(makeSnapshot());
-        if (state.history.length > HISTORY_LIMIT) {
-          state.history.splice(0, state.history.length - HISTORY_LIMIT);
-        }
-        state.redo = [];
-        updateUi();
-      }
+      /* ---- Stroke-log history -------------------------------------------
+         Undo/redo/clear operate on the recorded stroke log instead of
+         raster snapshots, so they compose with the crisp infinite-zoom
+         rebuild (see "Deterministic replay + crisp rebuild" below): every
+         entry is replayed at the current view scale, at any zoom depth. */
 
       function undo() {
-        if (!state.history.length) return;
-        state.redo.push(makeSnapshot());
-        state.tendrils = [];
-        restoreSnapshot(state.history.pop());
+        flushRenderJob();
+        const action = state.undoStack.pop();
+        if (!action) return;
+        if (action.type === "stroke") {
+          const stroke = state.strokeLog.pop();
+          state.redoStack.push({ type: "stroke", stroke });
+        } else if (action.type === "clear") {
+          state.strokeLog = action.strokes.slice();
+          state.redoStack.push({ type: "clear", strokes: action.strokes.slice() });
+        }
+        renderWorldSync();
         updateUi();
       }
 
       function redo() {
-        if (!state.redo.length) return;
-        state.history.push(makeSnapshot());
-        state.tendrils = [];
-        restoreSnapshot(state.redo.pop());
+        flushRenderJob();
+        const action = state.redoStack.pop();
+        if (!action) return;
+        if (action.type === "stroke") {
+          state.strokeLog.push(action.stroke);
+          state.undoStack.push({ type: "stroke" });
+        } else if (action.type === "clear") {
+          state.strokeLog = [];
+          state.undoStack.push({ type: "clear", strokes: action.strokes.slice() });
+        }
+        renderWorldSync();
         updateUi();
       }
 
       function clearArt() {
-        pushHistory();
-        state.tendrils = [];
+        flushRenderJob();
+        commitLiveStroke();
+        state.tendrils.length = 0;
+        if (state.strokeLog.length) {
+          state.undoStack.push({ type: "clear", strokes: state.strokeLog.slice() });
+          state.strokeLog = [];
+          state.redoStack = [];
+        }
         clearSurface();
+        updateUi();
+        showToast("Canvas cleared");
       }
 
       function showToast(message) {
@@ -1154,6 +1313,8 @@
       }
 
       function exportPng() {
+        flushRenderJob();
+        commitLiveStroke();
         const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
         const name = `fractal-brushes-${stamp}.png`;
         const finish = (url, revoke) => {
@@ -1188,8 +1349,8 @@
       function updateUi() {
         root.style.setProperty("--active", `hsl(${Math.round(state.hue)} 100% 62%)`);
         root.style.setProperty("--secondary", `hsl(${Math.round(state.hue2)} 100% 62%)`);
-        ui.undo.disabled = state.history.length === 0;
-        ui.redo.disabled = state.redo.length === 0;
+        ui.undo.disabled = state.undoStack.length === 0;
+        ui.redo.disabled = state.redoStack.length === 0;
         ui.mirror.setAttribute("aria-pressed", String(state.mirror));
         ui.hueValue.textContent = String(Math.round(state.hue));
         ui.hue2Value.textContent = String(Math.round(state.hue2));
@@ -1283,6 +1444,9 @@
       }
 
       function startPainting(event) {
+        flushRenderJob();
+        // Commit any pending zoom preview first, so the stroke record below
+        // snapshots the post-commit view (symCenter/drawScale).
         commitViewPreviewNow();
         if (state.gesturing) return;
         if (event.button !== undefined && event.button !== 0) return;
@@ -1292,7 +1456,34 @@
           state.hinted = true;
           ui.hint.classList.add("hidden");
         }
-        pushHistory();
+        // Every guard above has already returned if painting won't start,
+        // so it's safe to build the stroke record here, before the initial
+        // spawnFan burst below, so that burst is captured as segment 0.
+        const seed = Math.floor(nativeRandom() * 4294967296);
+        state.liveStroke = {
+          id: (strokeIdCounter += 1),
+          seed,
+          rng: mulberry32(seed),
+          brush: state.brush,
+          hue: state.hue,
+          hue2: state.hue2,
+          blend: state.blend,
+          size: state.size,
+          expansion: state.expansion,
+          symmetry: state.symmetry,
+          mirror: state.mirror,
+          custom: state.brush === "custom"
+            ? JSON.parse(JSON.stringify(brushProfiles.custom))
+            : null,
+          symCenter: { x: state.view.x, y: state.view.y },
+          drawScale: state.view.scale,
+          dpr: state.dpr,
+          viewW: state.width,
+          viewH: state.height,
+          segments: [],
+          stepCount: 0,
+          maxR: 0
+        };
         state.painting = true;
         state.pointerId = event.pointerId ?? "mouse";
         state.last = eventPosition(event);
@@ -1341,6 +1532,7 @@
         if (event.pointerId !== undefined && stage.releasePointerCapture) {
           try { stage.releasePointerCapture(event.pointerId); } catch (_) { /* already released */ }
         }
+        commitLiveStroke();
         updateUi();
       }
 
@@ -1505,6 +1697,8 @@
       }
 
       // v1 (soft): carry the raster across the view change by scaling it.
+      // Replaced below by crispRebuildView, the deterministic stroke-replay
+      // rebuild (see "Deterministic replay + crisp rebuild").
       let rebuildView = function softRebuildView(zoom, panX, panY) {
         const shot = makeSnapshot();
         clearSurface();
@@ -1578,6 +1772,12 @@
         }
         if (state.zoom !== 1 || state.panX !== 0 || state.panY !== 0) {
           commitViewPreview();
+          // Callers of "commit now" (e.g. starting a stroke) need the
+          // chunked rebuild commitViewPreview() may have just scheduled to
+          // be fully settled synchronously too, or the opaque preview
+          // overlay can be left showing stale pixels while the live stroke
+          // paints beneath it.
+          flushRenderJob();
         }
       }
 
@@ -1601,6 +1801,203 @@
 
       ui.zoomChip.addEventListener("click", () => resetView());
 
+      /* ---- Deterministic replay + crisp rebuild -------------------------
+         Every stroke in state.strokeLog carries its own seed and segment
+         list; replaying it re-seeds a fresh RNG stream and re-drives
+         rawSpawnFan/rawSpawnAlong + stepTendrils exactly as it happened
+         live, so the raster can be rebuilt crisply (not resampled) at any
+         zoom depth. renderWorldSync() does this synchronously for the
+         whole visible set (undo/redo/resize); scheduleRebuild()/pumpRender()
+         chunk it across frames for a zoom/pan commit so a stroke-heavy
+         canvas doesn't stall the main thread. */
+
+      const RENDER_BUDGET_MS = 6;
+      const REPLAY_STEP_GUARD = 20000;
+
+      const previewCanvas = document.createElement("canvas");
+      previewCanvas.id = "viewPreview";
+      previewCanvas.setAttribute("aria-hidden", "true");
+      previewCanvas.style.cssText =
+        "position:absolute;inset:0;width:100%;height:100%;pointer-events:none;display:none;";
+      stage.appendChild(previewCanvas);
+
+      function strokeWorldRadius(stroke) {
+        return stroke.maxR / (stroke.dpr * stroke.drawScale);
+      }
+
+      function visibleStrokes() {
+        const halfW = viewCssWidth() / 2 / state.view.scale;
+        const halfH = viewCssHeight() / 2 / state.view.scale;
+        return state.strokeLog.filter((stroke) => {
+          const r = strokeWorldRadius(stroke);
+          return stroke.symCenter.x + r > state.view.x - halfW &&
+            stroke.symCenter.x - r < state.view.x + halfW &&
+            stroke.symCenter.y + r > state.view.y - halfH &&
+            stroke.symCenter.y - r < state.view.y + halfH;
+        });
+      }
+
+      function drawStrokeDot(stroke, sx, sy) {
+        ctx.globalCompositeOperation = "lighter";
+        ctx.fillStyle = `hsla(${Math.round(normalizedHue(stroke.hue))}, 90%, 60%, 0.5)`;
+        const px = Math.max(1, Math.round(state.dpr));
+        ctx.fillRect(Math.round(sx * state.dpr), Math.round(sy * state.dpr), px, px);
+      }
+
+      function replayStroke(stroke) {
+        // k converts stroke-local device px to current device px.
+        const k = (state.view.scale / stroke.drawScale) * (state.dpr / stroke.dpr);
+        const [sx, sy] = worldToScreen(stroke.symCenter.x, stroke.symCenter.y);
+        if (stroke.maxR * k * 2 < 1.5) {
+          drawStrokeDot(stroke, sx, sy);
+          return;
+        }
+        const saved = {
+          brush: state.brush, hue: state.hue, hue2: state.hue2, blend: state.blend,
+          size: state.size, expansion: state.expansion,
+          symmetry: state.symmetry, mirror: state.mirror,
+          dpr: state.dpr, width: state.width, height: state.height,
+          cx: state.cx, cy: state.cy,
+          tendrils: state.tendrils, strokeDistance: state.strokeDistance,
+          liveStroke: state.liveStroke
+        };
+        const savedCustom = stroke.custom
+          ? JSON.parse(JSON.stringify(brushProfiles.custom)) : null;
+
+        // Everything below mutates shared, page-lifetime state (state
+        // fields, brushProfiles.custom, ctx transform, Math.random). A
+        // throw mid-replay must not leave any of that corrupted --
+        // renderWorldSync/pumpRender loop over strokes, so one bad stroke
+        // would otherwise wreck all subsequent rendering. The finally
+        // below is the single, unconditional restore path.
+        try {
+          if (stroke.custom) Object.assign(brushProfiles.custom, stroke.custom);
+
+          state.brush = stroke.brush;
+          state.hue = stroke.hue;
+          state.hue2 = stroke.hue2;
+          state.blend = stroke.blend;
+          state.size = stroke.size;
+          state.expansion = stroke.expansion;
+          state.symmetry = stroke.symmetry;
+          state.mirror = stroke.mirror;
+          state.dpr = stroke.dpr;
+          state.width = stroke.viewW;
+          state.height = stroke.viewH;
+          state.cx = stroke.viewW / 2;
+          state.cy = stroke.viewH / 2;
+          state.tendrils = [];
+          state.strokeDistance = 0;
+          state.liveStroke = null;
+
+          ctx.setTransform(
+            k, 0, 0, k,
+            sx * saved.dpr - k * (stroke.viewW / 2),
+            sy * saved.dpr - k * (stroke.viewH / 2)
+          );
+
+          const replayContext = { rng: mulberry32(stroke.seed) };
+          let segIndex = 0;
+          let stepIndex = 0;
+          let guard = 0;
+          replayingStroke = true;
+          try {
+            while ((segIndex < stroke.segments.length || state.tendrils.length) && guard < REPLAY_STEP_GUARD) {
+              while (segIndex < stroke.segments.length && stroke.segments[segIndex].step <= stepIndex) {
+                const seg = stroke.segments[segIndex];
+                segIndex += 1;
+                Math.random = replayContext.rng;
+                if (seg.fan) {
+                  rawSpawnFan(seg.x, seg.y, seg.dx, seg.dy);
+                } else {
+                  rawSpawnAlong(seg.x0, seg.y0, seg.x1, seg.y1);
+                }
+                Math.random = nativeRandom;
+                tagNewTendrils(replayContext);
+              }
+              stepTendrils(state.tendrils);
+              stepIndex += 1;
+              guard += 1;
+            }
+          } finally {
+            replayingStroke = false;
+          }
+        } finally {
+          // Unconditional backstop: guarantees these are restored even if
+          // the simulation loop above threw before reaching its own
+          // (now-redundant on the happy path) restore code.
+          Math.random = nativeRandom;
+          replayingStroke = false;
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          if (savedCustom) Object.assign(brushProfiles.custom, savedCustom);
+          Object.assign(state, saved);
+        }
+      }
+
+      let renderJob = null;
+
+      function renderWorldSync() {
+        renderJob = null;
+        previewCanvas.style.display = "none";
+        state.tendrils.length = 0;
+        clearSurface();
+        for (const stroke of visibleStrokes()) replayStroke(stroke);
+      }
+
+      function pumpRender() {
+        if (!renderJob) return;
+        const start = performance.now();
+        while (renderJob.index < renderJob.strokes.length &&
+               performance.now() - start < RENDER_BUDGET_MS) {
+          replayStroke(renderJob.strokes[renderJob.index]);
+          renderJob.index += 1;
+        }
+        if (renderJob.index >= renderJob.strokes.length) {
+          renderJob = null;
+          previewCanvas.style.display = "none";
+        } else {
+          requestAnimationFrame(pumpRender);
+        }
+      }
+
+      function flushRenderJob() {
+        if (!renderJob) return;
+        while (renderJob.index < renderJob.strokes.length) {
+          replayStroke(renderJob.strokes[renderJob.index]);
+          renderJob.index += 1;
+        }
+        renderJob = null;
+        previewCanvas.style.display = "none";
+      }
+
+      function scheduleRebuild(zoom, panX, panY) {
+        // Soft preview: current pixels, transformed, on the overlay.
+        previewCanvas.width = canvas.width;
+        previewCanvas.height = canvas.height;
+        const pctx = previewCanvas.getContext("2d");
+        pctx.fillStyle = "#000";
+        pctx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
+        pctx.setTransform(
+          zoom, 0, 0, zoom,
+          canvas.width / 2 - zoom * (canvas.width / 2) + panX * state.dpr,
+          canvas.height / 2 - zoom * (canvas.height / 2) + panY * state.dpr
+        );
+        pctx.drawImage(canvas, 0, 0);
+        pctx.setTransform(1, 0, 0, 1, 0, 0);
+        previewCanvas.style.display = "block";
+
+        // Live tendrils are already recorded; kill them so they don't paint
+        // at stale positions while the crisp render builds underneath.
+        state.tendrils.length = 0;
+        clearSurface();
+        renderJob = { strokes: visibleStrokes(), index: 0 };
+        requestAnimationFrame(pumpRender);
+      }
+
+      rebuildView = function crispRebuildView(zoom, panX, panY) {
+        scheduleRebuild(zoom, panX, panY);
+      };
+
       /* ---- Two-finger pinch/pan gesture -------------------------------- */
 
       const activeTouchPointers = new Map();
@@ -1619,6 +2016,7 @@
       }
 
       function beginGestureIfNeeded(event) {
+        flushRenderJob();
         if (event.pointerType !== "touch") return;
         activeTouchPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
         if (activeTouchPointers.size < 2) return;
@@ -1627,6 +2025,7 @@
         if (!metrics) return;
         state.gesturing = true;
         state.painting = false;
+        commitLiveStroke();
         state.pointerId = null;
         state.last = null;
         clearHoldBloom();
@@ -1665,15 +2064,34 @@
           const wasGesturing = state.gesturing;
           state.gesturing = false;
           gestureStart = null;
-          state.painting = false;
-          state.pointerId = null;
-          state.last = null;
-          if (wasGesturing) commitViewPreview();
+          // Only clear the painting pointer state here if a two-finger
+          // gesture was actually in progress (beginGestureIfNeeded already
+          // nulled these when the gesture started). This handler and
+          // stopPainting are both registered on window's pointerup, and
+          // this one runs first (registered first, same target -> target-
+          // phase listeners run in registration order regardless of the
+          // capture flag); unconditionally zeroing state.painting here for
+          // every solitary touch pointerup would race ahead of
+          // stopPainting's own guard and skip commitLiveStroke().
+          if (wasGesturing) {
+            state.painting = false;
+            state.pointerId = null;
+            state.last = null;
+            commitViewPreview();
+          }
           updateUi();
         }
       }
 
-      window.__fractal = { state, previewZoomAt, commitViewPreview, resetView };
+      window.__fractal = {
+        state,
+        previewZoomAt,
+        commitViewPreview,
+        commitViewPreviewNow,
+        resetView,
+        renderWorldSync,
+        flushRenderJob
+      };
 
       /* ---------------------------------------------------------------
          Wiring
