@@ -368,7 +368,8 @@
       bottom: 18px;
       opacity: 0.72;
       display: grid;
-      grid-template-columns: minmax(124px, 180px) 56px;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
       gap: 10px;
       width: min(260px, calc(100vw - 36px));
       padding: 8px 10px;
@@ -381,6 +382,13 @@
       font-size: 12px;
       font-weight: 720;
       text-align: center;
+    }
+
+    .zoom-btn {
+      width: 30px;
+      height: 30px;
+      font-size: 16px;
+      line-height: 1;
     }
 
     .panel {
@@ -1776,8 +1784,9 @@
   </aside>
 
   <div class="zoom-cluster" aria-label="Zoom controls">
-    <input id="zoom" type="range" min="50" max="220" step="5" value="100" aria-label="Zoom">
-    <span class="zoom-value" id="zoomValue">100%</span>
+    <button class="tool zoom-btn" id="zoomOut" type="button" title="Zoom out (−)" aria-label="Zoom out">−</button>
+    <span class="zoom-value" id="zoomValue" title="Double-click to reset view">×1.00</span>
+    <button class="tool zoom-btn" id="zoomIn" type="button" title="Zoom in (+)" aria-label="Zoom in">+</button>
   </div>
 
   <div class="status" id="status" hidden role="status" aria-live="polite"></div>
@@ -1838,7 +1847,8 @@
         modes: Array.from(document.querySelectorAll(".mode")),
         targets: Array.from(document.querySelectorAll(".target")),
         targetSwitch: document.querySelector(".target-switch"),
-        zoom: document.getElementById("zoom"),
+        zoomIn: document.getElementById("zoomIn"),
+        zoomOut: document.getElementById("zoomOut"),
         zoomValue: document.getElementById("zoomValue"),
         symmetryGuide: document.getElementById("symmetryGuide"),
         size: document.getElementById("size"),
@@ -2212,6 +2222,7 @@
         symmetry: 6,
         mirror: true,
         zoom: 1,
+        view: { x: 0, y: 0, scale: 1 },
         painting: false,
         pointerId: null,
         last: null,
@@ -2355,8 +2366,10 @@
         ui.expansionValue.textContent = `${Math.round(state.expansion * 100)}%`;
         ui.symmetry.value = String(state.symmetry);
         ui.symmetryValue.textContent = String(state.symmetry);
-        ui.zoom.value = String(Math.round(state.zoom * 100));
-        ui.zoomValue.textContent = `${Math.round(state.zoom * 100)}%`;
+        const totalZoom = ((state.view && state.view.scale) || 1) * (state.zoom || 1);
+        ui.zoomValue.textContent = totalZoom >= 100
+          ? `×${Math.round(totalZoom)}`
+          : totalZoom >= 10 ? `×${totalZoom.toFixed(1)}` : `×${totalZoom.toFixed(2)}`;
         Array.from(ui.brushList.querySelectorAll(".brush")).forEach((button) => {
           button.setAttribute("aria-pressed", String(button.dataset.brush === state.brush));
         });
@@ -3858,8 +3871,8 @@
 
       {
         const CANVAS_CONFIG = {
-          desktopScale: 1.82,
-          mobileScale: 1.45,
+          desktopScale: 1,
+          mobileScale: 1,
           desktopMaxPixels: 14000000,
           mobileMaxPixels: 5200000,
           desktopDprCap: 2.15,
@@ -3923,8 +3936,6 @@
           ui.scaleFactor.min = String(SCALE_FACTOR_RANGE.min);
           ui.scaleFactor.max = String(SCALE_FACTOR_RANGE.max);
           ui.scaleFactor.step = "0.1";
-          ui.zoom.min = String(Math.ceil(100 / state.canvasScale));
-          ui.zoom.max = "240";
         }
 
         function cssCanvasSize() {
@@ -3946,14 +3957,7 @@
         }
 
         function clampPan() {
-          const cssWidth = canvasCssWidth() || cssCanvasSize().width;
-          const cssHeight = canvasCssHeight() || cssCanvasSize().height;
-          const renderedWidth = cssWidth * state.zoom;
-          const renderedHeight = cssHeight * state.zoom;
-          const maxX = Math.max(0, (renderedWidth - window.innerWidth) / 2);
-          const maxY = Math.max(0, (renderedHeight - window.innerHeight) / 2);
-          state.panX = clamp(Number(state.panX) || 0, -maxX, maxX);
-          state.panY = clamp(Number(state.panY) || 0, -maxY, maxY);
+          // Infinite canvas: pan is unbounded.
         }
 
         function expandedBrushLengthScale(length) {
@@ -4118,10 +4122,8 @@
           state.last = cursor;
         }
 
-        applyZoom = function patchedExpandedApplyZoom() {
-          syncCanvasConfig();
-          state.zoom = clamp(Number(state.zoom) || 1, 1 / (state.canvasScale || 1), 2.4);
-          clampPan();
+        applyZoom = function previewApplyZoom() {
+          state.zoom = Math.max(Number(state.zoom) || 1, 1e-9);
           canvas.style.left = `calc(50% + ${state.panX}px)`;
           canvas.style.top = `calc(50% + ${state.panY}px)`;
           canvas.style.transform = `translate(-50%, -50%) scale(${state.zoom})`;
@@ -4468,7 +4470,7 @@
           const metrics = gestureMetrics();
           if (!metrics) return;
           const ratio = metrics.distance / gestureStart.distance;
-          state.zoom = clamp(gestureStart.zoom * ratio, 1 / (state.canvasScale || 1), 2.4);
+          state.zoom = gestureStart.zoom * ratio;
           state.panX = gestureStart.panX + metrics.cx - gestureStart.cx;
           state.panY = gestureStart.panY + metrics.cy - gestureStart.cy;
           applyZoom();
@@ -4480,15 +4482,145 @@
           if (event.pointerType !== "touch") return;
           activeTouchPointers.delete(event.pointerId);
           if (activeTouchPointers.size < 2) {
+            const wasGesturing = state.gesturing;
             state.gesturing = false;
             gestureStart = null;
             state.painting = false;
             state.pointerId = null;
             state.last = null;
             hideSymmetryGuide();
+            if (wasGesturing) commitViewPreview();
             updateUi();
           }
         }
+
+        /* ---- Infinite view model ---------------------------------------- */
+        const REBUILD_DEBOUNCE_MS = 150;
+        const ZOOM_STEP_FACTOR = 1.25;
+
+        function viewCssWidth() { return state.width / (state.dpr || 1); }
+        function viewCssHeight() { return state.height / (state.dpr || 1); }
+
+        function screenToWorld(sx, sy) {
+          return [
+            state.view.x + (sx - viewCssWidth() / 2) / state.view.scale,
+            state.view.y + (sy - viewCssHeight() / 2) / state.view.scale
+          ];
+        }
+
+        function worldToScreen(wx, wy) {
+          return [
+            (wx - state.view.x) * state.view.scale + viewCssWidth() / 2,
+            (wy - state.view.y) * state.view.scale + viewCssHeight() / 2
+          ];
+        }
+
+        // v1 (soft): carry the raster across the view change by scaling it.
+        // Task 4 replaces this body with the crisp stroke-replay pipeline.
+        let rebuildView = function softRebuildView(zoom, panX, panY) {
+          const shot = makeSnapshot();
+          clearSurface();
+          ctx.globalCompositeOperation = "source-over";
+          ctx.setTransform(
+            zoom, 0, 0, zoom,
+            canvas.width / 2 - zoom * (canvas.width / 2) + panX * state.dpr,
+            canvas.height / 2 - zoom * (canvas.height / 2) + panY * state.dpr
+          );
+          ctx.drawImage(shot, 0, 0);
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+        };
+
+        function commitViewPreview() {
+          const zoom = Number(state.zoom) || 1;
+          const panX = state.panX || 0;
+          const panY = state.panY || 0;
+          if (zoom === 1 && panX === 0 && panY === 0) return;
+          const nextScale = state.view.scale * zoom;
+          state.view.x -= panX / nextScale;
+          state.view.y -= panY / nextScale;
+          state.view.scale = nextScale;
+          rebuildView(zoom, panX, panY);
+          state.zoom = 1;
+          state.panX = 0;
+          state.panY = 0;
+          applyZoom();
+        }
+
+        let previewCommitTimer = null;
+        function previewZoomAt(clientX, clientY, factor) {
+          if (state.painting) return;
+          const cx = window.innerWidth / 2;
+          const cy = window.innerHeight / 2;
+          state.panX = clientX - cx - (clientX - cx - state.panX) * factor;
+          state.panY = clientY - cy - (clientY - cy - state.panY) * factor;
+          state.zoom = (Number(state.zoom) || 1) * factor;
+          applyZoom();
+          if (previewCommitTimer) window.clearTimeout(previewCommitTimer);
+          previewCommitTimer = window.setTimeout(() => {
+            previewCommitTimer = null;
+            commitViewPreview();
+          }, REBUILD_DEBOUNCE_MS);
+        }
+
+        function resetView() {
+          state.view = { x: 0, y: 0, scale: 1 };
+          state.zoom = 1;
+          state.panX = 0;
+          state.panY = 0;
+          clearSurface(); // v1: raster can't be recovered; Task 4 replaces this line
+          applyZoom();
+        }
+
+        stage.addEventListener("wheel", (event) => {
+          event.preventDefault();
+          if (state.painting || state.gesturing) return;
+          const factor = Math.exp(-event.deltaY * (event.ctrlKey ? 0.014 : 0.0022));
+          previewZoomAt(event.clientX, event.clientY, factor);
+        }, { passive: false });
+
+        // Safari-only proprietary pinch events; harmless elsewhere.
+        let safariGestureScale = 1;
+        stage.addEventListener("gesturestart", (event) => {
+          event.preventDefault();
+          safariGestureScale = event.scale || 1;
+        });
+        stage.addEventListener("gesturechange", (event) => {
+          event.preventDefault();
+          if (state.painting || state.gesturing) return;
+          const scale = event.scale || 1;
+          previewZoomAt(
+            event.clientX ?? window.innerWidth / 2,
+            event.clientY ?? window.innerHeight / 2,
+            scale / (safariGestureScale || 1)
+          );
+          safariGestureScale = scale;
+        });
+        stage.addEventListener("gestureend", (event) => event.preventDefault());
+
+        stepZoom = function infiniteStepZoom(delta) {
+          previewZoomAt(window.innerWidth / 2, window.innerHeight / 2,
+            delta >= 0 ? ZOOM_STEP_FACTOR : 1 / ZOOM_STEP_FACTOR);
+        };
+
+        setZoom = function infiniteSetZoom(zoom) {
+          const target = Number(zoom) || 1;
+          if (target === 1) { resetView(); return; }
+          previewZoomAt(window.innerWidth / 2, window.innerHeight / 2,
+            target / (state.view.scale * (Number(state.zoom) || 1)));
+        };
+
+        ui.zoomIn.addEventListener("click", () => stepZoom(1));
+        ui.zoomOut.addEventListener("click", () => stepZoom(-1));
+        ui.zoomValue.addEventListener("dblclick", () => resetView());
+
+        window.__fractal = {
+          state,
+          screenToWorld,
+          worldToScreen,
+          previewZoomAt,
+          commitViewPreview,
+          resetView
+        };
 
         function previewSymmetryGuide(event) {
           if (state.painting || state.gesturing || event.pointerType === "touch") return;
@@ -4508,7 +4640,6 @@
         if (state.size < BRUSH_LENGTH_RANGE.default) {
           state.size = BRUSH_LENGTH_RANGE.default;
         }
-        state.zoom = clamp(state.zoom, 1 / (state.canvasScale || 1), 2.4);
       }
 
       /* ========================================================================
@@ -4710,8 +4841,6 @@
       ui.closeParamsPanel.addEventListener("click", () => togglePanel(ui.paramsPanel, ui.paramsToggle, false));
       ui.closeBrushPanel.addEventListener("click", () => togglePanel(ui.brushPanel, ui.brushToggle, false));
       ui.closeColorPanel.addEventListener("click", () => togglePanel(ui.colorPanel, ui.colorToggle, false));
-      ui.zoom.addEventListener("input", (event) => setZoom(Number(event.target.value) / 100));
-      ui.zoom.addEventListener("dblclick", () => setZoom(1));
       ui.randomize.addEventListener("click", randomize);
       ui.help.addEventListener("click", openTutorial);
       ui.tutorialBack.addEventListener("click", previousTutorialStep);
