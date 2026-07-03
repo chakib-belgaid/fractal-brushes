@@ -85,6 +85,9 @@
       touch-action: none;
     }
 
+    body.hand-mode #stage { cursor: grab; }
+    body.panning #stage { cursor: grabbing; }
+
     #art {
       position: absolute;
       left: 50%;
@@ -1671,6 +1674,9 @@
       <button class="tool" id="redo" type="button" title="Redo" aria-label="Redo" data-mobile-label="Redo" disabled>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 7h5v5"/><path d="M19 12a8 8 0 1 1-2.35-5.65L20 9.7"/></svg>
       </button>
+      <button class="tool" id="handTool" type="button" title="Hand — pan the view (H)" aria-label="Hand tool" aria-pressed="false" data-mobile-label="Pan">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12V6.5a1.5 1.5 0 0 1 3 0V11"/><path d="M11 11V5a1.5 1.5 0 0 1 3 0v6"/><path d="M14 11V6.5a1.5 1.5 0 0 1 3 0V13"/><path d="M17 12.5a1.5 1.5 0 0 1 3 1c0 3-1.5 4.5-2.5 6-1 1.4-2.6 2.5-5 2.5-3.2 0-4.6-1.6-6.4-4.8L4.4 14a1.4 1.4 0 0 1 2.4-1.4L8 14.5"/></svg>
+      </button>
       <button class="tool" id="exportToggle" type="button" title="Export" aria-label="Export" data-mobile-label="Export" aria-expanded="false" aria-controls="exportMenu">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11"/><path d="m7 9 5 5 5-5"/><path d="M5 19h14"/></svg>
       </button>
@@ -1826,6 +1832,7 @@
       const ui = {
         undo: document.getElementById("undo"),
         redo: document.getElementById("redo"),
+        handTool: document.getElementById("handTool"),
         exportToggle: document.getElementById("exportToggle"),
         exportMenu: document.getElementById("exportMenu"),
         exportOptions: Array.from(document.querySelectorAll("[data-export]")),
@@ -2223,6 +2230,9 @@
         mirror: true,
         zoom: 1,
         view: { x: 0, y: 0, scale: 1 },
+        tool: "brush",
+        spaceHeld: false,
+        panning: null,
         painting: false,
         pointerId: null,
         last: null,
@@ -4634,6 +4644,83 @@
           commitViewPreviewNow,
           resetView
         };
+
+        /* ---- Hand tool & drag panning ----------------------------------- */
+        function setTool(tool) {
+          state.tool = tool === "hand" ? "hand" : "brush";
+          ui.handTool.setAttribute("aria-pressed", String(state.tool === "hand"));
+          document.body.classList.toggle("hand-mode", state.tool === "hand" || state.spaceHeld);
+        }
+
+        function panModeActive(event) {
+          if (event.button === 1) return true;
+          if (event.pointerType === "touch") return state.tool === "hand";
+          return (state.tool === "hand" || state.spaceHeld) && (event.button === 0 || event.button === undefined);
+        }
+
+        function beginPan(event) {
+          if (state.painting || state.gesturing || state.panning) return;
+          if (!panModeActive(event)) return;
+          state.panning = {
+            pointerId: event.pointerId ?? "mouse",
+            startX: event.clientX,
+            startY: event.clientY,
+            panX: state.panX,
+            panY: state.panY
+          };
+          document.body.classList.add("panning");
+          if (event.pointerId !== undefined && stage.setPointerCapture) {
+            try { stage.setPointerCapture(event.pointerId); } catch (_) {}
+          }
+          event.preventDefault();
+          event.stopImmediatePropagation();
+        }
+
+        function movePan(event) {
+          if (!state.panning || (event.pointerId ?? "mouse") !== state.panning.pointerId) return;
+          state.panX = state.panning.panX + (event.clientX - state.panning.startX);
+          state.panY = state.panning.panY + (event.clientY - state.panning.startY);
+          applyZoom();
+          event.preventDefault();
+          event.stopImmediatePropagation();
+        }
+
+        function endPan(event) {
+          if (!state.panning || (event.pointerId ?? "mouse") !== state.panning.pointerId) return;
+          state.panning = null;
+          document.body.classList.remove("panning");
+          commitViewPreview();
+        }
+
+        stage.addEventListener("pointerdown", beginPan, { capture: true });
+        stage.addEventListener("pointermove", movePan, { capture: true });
+        window.addEventListener("pointerup", endPan, { capture: true });
+        stage.addEventListener("pointercancel", endPan, { capture: true });
+
+        ui.handTool.addEventListener("click", () => setTool(state.tool === "hand" ? "brush" : "hand"));
+
+        window.addEventListener("keydown", (event) => {
+          const tag = document.activeElement && document.activeElement.tagName;
+          if (tag === "INPUT" || tag === "TEXTAREA" || !ui.tutorial.hidden) return;
+          if (event.key === " " && !event.repeat) {
+            state.spaceHeld = true;
+            document.body.classList.add("hand-mode");
+            event.preventDefault();
+          } else if (event.key.toLowerCase() === "h") {
+            setTool(state.tool === "hand" ? "brush" : "hand");
+            event.preventDefault();
+          } else if (event.key === "Escape" && state.tool === "hand") {
+            setTool("brush");
+          }
+        });
+        window.addEventListener("keyup", (event) => {
+          if (event.key === " ") {
+            state.spaceHeld = false;
+            document.body.classList.toggle("hand-mode", state.tool === "hand");
+          }
+        });
+
+        window.__fractal.setTool = setTool;
 
         function previewSymmetryGuide(event) {
           if (state.painting || state.gesturing || event.pointerType === "touch") return;

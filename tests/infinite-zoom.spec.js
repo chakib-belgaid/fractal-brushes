@@ -99,3 +99,44 @@ test("zoom buttons step the view scale", async ({ page }) => {
   const scale = await page.evaluate(() => window.__fractal.state.view.scale);
   expect(scale).toBeCloseTo(1.25, 3);
 });
+
+test("hand tool pans without painting", async ({ page }) => {
+  await setupPage(page);
+  await page.locator("#handTool").click();
+  await expect(page.locator("#handTool")).toHaveAttribute("aria-pressed", "true");
+  const before = await page.evaluate(() => ({ ...window.__fractal.state.view }));
+  const stage = page.locator("#stage");
+  await stage.dispatchEvent("pointerdown", { clientX: 400, clientY: 300, pointerId: 7, pointerType: "mouse", button: 0, buttons: 1, bubbles: true });
+  await stage.dispatchEvent("pointermove", { clientX: 520, clientY: 340, pointerId: 7, pointerType: "mouse", button: 0, buttons: 1, bubbles: true });
+  await page.evaluate(() => {
+    window.dispatchEvent(new PointerEvent("pointerup", { clientX: 520, clientY: 340, pointerId: 7, pointerType: "mouse", bubbles: true }));
+  });
+  const after = await page.evaluate(() => ({
+    view: { ...window.__fractal.state.view },
+    painting: window.__fractal.state.painting
+  }));
+  expect(after.painting).toBe(false);
+  expect(after.view.x).toBeCloseTo(before.x - 120, 3);
+  expect(after.view.y).toBeCloseTo(before.y - 40, 3);
+});
+
+test("H toggles hand tool, Escape returns to brush, Space pans while held", async ({ page }) => {
+  await setupPage(page);
+  await page.keyboard.press("h");
+  await expect(page.locator("#handTool")).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#handTool")).toHaveAttribute("aria-pressed", "false");
+
+  await page.keyboard.down("Space");
+  const stage = page.locator("#stage");
+  await stage.dispatchEvent("pointerdown", { clientX: 400, clientY: 300, pointerId: 9, pointerType: "mouse", button: 0, buttons: 1, bubbles: true });
+  await stage.dispatchEvent("pointermove", { clientX: 350, clientY: 300, pointerId: 9, pointerType: "mouse", button: 0, buttons: 1, bubbles: true });
+  await page.evaluate(() => {
+    window.dispatchEvent(new PointerEvent("pointerup", { clientX: 350, clientY: 300, pointerId: 9, pointerType: "mouse", bubbles: true }));
+  });
+  await page.keyboard.up("Space");
+  const view = await page.evaluate(() => window.__fractal.state.view);
+  expect(view.x).toBeCloseTo(50, 3);
+  const painting = await page.evaluate(() => window.__fractal.state.painting);
+  expect(painting).toBe(false);
+});
