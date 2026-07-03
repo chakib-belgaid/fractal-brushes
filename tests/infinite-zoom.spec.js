@@ -353,6 +353,39 @@ test("strokes survive zoom crisply: draw, zoom in, draw, zoom out", async ({ pag
   expect(counts.lit).toBeGreaterThan(500); // both strokes visible
 });
 
+test("starting a stroke flushes a pending chunked rebuild so the live stroke never paints under the opaque preview overlay", async ({ page }) => {
+  const errors = await setupPage(page);
+  await drawStroke(page, 360);
+  await page.waitForTimeout(400); // let the first stroke's commit/rebuild fully settle
+
+  const result = await page.evaluate(async () => {
+    const stage = document.getElementById("stage");
+    // Kick off a wheel-zoom preview (starts the 150ms debounced commit timer),
+    // then immediately start a stroke within that debounce window.
+    // recordingStartPainting -> commitViewPreviewNow() synchronously commits
+    // the preview, which schedules a NEW async chunked rebuild (opaque
+    // #viewPreview overlay + queued pumpRender). Sampled right after
+    // pointerdown returns, the overlay must already be flushed away.
+    window.__fractal.previewZoomAt(480, 360, 1.5);
+
+    const opts = { pointerId: 1, pointerType: "mouse", button: 0, buttons: 1, bubbles: true, cancelable: true };
+    stage.dispatchEvent(new PointerEvent("pointerdown", { ...opts, clientX: 480, clientY: 360 }));
+
+    const overlayDisplay = document.getElementById("viewPreview").style.display;
+
+    stage.dispatchEvent(new PointerEvent("pointermove", { ...opts, clientX: 500, clientY: 375 }));
+    stage.dispatchEvent(new PointerEvent("pointermove", { ...opts, clientX: 520, clientY: 390 }));
+    stage.dispatchEvent(new PointerEvent("pointerup", { ...opts, buttons: 0, clientX: 520, clientY: 390 }));
+
+    return { overlayDisplay };
+  });
+  await page.waitForTimeout(400);
+  expect(result.overlayDisplay).toBe("none");
+  const logLen = await page.evaluate(() => window.__fractal.state.strokeLog.length);
+  expect(logLen).toBe(2);
+  expect(errors).toEqual([]);
+});
+
 test("world render is deterministic: two replays produce identical pixels", async ({ page }) => {
   await setupPage(page);
   await drawStroke(page, 360);

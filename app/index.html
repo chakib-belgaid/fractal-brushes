@@ -4595,6 +4595,11 @@
           }
           if (state.zoom !== 1 || state.panX !== 0 || state.panY !== 0) {
             commitViewPreview();
+            // "Commit now" callers (e.g. starting a stroke) need the chunked
+            // rebuild commitViewPreview() may have just scheduled to be fully
+            // settled synchronously too, or the opaque preview overlay can be
+            // left showing stale pixels while the live stroke paints beneath it.
+            flushRenderJob();
           }
         }
 
@@ -5051,62 +5056,76 @@
           };
           const savedCustom = stroke.custom
             ? JSON.parse(JSON.stringify(brushProfiles.custom)) : null;
-          if (stroke.custom) Object.assign(brushProfiles.custom, stroke.custom);
 
-          state.brush = stroke.brush;
-          state.hue = stroke.hue;
-          state.hue2 = stroke.hue2;
-          state.blend = stroke.blend;
-          state.size = stroke.size;
-          state.scaleFactor = stroke.scaleFactor;
-          state.expansion = stroke.expansion;
-          state.symmetry = stroke.symmetry;
-          state.mirror = stroke.mirror;
-          state.dpr = stroke.dpr;
-          state.width = stroke.viewW;
-          state.height = stroke.viewH;
-          state.cx = stroke.viewW / 2;
-          state.cy = stroke.viewH / 2;
-          state.tendrils = [];
-          state.strokeDistance = 0;
-          state.liveStroke = null;
-
-          ctx.setTransform(
-            k, 0, 0, k,
-            sx * saved.dpr - k * (stroke.viewW / 2),
-            sy * saved.dpr - k * (stroke.viewH / 2)
-          );
-
-          const replayContext = { rng: mulberry32(stroke.seed) };
-          let segIndex = 0;
-          let stepIndex = 0;
-          let guard = 0;
-          replayingStroke = true;
+          // Everything below mutates shared, page-lifetime state (state
+          // fields, brushProfiles.custom, ctx transform, Math.random). A
+          // throw mid-replay must not leave any of that corrupted --
+          // renderWorldSync/pumpRender loop over strokes, so one bad stroke
+          // would otherwise wreck all subsequent rendering. The finally
+          // below is the single, unconditional restore path.
           try {
-            while ((segIndex < stroke.segments.length || state.tendrils.length) && guard < REPLAY_STEP_GUARD) {
-              while (segIndex < stroke.segments.length && stroke.segments[segIndex].step <= stepIndex) {
-                const seg = stroke.segments[segIndex];
-                segIndex += 1;
-                Math.random = replayContext.rng;
-                if (seg.fan) {
-                  recordedSpawnFan(seg.x, seg.y, seg.dx, seg.dy);
-                } else {
-                  recordedSpawnAlong(seg.x0, seg.y0, seg.x1, seg.y1);
+            if (stroke.custom) Object.assign(brushProfiles.custom, stroke.custom);
+
+            state.brush = stroke.brush;
+            state.hue = stroke.hue;
+            state.hue2 = stroke.hue2;
+            state.blend = stroke.blend;
+            state.size = stroke.size;
+            state.scaleFactor = stroke.scaleFactor;
+            state.expansion = stroke.expansion;
+            state.symmetry = stroke.symmetry;
+            state.mirror = stroke.mirror;
+            state.dpr = stroke.dpr;
+            state.width = stroke.viewW;
+            state.height = stroke.viewH;
+            state.cx = stroke.viewW / 2;
+            state.cy = stroke.viewH / 2;
+            state.tendrils = [];
+            state.strokeDistance = 0;
+            state.liveStroke = null;
+
+            ctx.setTransform(
+              k, 0, 0, k,
+              sx * saved.dpr - k * (stroke.viewW / 2),
+              sy * saved.dpr - k * (stroke.viewH / 2)
+            );
+
+            const replayContext = { rng: mulberry32(stroke.seed) };
+            let segIndex = 0;
+            let stepIndex = 0;
+            let guard = 0;
+            replayingStroke = true;
+            try {
+              while ((segIndex < stroke.segments.length || state.tendrils.length) && guard < REPLAY_STEP_GUARD) {
+                while (segIndex < stroke.segments.length && stroke.segments[segIndex].step <= stepIndex) {
+                  const seg = stroke.segments[segIndex];
+                  segIndex += 1;
+                  Math.random = replayContext.rng;
+                  if (seg.fan) {
+                    recordedSpawnFan(seg.x, seg.y, seg.dx, seg.dy);
+                  } else {
+                    recordedSpawnAlong(seg.x0, seg.y0, seg.x1, seg.y1);
+                  }
+                  Math.random = nativeRandom;
+                  tagNewTendrils(replayContext);
                 }
-                Math.random = nativeRandom;
-                tagNewTendrils(replayContext);
+                stepTendrils(state.tendrils);
+                stepIndex += 1;
+                guard += 1;
               }
-              stepTendrils(state.tendrils);
-              stepIndex += 1;
-              guard += 1;
+            } finally {
+              replayingStroke = false;
             }
           } finally {
+            // Unconditional backstop: guarantees these are restored even if
+            // the simulation loop above threw before reaching its own
+            // (now-redundant on the happy path) restore code.
+            Math.random = nativeRandom;
             replayingStroke = false;
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            if (savedCustom) Object.assign(brushProfiles.custom, savedCustom);
+            Object.assign(state, saved);
           }
-
-          ctx.setTransform(1, 0, 0, 1, 0, 0);
-          if (savedCustom) Object.assign(brushProfiles.custom, savedCustom);
-          Object.assign(state, saved);
         }
 
         let renderJob = null;
