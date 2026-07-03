@@ -320,3 +320,50 @@ test("stroke started during zoom debounce records post-commit view", async ({ pa
   expect(log[0].symCenter.y).toBeCloseTo(0, 3);
   expect(errors).toEqual([]);
 });
+
+test("strokes survive zoom crisply: draw, zoom in, draw, zoom out", async ({ page }) => {
+  await setupPage(page);
+  await drawStroke(page, 360);
+  await page.waitForTimeout(600);
+  // zoom in 8x about the stroke's left end
+  await page.evaluate(() => {
+    window.__fractal.previewZoomAt(480, 360, 8);
+    window.__fractal.commitViewPreview();
+    window.__fractal.flushRenderJob();
+  });
+  await drawStroke(page, 250);
+  await page.waitForTimeout(600);
+  // zoom back out
+  await page.evaluate(() => {
+    window.__fractal.previewZoomAt(480, 360, 1 / 8);
+    window.__fractal.commitViewPreview();
+    window.__fractal.flushRenderJob();
+  });
+  const counts = await page.evaluate(() => {
+    const canvas = document.getElementById("art");
+    const ctx2 = canvas.getContext("2d");
+    const { data } = ctx2.getImageData(0, 0, canvas.width, canvas.height);
+    let lit = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i] + data[i + 1] + data[i + 2] > 60) lit += 1;
+    }
+    return { lit, strokes: window.__fractal.state.strokeLog.length };
+  });
+  expect(counts.strokes).toBe(2);
+  expect(counts.lit).toBeGreaterThan(500); // both strokes visible
+});
+
+test("world render is deterministic: two replays produce identical pixels", async ({ page }) => {
+  await setupPage(page);
+  await drawStroke(page, 360);
+  await page.waitForTimeout(600);
+  const [first, second] = await page.evaluate(() => {
+    const canvas = document.getElementById("art");
+    window.__fractal.renderWorldSync();
+    const a = canvas.toDataURL();
+    window.__fractal.renderWorldSync();
+    const b = canvas.toDataURL();
+    return [a, b];
+  });
+  expect(first).toBe(second);
+});

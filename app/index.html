@@ -4185,7 +4185,9 @@
           canvas.style.width = `${cssSize.width}px`;
           canvas.style.height = `${cssSize.height}px`;
 
-          if (previous) {
+          if (state.strokeLog && state.strokeLog.length) {
+            renderWorldSync();
+          } else if (previous) {
             restoreSnapshot(previous);
           } else {
             clearSurface();
@@ -4452,6 +4454,7 @@
         }
 
         function beginGestureIfNeeded(event) {
+          flushRenderJob();
           if (event.pointerType !== "touch") return;
           activeTouchPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
           if (activeTouchPointers.size < 2) return;
@@ -4600,11 +4603,13 @@
           state.zoom = 1;
           state.panX = 0;
           state.panY = 0;
-          clearSurface(); // v1: raster can't be recovered; Task 4 replaces this line
+          flushRenderJob();
+          renderWorldSync();
           applyZoom();
         }
 
         stage.addEventListener("wheel", (event) => {
+          flushRenderJob();
           event.preventDefault();
           if (state.painting || state.gesturing) return;
           const factor = Math.exp(-event.deltaY * (event.ctrlKey ? 0.014 : 0.0022));
@@ -4670,6 +4675,7 @@
         }
 
         function beginPan(event) {
+          flushRenderJob();
           if (state.painting || state.gesturing || state.panning) return;
           if (!panModeActive(event)) return;
           state.panning = {
@@ -4798,6 +4804,7 @@
 
         const recordedStartPainting = startPainting;
         startPainting = function recordingStartPainting(event) {
+          flushRenderJob();
           // Commit any pending zoom preview first, so stroke record snapshots the post-commit view.
           commitViewPreviewNow();
           const wasPainting = state.painting;
@@ -4843,9 +4850,25 @@
           return result;
         };
 
+        // Set by replayStroke while it is synchronously re-simulating a
+        // stroke. patchedExpandedSpawnAlong (captured below as
+        // recordedSpawnAlong) internally calls the mutable `spawnFan`
+        // binding, which resolves to recordingSpawnFan below -- without this
+        // guard that nested call would see state.liveStroke === null (nulled
+        // during replay) and misfire the tagOrphanTendrils() path, tagging
+        // replayed tendrils with nativeRandom instead of the seeded replay
+        // stream and making replay non-deterministic. When replaying, defer
+        // entirely to the raw recorded* function; replayStroke's own loop
+        // calls tagNewTendrils(replayContext) once per top-level segment.
+        let replayingStroke = false;
+
         let insideSpawnAlong = false;
         const recordedSpawnAlong = spawnAlong;
         spawnAlong = function recordingSpawnAlong(x0, y0, x1, y1) {
+          if (replayingStroke) {
+            recordedSpawnAlong(x0, y0, x1, y1);
+            return;
+          }
           const stroke = state.liveStroke;
           if (!stroke) {
             recordedSpawnAlong(x0, y0, x1, y1);
@@ -4866,6 +4889,10 @@
 
         const recordedSpawnFan = spawnFan;
         spawnFan = function recordingSpawnFan(x, y, dx, dy) {
+          if (replayingStroke) {
+            recordedSpawnFan(x, y, dx, dy);
+            return;
+          }
           const stroke = state.liveStroke;
           if (!stroke || insideSpawnAlong) {
             recordedSpawnFan(x, y, dx, dy);
@@ -4970,6 +4997,185 @@
 
         window.__fractal.mulberry32 = mulberry32;
         window.__fractal.stepTendrils = stepTendrils;
+
+        /* ---- Replay & crisp rebuild -------------------------------------- */
+        const RENDER_BUDGET_MS = 8;
+        const REPLAY_STEP_GUARD = 20000;
+
+        const previewCanvas = document.createElement("canvas");
+        previewCanvas.id = "viewPreview";
+        previewCanvas.setAttribute("aria-hidden", "true");
+        previewCanvas.style.cssText =
+          "position:absolute;inset:0;width:100%;height:100%;pointer-events:none;display:none;";
+        stage.appendChild(previewCanvas);
+
+        function strokeWorldRadius(stroke) {
+          return stroke.maxR / (stroke.dpr * stroke.drawScale);
+        }
+
+        function visibleStrokes() {
+          const halfW = viewCssWidth() / 2 / state.view.scale;
+          const halfH = viewCssHeight() / 2 / state.view.scale;
+          return state.strokeLog.filter((stroke) => {
+            const r = strokeWorldRadius(stroke);
+            return stroke.symCenter.x + r > state.view.x - halfW &&
+              stroke.symCenter.x - r < state.view.x + halfW &&
+              stroke.symCenter.y + r > state.view.y - halfH &&
+              stroke.symCenter.y - r < state.view.y + halfH;
+          });
+        }
+
+        function drawStrokeDot(stroke, sx, sy) {
+          ctx.globalCompositeOperation = "lighter";
+          ctx.fillStyle = `hsla(${Math.round(normalizedHue(stroke.hue))}, 90%, 60%, 0.5)`;
+          const px = Math.max(1, Math.round(state.dpr));
+          ctx.fillRect(Math.round(sx * state.dpr), Math.round(sy * state.dpr), px, px);
+        }
+
+        function replayStroke(stroke) {
+          // k converts stroke-local device px to current device px.
+          const k = (state.view.scale / stroke.drawScale) * (state.dpr / stroke.dpr);
+          const [sx, sy] = worldToScreen(stroke.symCenter.x, stroke.symCenter.y);
+          if (stroke.maxR * k * 2 < 1.5) {
+            drawStrokeDot(stroke, sx, sy);
+            return;
+          }
+          const saved = {
+            brush: state.brush, hue: state.hue, hue2: state.hue2, blend: state.blend,
+            size: state.size, scaleFactor: state.scaleFactor, expansion: state.expansion,
+            symmetry: state.symmetry, mirror: state.mirror,
+            dpr: state.dpr, width: state.width, height: state.height,
+            cx: state.cx, cy: state.cy,
+            tendrils: state.tendrils, strokeDistance: state.strokeDistance,
+            liveStroke: state.liveStroke
+          };
+          const savedCustom = stroke.custom
+            ? JSON.parse(JSON.stringify(brushProfiles.custom)) : null;
+          if (stroke.custom) Object.assign(brushProfiles.custom, stroke.custom);
+
+          state.brush = stroke.brush;
+          state.hue = stroke.hue;
+          state.hue2 = stroke.hue2;
+          state.blend = stroke.blend;
+          state.size = stroke.size;
+          state.scaleFactor = stroke.scaleFactor;
+          state.expansion = stroke.expansion;
+          state.symmetry = stroke.symmetry;
+          state.mirror = stroke.mirror;
+          state.dpr = stroke.dpr;
+          state.width = stroke.viewW;
+          state.height = stroke.viewH;
+          state.cx = stroke.viewW / 2;
+          state.cy = stroke.viewH / 2;
+          state.tendrils = [];
+          state.strokeDistance = 0;
+          state.liveStroke = null;
+
+          ctx.setTransform(
+            k, 0, 0, k,
+            sx * saved.dpr - k * (stroke.viewW / 2),
+            sy * saved.dpr - k * (stroke.viewH / 2)
+          );
+
+          const replayContext = { rng: mulberry32(stroke.seed) };
+          let segIndex = 0;
+          let stepIndex = 0;
+          let guard = 0;
+          replayingStroke = true;
+          try {
+            while ((segIndex < stroke.segments.length || state.tendrils.length) && guard < REPLAY_STEP_GUARD) {
+              while (segIndex < stroke.segments.length && stroke.segments[segIndex].step <= stepIndex) {
+                const seg = stroke.segments[segIndex];
+                segIndex += 1;
+                Math.random = replayContext.rng;
+                if (seg.fan) {
+                  recordedSpawnFan(seg.x, seg.y, seg.dx, seg.dy);
+                } else {
+                  recordedSpawnAlong(seg.x0, seg.y0, seg.x1, seg.y1);
+                }
+                Math.random = nativeRandom;
+                tagNewTendrils(replayContext);
+              }
+              stepTendrils(state.tendrils);
+              stepIndex += 1;
+              guard += 1;
+            }
+          } finally {
+            replayingStroke = false;
+          }
+
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          if (savedCustom) Object.assign(brushProfiles.custom, savedCustom);
+          Object.assign(state, saved);
+        }
+
+        let renderJob = null;
+
+        function renderWorldSync() {
+          renderJob = null;
+          previewCanvas.style.display = "none";
+          state.tendrils.length = 0;
+          clearSurface();
+          for (const stroke of visibleStrokes()) replayStroke(stroke);
+        }
+
+        function pumpRender() {
+          if (!renderJob) return;
+          const start = performance.now();
+          while (renderJob.index < renderJob.strokes.length &&
+                 performance.now() - start < RENDER_BUDGET_MS) {
+            replayStroke(renderJob.strokes[renderJob.index]);
+            renderJob.index += 1;
+          }
+          if (renderJob.index >= renderJob.strokes.length) {
+            renderJob = null;
+            previewCanvas.style.display = "none";
+          } else {
+            requestAnimationFrame(pumpRender);
+          }
+        }
+
+        function flushRenderJob() {
+          if (!renderJob) return;
+          while (renderJob.index < renderJob.strokes.length) {
+            replayStroke(renderJob.strokes[renderJob.index]);
+            renderJob.index += 1;
+          }
+          renderJob = null;
+          previewCanvas.style.display = "none";
+        }
+
+        function scheduleRebuild(zoom, panX, panY) {
+          // Soft preview: current pixels, transformed, on the overlay.
+          previewCanvas.width = canvas.width;
+          previewCanvas.height = canvas.height;
+          const pctx = previewCanvas.getContext("2d");
+          pctx.fillStyle = "#000";
+          pctx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
+          pctx.setTransform(
+            zoom, 0, 0, zoom,
+            canvas.width / 2 - zoom * (canvas.width / 2) + panX * state.dpr,
+            canvas.height / 2 - zoom * (canvas.height / 2) + panY * state.dpr
+          );
+          pctx.drawImage(canvas, 0, 0);
+          pctx.setTransform(1, 0, 0, 1, 0, 0);
+          previewCanvas.style.display = "block";
+
+          // Live tendrils are already recorded; kill them so they don't paint
+          // at stale positions while the crisp render builds underneath.
+          state.tendrils.length = 0;
+          clearSurface();
+          renderJob = { strokes: visibleStrokes(), index: 0 };
+          requestAnimationFrame(pumpRender);
+        }
+
+        rebuildView = function crispRebuildView(zoom, panX, panY) {
+          scheduleRebuild(zoom, panX, panY);
+        };
+
+        window.__fractal.renderWorldSync = renderWorldSync;
+        window.__fractal.flushRenderJob = flushRenderJob;
+        window.__fractal.replayStroke = replayStroke;
 
         installMobileCssPatch();
         syncCanvasConfig();
