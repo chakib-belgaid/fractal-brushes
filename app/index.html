@@ -4460,6 +4460,8 @@
           state.last = null;
           document.body.classList.remove("is-painting");
           clearHoldBloom();
+          state.panning = null;
+          document.body.classList.remove("panning");
           hideSymmetryGuide();
           gestureStart = {
             cx: metrics.cx,
@@ -4542,7 +4544,11 @@
         };
 
         function commitViewPreview() {
-          if (state.painting) return;
+          if (previewCommitTimer) {
+            window.clearTimeout(previewCommitTimer);
+            previewCommitTimer = null;
+          }
+          if (state.painting || state.panning || state.gesturing) return;
           const zoom = Number(state.zoom) || 1;
           const panX = state.panX || 0;
           const panY = state.panY || 0;
@@ -4692,11 +4698,6 @@
           commitViewPreview();
         }
 
-        stage.addEventListener("pointerdown", beginPan, { capture: true });
-        stage.addEventListener("pointermove", movePan, { capture: true });
-        window.addEventListener("pointerup", endPan, { capture: true });
-        stage.addEventListener("pointercancel", endPan, { capture: true });
-
         ui.handTool.addEventListener("click", () => setTool(state.tool === "hand" ? "brush" : "hand"));
 
         window.addEventListener("keydown", (event) => {
@@ -4734,6 +4735,16 @@
         stage.addEventListener("pointercancel", endGesturePointer, { capture: true });
         stage.addEventListener("pointerleave", endGesturePointer, { capture: true });
         stage.addEventListener("pointerleave", hideSymmetryGuide);
+
+        // Pan listeners must register after the gesture listeners above so a
+        // second touch can still be tracked into a pinch even when the hand
+        // tool has claimed the first pointer (see beginPan's
+        // stopImmediatePropagation, which only blocks later-registered
+        // capture listeners on this node).
+        stage.addEventListener("pointerdown", beginPan, { capture: true });
+        stage.addEventListener("pointermove", movePan, { capture: true });
+        window.addEventListener("pointerup", endPan, { capture: true });
+        stage.addEventListener("pointercancel", endPan, { capture: true });
 
         installMobileCssPatch();
         syncCanvasConfig();

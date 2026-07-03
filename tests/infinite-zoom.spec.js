@@ -120,6 +120,53 @@ test("hand tool pans without painting", async ({ page }) => {
   expect(after.view.y).toBeCloseTo(before.y - 40, 3);
 });
 
+test("pending zoom commit does not corrupt a hand pan", async ({ page }) => {
+  const errors = await setupPage(page);
+  await page.evaluate(() => window.__fractal.setTool("hand"));
+  const view = await page.evaluate(async () => {
+    const stage = document.getElementById("stage");
+    window.__fractal.previewZoomAt(480, 360, 2);
+
+    const opts = { pointerId: 1, pointerType: "mouse", button: 0, buttons: 1, bubbles: true, cancelable: true };
+    stage.dispatchEvent(new PointerEvent("pointerdown", { ...opts, clientX: 480, clientY: 360 }));
+    stage.dispatchEvent(new PointerEvent("pointermove", { ...opts, clientX: 530, clientY: 390 }));
+    await new Promise((resolve) => setTimeout(resolve, 400)); // past the 150ms debounce
+    stage.dispatchEvent(new PointerEvent("pointermove", { ...opts, clientX: 530, clientY: 390 }));
+    stage.dispatchEvent(new PointerEvent("pointerup", { ...opts, buttons: 0, clientX: 530, clientY: 390 }));
+    return { ...window.__fractal.state.view };
+  });
+  expect(view.x).toBeCloseTo(-25, 3);
+  expect(view.y).toBeCloseTo(-15, 3);
+  expect(view.scale).toBeCloseTo(2, 5);
+  expect(errors).toEqual([]);
+});
+
+test("touch pinch zooms while hand tool active", async ({ page }) => {
+  const errors = await setupPage(page);
+  await page.evaluate(() => window.__fractal.setTool("hand"));
+  const result = await page.evaluate(async () => {
+    const stage = document.getElementById("stage");
+    const touchEvent = (type, id, x, y) => new PointerEvent(type, {
+      pointerId: id, pointerType: "touch", clientX: x, clientY: y,
+      button: 0, buttons: 1, bubbles: true, cancelable: true
+    });
+    stage.dispatchEvent(touchEvent("pointerdown", 11, 400, 360));
+    stage.dispatchEvent(touchEvent("pointerdown", 12, 560, 360));
+    stage.dispatchEvent(touchEvent("pointermove", 11, 320, 360));
+    stage.dispatchEvent(touchEvent("pointermove", 12, 640, 360));
+    stage.dispatchEvent(touchEvent("pointerup", 11, 320, 360));
+    stage.dispatchEvent(touchEvent("pointerup", 12, 640, 360));
+    await new Promise((resolve) => setTimeout(resolve, 400)); // past the 150ms debounce
+    return {
+      scale: window.__fractal.state.view.scale,
+      painting: window.__fractal.state.painting
+    };
+  });
+  expect(result.scale).toBeCloseTo(2, 3);
+  expect(result.painting).toBe(false);
+  expect(errors).toEqual([]);
+});
+
 test("H toggles hand tool, Escape returns to brush, Space pans while held", async ({ page }) => {
   await setupPage(page);
   await page.keyboard.press("h");
