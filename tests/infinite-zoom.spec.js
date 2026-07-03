@@ -68,6 +68,30 @@ test("zoom is unbounded far beyond the old 240% clamp and resets", async ({ page
   expect(scale).toBe(1);
 });
 
+test("starting a stroke inside the debounce window commits the pending zoom instead of wiping mid-stroke", async ({ page }) => {
+  const errors = await setupPage(page);
+  const result = await page.evaluate(async () => {
+    const stage = document.getElementById("stage");
+    window.__fractal.previewZoomAt(480, 360, 2);
+
+    const opts = { pointerId: 1, pointerType: "mouse", button: 0, buttons: 1, bubbles: true, cancelable: true };
+    stage.dispatchEvent(new PointerEvent("pointerdown", { ...opts, clientX: 480, clientY: 360 }));
+    const afterDown = {
+      zoom: window.__fractal.state.zoom,
+      panX: window.__fractal.state.panX,
+      panY: window.__fractal.state.panY
+    };
+    stage.dispatchEvent(new PointerEvent("pointermove", { ...opts, clientX: 500, clientY: 375 }));
+    stage.dispatchEvent(new PointerEvent("pointermove", { ...opts, clientX: 520, clientY: 390 }));
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    stage.dispatchEvent(new PointerEvent("pointerup", { ...opts, buttons: 0, clientX: 520, clientY: 390 }));
+    return { afterDown, viewScale: window.__fractal.state.view.scale };
+  });
+  expect(result.afterDown).toEqual({ zoom: 1, panX: 0, panY: 0 });
+  expect(result.viewScale).toBeCloseTo(2, 5);
+  expect(errors).toEqual([]);
+});
+
 test("zoom buttons step the view scale", async ({ page }) => {
   await setupPage(page);
   await page.locator("#zoomIn").click();
