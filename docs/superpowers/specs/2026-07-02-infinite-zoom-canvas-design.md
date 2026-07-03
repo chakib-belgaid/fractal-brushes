@@ -100,7 +100,7 @@ returns to origin at ×1.
 **Hand tool:** a toolbar toggle (hand icon) switches the pointer from drawing
 to navigation. While active, the cursor shows `grab`/`grabbing`, click-drag
 pans the view, and drawing is suspended. Keyboard shortcut `H` toggles it,
-`B`/`Esc` returns to the brush; holding Space temporarily activates it
+`Esc` returns to the brush (`B` stays blend-toggle); holding Space temporarily activates it
 (pan-while-held, release returns to the brush), and middle-button drag pans
 regardless of tool. The active tool is reflected in the toolbar
 (`aria-pressed`) and the tutorial copy mentions it.
