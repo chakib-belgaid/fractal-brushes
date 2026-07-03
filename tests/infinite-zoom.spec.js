@@ -386,6 +386,24 @@ test("starting a stroke flushes a pending chunked rebuild so the live stroke nev
   expect(errors).toEqual([]);
 });
 
+test("undo/redo/clear operate on the stroke log", async ({ page }) => {
+  await setupPage(page);
+  await drawStroke(page, 360);
+  await page.waitForTimeout(300);
+  await drawStroke(page, 250);
+  await page.waitForTimeout(300);
+  const count = () => page.evaluate(() => window.__fractal.state.strokeLog.length);
+  expect(await count()).toBe(2);
+  await page.locator("#undo").click();
+  expect(await count()).toBe(1);
+  await page.locator("#redo").click();
+  expect(await count()).toBe(2);
+  await page.keyboard.press("c"); // clear
+  expect(await count()).toBe(0);
+  await page.locator("#undo").click(); // undo the clear
+  expect(await count()).toBe(2);
+});
+
 test("world render is deterministic: two replays produce identical pixels", async ({ page }) => {
   await setupPage(page);
   await drawStroke(page, 360);

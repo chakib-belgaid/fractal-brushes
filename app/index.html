@@ -2362,8 +2362,8 @@
         ui.hueRing.setAttribute("aria-valuenow", String(Math.round(state.colorTarget === "blend" ? state.hue2 : state.hue)));
         ui.hueRing.setAttribute("aria-valuetext", `${state.colorTarget === "blend" ? "Blend" : "Primary"} hue ${Math.round(state.colorTarget === "blend" ? state.hue2 : state.hue)} degrees`);
         ui.targetSwitch.dataset.colorMode = state.colorMode;
-        ui.undo.disabled = state.history.length === 0;
-        ui.redo.disabled = state.redo.length === 0;
+        ui.undo.disabled = (state.undoStack || []).length === 0;
+        ui.redo.disabled = (state.redoStack || []).length === 0;
         ui.mirror.setAttribute("aria-pressed", String(state.mirror));
         ui.paramsToggle.setAttribute("aria-expanded", String(!ui.paramsPanel.hidden));
         ui.brushToggle.setAttribute("aria-expanded", String(!ui.brushPanel.hidden));
@@ -5195,6 +5195,57 @@
         window.__fractal.renderWorldSync = renderWorldSync;
         window.__fractal.flushRenderJob = flushRenderJob;
         window.__fractal.replayStroke = replayStroke;
+
+        /* ---- Stroke-log history ------------------------------------------ */
+        pushHistory = function noopPushHistory() {
+          // Raster snapshots replaced by the stroke log (see undo/redo below).
+          state.history.length = 0;
+          state.redo.length = 0;
+        };
+
+        undo = function infiniteUndo() {
+          flushRenderJob();
+          const action = state.undoStack.pop();
+          if (!action) return;
+          if (action.type === "stroke") {
+            const stroke = state.strokeLog.pop();
+            state.redoStack.push({ type: "stroke", stroke });
+          } else if (action.type === "clear") {
+            state.strokeLog = action.strokes;
+            state.redoStack.push({ type: "clear", strokes: action.strokes });
+          }
+          renderWorldSync();
+          updateUi();
+        };
+
+        redo = function infiniteRedo() {
+          flushRenderJob();
+          const action = state.redoStack.pop();
+          if (!action) return;
+          if (action.type === "stroke") {
+            state.strokeLog.push(action.stroke);
+            state.undoStack.push({ type: "stroke" });
+          } else if (action.type === "clear") {
+            state.strokeLog = [];
+            state.undoStack.push({ type: "clear", strokes: action.strokes });
+          }
+          renderWorldSync();
+          updateUi();
+        };
+
+        clearArt = function infiniteClearArt() {
+          flushRenderJob();
+          commitLiveStroke();
+          state.tendrils.length = 0;
+          if (state.strokeLog.length) {
+            state.undoStack.push({ type: "clear", strokes: state.strokeLog });
+            state.strokeLog = [];
+            state.redoStack = [];
+          }
+          clearSurface();
+          updateUi();
+          showStatus("Canvas cleared");
+        };
 
         installMobileCssPatch();
         syncCanvasConfig();
