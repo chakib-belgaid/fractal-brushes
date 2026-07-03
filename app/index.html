@@ -5247,6 +5247,56 @@
           showStatus("Canvas cleared");
         };
 
+        /* ---- Crisp export ------------------------------------------------- */
+        const baseExportPngPreset = exportPngPreset;
+        exportPngPreset = async function infiniteExportPngPreset(presetName) {
+          flushRenderJob();
+          commitLiveStroke();
+          if (presetName === "current" || !state.strokeLog.length) {
+            return baseExportPngPreset(presetName);
+          }
+          // Sized presets: re-render the world at target resolution.
+          if (state.exporting) return;
+          if (!exportPresets[presetName]) return;
+          state.exporting = true;
+          updateUi();
+          showStatus("Preparing PNG export...", "busy");
+          await new Promise((resolve) => requestAnimationFrame(resolve));
+          const preset = exportPresets[presetName];
+          const saved = {
+            deviceW: canvas.width, deviceH: canvas.height,
+            dpr: state.dpr, width: state.width, height: state.height,
+            cx: state.cx, cy: state.cy
+          };
+          try {
+            const fit = Math.min(preset.width / window.innerWidth, preset.height / window.innerHeight);
+            canvas.width = preset.width;
+            canvas.height = preset.height;
+            state.dpr = fit;
+            state.width = preset.width;
+            state.height = preset.height;
+            state.cx = preset.width / 2;
+            state.cy = preset.height / 2;
+            renderWorldSync();
+            window.__fractal.lastExportPath = "replay";
+            downloadBlob(await canvasToBlob(canvas), preset.label, "png");
+            showStatus("PNG export ready.", "success");
+          } catch (error) {
+            showStatus("Export failed in this browser. Try a smaller preset.", "error");
+          } finally {
+            canvas.width = saved.deviceW;
+            canvas.height = saved.deviceH;
+            state.dpr = saved.dpr;
+            state.width = saved.width;
+            state.height = saved.height;
+            state.cx = saved.cx;
+            state.cy = saved.cy;
+            renderWorldSync();
+            state.exporting = false;
+            updateUi();
+          }
+        };
+
         installMobileCssPatch();
         syncCanvasConfig();
         if (state.size < BRUSH_LENGTH_RANGE.default) {

@@ -473,3 +473,27 @@ test("world render is deterministic: two replays produce identical pixels", asyn
   });
   expect(first).toBe(second);
 });
+
+test("4K export re-renders crisply at target resolution", async ({ page }) => {
+  await setupPage(page);
+  await page.addInitScript(() => {}); // page already loaded; use evaluate patching instead
+  await page.evaluate(() => {
+    const originalCreateObjectURL = URL.createObjectURL.bind(URL);
+    URL.createObjectURL = (blob) => {
+      if (blob.type === "image/png") window.__lastPngExport = { size: blob.size };
+      return originalCreateObjectURL(blob);
+    };
+    HTMLAnchorElement.prototype.click = function () { window.__lastDownloadName = this.download; };
+  });
+  await drawStroke(page, 360);
+  await page.waitForTimeout(400);
+  await page.locator("#exportToggle").click();
+  await page.locator("[data-export='wide4k']").click();
+  await expect.poll(() => page.evaluate(() => window.__lastPngExport?.size), { timeout: 20000 }).toBeGreaterThan(1000);
+  const restored = await page.evaluate(() => ({
+    exportedVia: window.__fractal.lastExportPath || null,
+    w: document.getElementById("art").width
+  }));
+  expect(restored.exportedVia).toBe("replay"); // set by the new export path
+  expect(restored.w).toBeLessThan(3840); // canvas restored after export
+});
