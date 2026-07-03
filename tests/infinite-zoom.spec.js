@@ -511,6 +511,20 @@ test("4K export re-renders crisply at target resolution", async ({ page }) => {
   expect(dimensions.height).toBe(2160);
 });
 
+test("single-finger touch stroke on desktop is not dropped by the gesture-cleanup race", async ({ page }) => {
+  const errors = await setupPage(page);
+  const stage = page.locator("#stage");
+  const touchOpts = { pointerId: 21, pointerType: "touch", isPrimary: true, button: 0, buttons: 1, bubbles: true, cancelable: true };
+  await stage.dispatchEvent("pointerdown", { ...touchOpts, clientX: 300, clientY: 300 });
+  await stage.dispatchEvent("pointermove", { ...touchOpts, clientX: 340, clientY: 320 });
+  await stage.dispatchEvent("pointermove", { ...touchOpts, clientX: 380, clientY: 340 });
+  await stage.dispatchEvent("pointerup", { ...touchOpts, buttons: 0, clientX: 380, clientY: 340 });
+  await page.waitForTimeout(300);
+  const logLength = await page.evaluate(() => window.__fractal.state.strokeLog.length);
+  expect(logLength).toBe(1);
+  expect(errors).toEqual([]);
+});
+
 const mobileUrl = pathToFileURL(path.resolve(__dirname, "../app/mobile/index.html")).toString();
 
 test.describe("mobile infinite zoom", () => {

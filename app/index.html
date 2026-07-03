@@ -4506,11 +4506,22 @@
             const wasGesturing = state.gesturing;
             state.gesturing = false;
             gestureStart = null;
-            state.painting = false;
-            state.pointerId = null;
-            state.last = null;
+            // Only clear the painting pointer state here if a two-finger
+            // gesture was actually in progress (beginGestureIfNeeded already
+            // nulled these when the gesture started). This handler and
+            // stopPainting are both registered on window's pointerup, and
+            // this one runs first (capture phase runs before the bubble-
+            // phase target/window listeners); unconditionally zeroing
+            // state.painting here for every solitary touch pointerup would
+            // race ahead of stopPainting's own guard and skip
+            // commitLiveStroke(), silently dropping the stroke.
+            if (wasGesturing) {
+              state.painting = false;
+              state.pointerId = null;
+              state.last = null;
+              commitViewPreview();
+            }
             hideSymmetryGuide();
-            if (wasGesturing) commitViewPreview();
             updateUi();
           }
         }
