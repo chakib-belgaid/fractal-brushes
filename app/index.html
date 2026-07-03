@@ -4787,11 +4787,24 @@
           updateUi();
         }
 
+        // Tag any tendril spawned with no live stroke (tutorial demo strokes,
+        // or any other unrecorded spawn) so a later stroke's tagNewTendrils
+        // cannot adopt it and consume RNG draws replay will never make.
+        function tagOrphanTendrils() {
+          for (const tendril of state.tendrils) {
+            if (!tendril.rng) tendril.rng = nativeRandom;
+          }
+        }
+
         const recordedStartPainting = startPainting;
         startPainting = function recordingStartPainting(event) {
           const wasPainting = state.painting;
-          const result = recordedStartPainting(event);
-          if (!wasPainting && state.painting) {
+          // Built BEFORE calling the patched handler: patchedExpandedStartPainting
+          // synchronously fires the hold-bloom spawnFan burst before returning, so
+          // state.liveStroke must already exist for that burst to be recorded and
+          // its tendrils tagged. Everything the record needs comes from `state`,
+          // not the event, so early creation is safe.
+          if (!wasPainting) {
             const seed = Math.floor(nativeRandom() * 4294967296);
             state.liveStroke = {
               id: (strokeIdCounter += 1),
@@ -4819,6 +4832,12 @@
               maxR: 0
             };
           }
+          const result = recordedStartPainting(event);
+          if (!wasPainting && !state.painting) {
+            // The patched handler early-returned (gesturing, hand tool, etc.);
+            // no stroke actually started, so discard the speculative record.
+            state.liveStroke = null;
+          }
           return result;
         };
 
@@ -4826,25 +4845,39 @@
         const recordedSpawnAlong = spawnAlong;
         spawnAlong = function recordingSpawnAlong(x0, y0, x1, y1) {
           const stroke = state.liveStroke;
-          if (!stroke) { recordedSpawnAlong(x0, y0, x1, y1); return; }
+          if (!stroke) {
+            recordedSpawnAlong(x0, y0, x1, y1);
+            tagOrphanTendrils();
+            return;
+          }
           stroke.segments.push({ x0, y0, x1, y1, step: stroke.stepCount });
           insideSpawnAlong = true;
-          Math.random = stroke.rng;
-          recordedSpawnAlong(x0, y0, x1, y1);
-          Math.random = nativeRandom;
-          insideSpawnAlong = false;
+          try {
+            Math.random = stroke.rng;
+            recordedSpawnAlong(x0, y0, x1, y1);
+          } finally {
+            Math.random = nativeRandom;
+            insideSpawnAlong = false;
+          }
           tagNewTendrils(stroke);
         };
 
         const recordedSpawnFan = spawnFan;
         spawnFan = function recordingSpawnFan(x, y, dx, dy) {
           const stroke = state.liveStroke;
-          if (!stroke || insideSpawnAlong) { recordedSpawnFan(x, y, dx, dy); return; }
+          if (!stroke || insideSpawnAlong) {
+            recordedSpawnFan(x, y, dx, dy);
+            if (!stroke) tagOrphanTendrils();
+            return;
+          }
           // Direct call outside spawnAlong (hold-bloom): record as a fan event.
           stroke.segments.push({ fan: true, x, y, dx, dy, step: stroke.stepCount });
-          Math.random = stroke.rng;
-          recordedSpawnFan(x, y, dx, dy);
-          Math.random = nativeRandom;
+          try {
+            Math.random = stroke.rng;
+            recordedSpawnFan(x, y, dx, dy);
+          } finally {
+            Math.random = nativeRandom;
+          }
           tagNewTendrils(stroke);
         };
 
@@ -4858,68 +4891,72 @@
 
         /* ---- Deterministic simulation step -------------------------------
            Mirrors the original step() body (see `function step()` near the
-           base engine) with three changes: operates on an arbitrary list,
-           uses per-tendril seeded RNG streams, and tags branch children. */
+           base engine) with four changes: operates on an arbitrary list, uses
+           per-tendril seeded RNG streams, tags branch children, and tracks
+           per-stroke max reach (`maxR`) via each tendril's `strokeRef`. */
         function stepTendrils(list) {
           for (let i = list.length - 1; i >= 0; i -= 1) {
             const tendril = list[i];
-            if (tendril.rng) Math.random = tendril.rng;
-            const ox = tendril.x;
-            const oy = tendril.y;
-            const speed = Math.max(0.001, Math.hypot(tendril.vx, tendril.vy));
-            const nx = -tendril.vy / speed;
-            const ny = tendril.vx / speed;
-            const phase = tendril.maxLife - tendril.life;
-            const curl = Math.sin(phase * 0.16 + tendril.seed) * tendril.curl;
+            try {
+              if (tendril.rng) Math.random = tendril.rng;
+              const ox = tendril.x;
+              const oy = tendril.y;
+              const speed = Math.max(0.001, Math.hypot(tendril.vx, tendril.vy));
+              const nx = -tendril.vy / speed;
+              const ny = tendril.vx / speed;
+              const phase = tendril.maxLife - tendril.life;
+              const curl = Math.sin(phase * 0.16 + tendril.seed) * tendril.curl;
 
-            tendril.vx += nx * curl * state.dpr;
-            tendril.vy += ny * curl * state.dpr;
-            const noiseShare = tendril.angular ? 0.42 : 0.12;
-            const seed2 = tendril.seed * 2.618;
-            const wanderX = Math.sin(phase * 0.21 + tendril.seed) * Math.cos(phase * 0.057 + seed2);
-            const wanderY = Math.cos(phase * 0.17 + seed2) * Math.sin(phase * 0.049 + tendril.seed);
-            tendril.vx += tendril.jitter * (wanderX * (1 - noiseShare) * 0.62 + rand(-1, 1) * noiseShare) * state.dpr;
-            tendril.vy += tendril.jitter * (wanderY * (1 - noiseShare) * 0.62 + rand(-1, 1) * noiseShare) * state.dpr;
-            tendril.vy -= tendril.lift * state.dpr * (1 + tendril.width);
-            quantizeVelocity(tendril, tendril.angular);
+              tendril.vx += nx * curl * state.dpr;
+              tendril.vy += ny * curl * state.dpr;
+              const noiseShare = tendril.angular ? 0.42 : 0.12;
+              const seed2 = tendril.seed * 2.618;
+              const wanderX = Math.sin(phase * 0.21 + tendril.seed) * Math.cos(phase * 0.057 + seed2);
+              const wanderY = Math.cos(phase * 0.17 + seed2) * Math.sin(phase * 0.049 + tendril.seed);
+              tendril.vx += tendril.jitter * (wanderX * (1 - noiseShare) * 0.62 + rand(-1, 1) * noiseShare) * state.dpr;
+              tendril.vy += tendril.jitter * (wanderY * (1 - noiseShare) * 0.62 + rand(-1, 1) * noiseShare) * state.dpr;
+              tendril.vy -= tendril.lift * state.dpr * (1 + tendril.width);
+              quantizeVelocity(tendril, tendril.angular);
 
-            const tx = tendril.x + tendril.vx;
-            const ty = tendril.y + tendril.vy;
-            drawBrushSegment(ox, oy, tx, ty, tendril);
+              const tx = tendril.x + tendril.vx;
+              const ty = tendril.y + tendril.vy;
+              drawBrushSegment(ox, oy, tx, ty, tendril);
 
-            tendril.x = tx;
-            tendril.y = ty;
-            tendril.vx *= tendril.drag;
-            tendril.vy *= tendril.drag;
-            tendril.life -= 1;
+              tendril.x = tx;
+              tendril.y = ty;
+              tendril.vx *= tendril.drag;
+              tendril.vy *= tendril.drag;
+              tendril.life -= 1;
 
-            if (tendril.strokeRef) {
-              const reach = Math.hypot(tendril.x - state.cx, tendril.y - state.cy) + tendril.width * 3;
-              if (reach > tendril.strokeRef.maxR) tendril.strokeRef.maxR = reach;
-            }
-
-            const activeProfile = brushProfiles[tendril.brush] || brushProfiles.thunder;
-            const maxTendrils = Math.round((activeProfile.maxTendrils || 1600) * (0.72 + state.expansion * 0.34));
-            if (tendril.life > 12 && Math.random() < tendril.branch && list.length < maxTendrils) {
-              branchFrom(tendril, speed);
-              const child = list[list.length - 1];
-              if (child && !child.rng && tendril.rng) {
-                child.rng = mulberry32(Math.floor(tendril.rng() * 4294967296));
-                child.strokeRef = tendril.strokeRef;
+              if (tendril.strokeRef) {
+                const reach = Math.hypot(tendril.x - state.cx, tendril.y - state.cy) + tendril.width * 3;
+                if (reach > tendril.strokeRef.maxR) tendril.strokeRef.maxR = reach;
               }
-            }
 
-            if (
-              tendril.life <= 0 ||
-              Math.abs(tendril.vx) + Math.abs(tendril.vy) < 0.015 ||
-              tendril.x < -state.width * 0.1 ||
-              tendril.x > state.width * 1.1 ||
-              tendril.y < -state.height * 0.1 ||
-              tendril.y > state.height * 1.1
-            ) {
-              list.splice(i, 1);
+              const activeProfile = brushProfiles[tendril.brush] || brushProfiles.thunder;
+              const maxTendrils = Math.round((activeProfile.maxTendrils || 1600) * (0.72 + state.expansion * 0.34));
+              if (tendril.life > 12 && Math.random() < tendril.branch && list.length < maxTendrils) {
+                branchFrom(tendril, speed);
+                const child = list[list.length - 1];
+                if (child && !child.rng && tendril.rng) {
+                  child.rng = mulberry32(Math.floor(tendril.rng() * 4294967296));
+                  child.strokeRef = tendril.strokeRef;
+                }
+              }
+
+              if (
+                tendril.life <= 0 ||
+                Math.abs(tendril.vx) + Math.abs(tendril.vy) < 0.015 ||
+                tendril.x < -state.width * 0.1 ||
+                tendril.x > state.width * 1.1 ||
+                tendril.y < -state.height * 0.1 ||
+                tendril.y > state.height * 1.1
+              ) {
+                list.splice(i, 1);
+              }
+            } finally {
+              Math.random = nativeRandom;
             }
-            Math.random = nativeRandom;
           }
         }
 

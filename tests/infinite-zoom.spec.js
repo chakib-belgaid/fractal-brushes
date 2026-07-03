@@ -197,6 +197,84 @@ test("strokes are recorded into the stroke log with replay data", async ({ page 
   expect(seeds[0]).not.toBe(seeds[1]);
 });
 
+test("pointerdown hold-bloom burst is recorded as the first segment and tendrils stay tagged mid-stroke", async ({ page }) => {
+  const errors = await setupPage(page);
+  const stage = page.locator("#stage");
+  await stage.dispatchEvent("pointerdown", { clientX: 400, clientY: 300, pointerId: 1, pointerType: "mouse", button: 0, buttons: 1, bubbles: true });
+  await page.waitForTimeout(30);
+  const afterDown = await page.evaluate(() => {
+    const s = window.__fractal.state;
+    return {
+      logLen: s.strokeLog.length,
+      liveSegs: s.liveStroke ? s.liveStroke.segments.length : 0,
+      firstFan: s.liveStroke && s.liveStroke.segments[0] ? !!s.liveStroke.segments[0].fan : null,
+      tendrilCount: s.tendrils.length,
+      untagged: s.tendrils.filter((t) => !t.rng).length
+    };
+  });
+  expect(afterDown.logLen).toBe(0);
+  expect(afterDown.liveSegs).toBeGreaterThan(0);
+  expect(afterDown.firstFan).toBe(true);
+  expect(afterDown.tendrilCount).toBeGreaterThan(0);
+  expect(afterDown.untagged).toBe(0);
+
+  for (let x = 460; x <= 640; x += 60) {
+    await stage.dispatchEvent("pointermove", { clientX: x, clientY: 300, pointerId: 1, pointerType: "mouse", button: 0, buttons: 1, bubbles: true });
+    await page.waitForTimeout(30);
+    const untaggedMid = await page.evaluate(() => window.__fractal.state.tendrils.filter((t) => !t.rng).length);
+    expect(untaggedMid).toBe(0);
+  }
+
+  await stage.dispatchEvent("pointerup", { clientX: 640, clientY: 300, pointerId: 1, pointerType: "mouse", button: 0, buttons: 0, bubbles: true });
+  await page.waitForTimeout(200);
+  const log = await page.evaluate(() => window.__fractal.state.strokeLog.map((s) => ({
+    segs: s.segments.length,
+    firstFan: !!s.segments[0].fan
+  })));
+  expect(log.length).toBe(1);
+  expect(log[0].firstFan).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test("unrecorded tutorial demo stroke tags its tendrils with the native RNG so later strokes cannot adopt them", async ({ page }) => {
+  const errors = [];
+  page.on("pageerror", (err) => errors.push(String(err)));
+  page.on("console", (msg) => { if (msg.type() === "error") errors.push(msg.text()); });
+  await page.setViewportSize({ width: 960, height: 720 });
+  await page.goto(appUrl);
+
+  await expect(page.locator("#tutorial")).toBeVisible();
+  // Step 1 targets the stage; clicking Next triggers the unrecorded demo stroke
+  // (paintTutorialDemo -> spawnAlong with no state.liveStroke).
+  await page.locator("#tutorialNext").click();
+  const afterDemo = await page.evaluate(() => {
+    const s = window.__fractal.state;
+    return {
+      tendrilCount: s.tendrils.length,
+      untagged: s.tendrils.filter((t) => !t.rng).length,
+      withStrokeRef: s.tendrils.filter((t) => t.strokeRef).length
+    };
+  });
+  expect(afterDemo.tendrilCount).toBeGreaterThan(0);
+  expect(afterDemo.untagged).toBe(0);
+  expect(afterDemo.withStrokeRef).toBe(0);
+
+  await page.locator("#tutorialSkip").click();
+  await drawStroke(page, 500);
+  await page.waitForTimeout(200);
+
+  const afterRealStroke = await page.evaluate(() => {
+    const s = window.__fractal.state;
+    return {
+      untagged: s.tendrils.filter((t) => !t.rng).length,
+      logLen: s.strokeLog.length
+    };
+  });
+  expect(afterRealStroke.untagged).toBe(0);
+  expect(afterRealStroke.logLen).toBe(1);
+  expect(errors).toEqual([]);
+});
+
 test("H toggles hand tool, Escape returns to brush, Space pans while held", async ({ page }) => {
   await setupPage(page);
   await page.keyboard.press("h");
