@@ -15,6 +15,7 @@ Desktop is recommended for the best experience. The canvases remain usable on mo
 - `/app/` - interactive Fractal Brushes canvas app.
 - `/app/mobile/` - lightweight touch-first canvas served automatically to phones and small tablets. `/app/?desktop=1` opts back into the desktop app for the session.
 - `/white/` - Fractal Brushes Ink, a white-paper black-ink canvas app.
+- `/liquid-mix/` - Fractal Brushes Liquid Mix, a WebGL fluid-dynamics water canvas: tap to drop ink that blooms and drifts, hold to keep pouring, drag to stir the currents. Overlapping pigments mix subtractively like real paint in water, and the top bar offers clear plus single-click PNG export.
 
 ## Local Usage
 
