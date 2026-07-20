@@ -427,6 +427,10 @@
       left: 18px;
       bottom: 18px;
       width: 280px;
+      /* Keep the panel top below the color panel (bottom edge ~420px with
+         default content) so its drag handle is never buried under it. */
+      max-height: calc(100vh - 450px);
+      overflow-y: auto;
     }
 
     .panel-head {
@@ -1739,6 +1743,13 @@
       </div>
     </div>
     <div class="field">
+      <span class="field-label">Density</span>
+      <div class="slider-row">
+        <input id="density" type="range" min="30" max="200" value="100" aria-label="Brush density">
+        <span class="value" id="densityValue">100%</span>
+      </div>
+    </div>
+    <div class="field">
       <span class="field-label">Points</span>
       <div class="slider-row">
         <input id="symmetry" type="range" min="1" max="16" value="6" aria-label="Symmetry">
@@ -1864,6 +1875,8 @@
         scaleFactorValue: document.getElementById("scaleFactorValue"),
         expansion: document.getElementById("expansion"),
         expansionValue: document.getElementById("expansionValue"),
+        density: document.getElementById("density"),
+        densityValue: document.getElementById("densityValue"),
         symmetry: document.getElementById("symmetry"),
         symmetryValue: document.getElementById("symmetryValue"),
         status: document.getElementById("status"),
@@ -2226,6 +2239,7 @@
         size: BRUSH_LENGTH_RANGE.default,
         scaleFactor: SCALE_FACTOR_RANGE.default,
         expansion: 0.85,
+        density: 1,
         symmetry: 6,
         mirror: true,
         zoom: 1,
@@ -2378,6 +2392,11 @@
         ui.scaleFactor.setAttribute("aria-valuetext", `${controlDisplayValue(state.scaleFactor)} normalized, ${state.scaleFactor.toFixed(1)}x actual`);
         ui.expansion.value = String(Math.round(state.expansion * 100));
         ui.expansionValue.textContent = `${Math.round(state.expansion * 100)}%`;
+        if (ui.density) {
+          ui.density.value = String(Math.round(state.density * 100));
+          ui.densityValue.textContent = `${Math.round(state.density * 100)}%`;
+          ui.density.setAttribute("aria-valuetext", `${Math.round(state.density * 100)} percent particle density`);
+        }
         ui.symmetry.value = String(state.symmetry);
         ui.symmetryValue.textContent = String(state.symmetry);
         const totalZoom = ((state.view && state.view.scale) || 1) * (state.zoom || 1);
@@ -2809,6 +2828,14 @@
 
       function setExpansion(expansion) {
         state.expansion = clamp(Number(expansion), 0.35, 1.6);
+        updateUi();
+      }
+
+      // Density is a user multiplier on how many tendrils each fan spawns.
+      // Stored as a fraction (1 = 100% = the retuned baseline); the slider
+      // reports a percentage. Captured per-stroke so zoom replays match.
+      function setDensity(density) {
+        state.density = clamp(Number(density) / 100, 0.3, 2);
         updateUi();
       }
 
@@ -3636,6 +3663,36 @@
         }
       });
 
+      // Density rebalance: the presets above spawn many long, thin, luminous
+      // trails that overcrowd the viewport. Nudge every preset toward SHORTER
+      // trails (less life), BIGGER individual strokes (wider), and a few FEWER
+      // particles per fan -- same visual identity, just chunkier and less dense.
+      // Runs once, right after the active profiles are installed above, so live
+      // strokes and deterministic zoom replays read identical values. The
+      // user-tuned "custom" brush keeps its own persisted values and is skipped.
+      const BRUSH_DENSITY_RETUNE = { life: 0.8, width: 1.28, count: 0.85 };
+      for (const [retuneBrushId, retuneProfile] of Object.entries(brushProfiles)) {
+        if (retuneBrushId === "custom") continue;
+        if (Array.isArray(retuneProfile.life)) {
+          retuneProfile.life = [
+            retuneProfile.life[0] * BRUSH_DENSITY_RETUNE.life,
+            retuneProfile.life[1] * BRUSH_DENSITY_RETUNE.life
+          ];
+        }
+        if (Array.isArray(retuneProfile.width)) {
+          retuneProfile.width = [
+            retuneProfile.width[0] * BRUSH_DENSITY_RETUNE.width,
+            retuneProfile.width[1] * BRUSH_DENSITY_RETUNE.width
+          ];
+        }
+        if (Array.isArray(retuneProfile.count)) {
+          retuneProfile.count = [
+            Math.max(1, Math.round(retuneProfile.count[0] * BRUSH_DENSITY_RETUNE.count)),
+            Math.max(1, Math.round(retuneProfile.count[1] * BRUSH_DENSITY_RETUNE.count))
+          ];
+        }
+      }
+
       function drawLayerPack(x0, y0, x1, y1, profile, hue, alpha, baseWidth) {
         profile.layers.forEach(([scale, hueOffset, lightness, layerAlpha, special]) => {
           const width = Math.max(0.12, baseWidth * scale);
@@ -4249,7 +4306,7 @@
         }
 
         function showSymmetryGuide(point) {
-          if (!point || state.gesturing) {
+          if (!point || state.gesturing || state.tool === "hand" || state.spaceHeld || state.panning) {
             hideSymmetryGuide();
             return;
           }
@@ -4279,6 +4336,19 @@
           showSymmetryGuide(state.symmetryGuidePoint);
         }
 
+        // Viewport-relative + user density multiplier. A fixed particle budget
+        // overcrowds small windows, so the viewport share compares the current
+        // css canvas area to a 960x720 reference; the user share is the Density
+        // slider (state.density, 1 = 100%). Every input (density, width,
+        // height, dpr) is restored per-stroke by replayStroke, so zoom rebuilds
+        // recompute the exact same value and stay deterministic.
+        function combinedDensityScale() {
+          const cssArea = (state.width / state.dpr) * (state.height / state.dpr);
+          const viewportScale = clamp(Math.sqrt(cssArea / (960 * 720)), 0.55, 1.15);
+          const userScale = clamp(state.density ?? 1, 0.3, 2);
+          return viewportScale * userScale;
+        }
+
         spawnFan = function patchedExpandedSpawnFan(x, y, dx, dy) {
           const profile = brushProfiles[state.brush] || brushProfiles.thunder;
           const speed = Math.hypot(dx, dy);
@@ -4294,6 +4364,12 @@
             mobile ? 0.28 : 0.44,
             mobile ? 0.6 : 0.94
           );
+          // Combined density multiplier (viewport-relative x user slider).
+          // Per-fan counts are already ~1 at default settings, so sub-1 values
+          // cannot thin the fan here (Math.max(1, ...) floors them) -- the
+          // sub-1 share is applied as wider fan SPACING in spawnAlong instead.
+          // Only the above-1 share boosts the per-fan count.
+          const densityBoost = Math.max(1, combinedDensityScale());
           const factorScale = clamp(
             (state.scaleFactor || SCALE_FACTOR_RANGE.default) / SCALE_FACTOR_RANGE.default,
             SCALE_FACTOR_RANGE.min / SCALE_FACTOR_RANGE.default,
@@ -4307,7 +4383,12 @@
           const strokeRamp = clamp((state.strokeDistance ?? 999) / 60, 0, 1);
           const rampAlpha = 0.42 + strokeRamp * 0.58;
           const rampVelocity = 0.6 + strokeRamp * 0.4;
-          const count = Math.max(1, Math.round(rand(profile.count[0], profile.count[1]) * densityScale * (0.7 + strokeRamp * 0.3)));
+          // Stochastic rounding: several profiles have per-fan counts of ~1, so
+          // plain Math.round would swallow fractional density boosts (e.g.
+          // 1.3 -> 1 regardless of the slider). Drawing the fraction from the
+          // stroke's seeded RNG keeps zoom replays byte-identical.
+          const rawCount = rand(profile.count[0], profile.count[1]) * densityScale * (0.7 + strokeRamp * 0.3) * densityBoost;
+          const count = Math.max(1, Math.floor(rawCount) + (Math.random() < rawCount % 1 ? 1 : 0));
 
           for (let i = 0; i < count; i += 1) {
             const angle = baseAngle + rand(-profile.spread, profile.spread) * spreadScale;
@@ -4354,6 +4435,19 @@
           const dy = y1 - y0;
           const distance = Math.hypot(dx, dy);
           state.strokeDistance = (state.strokeDistance || 0) + distance;
+          // Sub-1 density thins the stroke by SKIPPING a deterministic share of
+          // fan spawns (per-fan counts are floored at 1 and the smoothed-move
+          // pipeline emits sub-spacing segments, so neither count nor spacing
+          // can thin below baseline). The budget accumulates the fractional
+          // share per call and only spawns when it crosses 1. It is reset at
+          // stroke start and at replay start, so zoom rebuilds walk the exact
+          // same skip pattern.
+          const densityThin = Math.min(1, combinedDensityScale());
+          if (densityThin < 0.999) {
+            state.densitySkipBudget = (state.densitySkipBudget || 0) + densityThin;
+            if (state.densitySkipBudget < 1) return;
+            state.densitySkipBudget -= 1;
+          }
           const sizeDistanceScale = expandedBrushSpacingScale(state.size);
           const expansionDistanceScale = 0.9 + state.expansion * 0.46;
           const spacing = clamp(11.8 * sizeDistanceScale * expansionDistanceScale * (profile.spacing || 1), mobile ? 15 : 10, mobile ? 92 : 96);
@@ -4371,6 +4465,7 @@
           if (mobileLike()) closeTransientControls(false);
           const result = originalStartPainting(event);
           state.strokeDistance = 0;
+          state.densitySkipBudget = 0;
           if (state.painting && state.last) {
             document.body.classList.toggle("is-painting", mobileLike());
             showSymmetryGuide(state.last);
@@ -4687,6 +4782,7 @@
           state.tool = tool === "hand" ? "hand" : "brush";
           ui.handTool.setAttribute("aria-pressed", String(state.tool === "hand"));
           document.body.classList.toggle("hand-mode", state.tool === "hand" || state.spaceHeld);
+          if (state.tool === "hand") hideSymmetryGuide();
         }
 
         function panModeActive(event) {
@@ -4706,6 +4802,7 @@
             panX: state.panX,
             panY: state.panY
           };
+          hideSymmetryGuide();
           document.body.classList.add("panning");
           if (event.pointerId !== undefined && stage.setPointerCapture) {
             try { stage.setPointerCapture(event.pointerId); } catch (_) {}
@@ -4738,6 +4835,7 @@
           if (event.key === " " && !event.repeat) {
             state.spaceHeld = true;
             document.body.classList.add("hand-mode");
+            hideSymmetryGuide();
             event.preventDefault();
           } else if (event.key.toLowerCase() === "h") {
             setTool(state.tool === "hand" ? "brush" : "hand");
@@ -4756,7 +4854,15 @@
         window.__fractal.setTool = setTool;
 
         function previewSymmetryGuide(event) {
-          if (state.painting || state.gesturing || event.pointerType === "touch") return;
+          if (
+            state.painting ||
+            state.gesturing ||
+            event.pointerType === "touch" ||
+            state.tool === "hand" ||
+            state.spaceHeld ||
+            state.panning
+          )
+            return;
           showSymmetryGuide(eventPosition(event));
         }
 
@@ -4847,6 +4953,7 @@
               size: state.size,
               scaleFactor: state.scaleFactor,
               expansion: state.expansion,
+              density: state.density,
               symmetry: state.symmetry,
               mirror: state.mirror,
               custom: state.brush === "custom"
@@ -5064,10 +5171,12 @@
           const saved = {
             brush: state.brush, hue: state.hue, hue2: state.hue2, blend: state.blend,
             size: state.size, scaleFactor: state.scaleFactor, expansion: state.expansion,
+            density: state.density,
             symmetry: state.symmetry, mirror: state.mirror,
             dpr: state.dpr, width: state.width, height: state.height,
             cx: state.cx, cy: state.cy,
             tendrils: state.tendrils, strokeDistance: state.strokeDistance,
+            densitySkipBudget: state.densitySkipBudget,
             liveStroke: state.liveStroke
           };
           const savedCustom = stroke.custom
@@ -5089,6 +5198,9 @@
             state.size = stroke.size;
             state.scaleFactor = stroke.scaleFactor;
             state.expansion = stroke.expansion;
+            // Strokes recorded before the Density control existed have no
+            // stored density; fall back to 1 (100%) so they replay unchanged.
+            state.density = stroke.density ?? 1;
             state.symmetry = stroke.symmetry;
             state.mirror = stroke.mirror;
             state.dpr = stroke.dpr;
@@ -5098,6 +5210,7 @@
             state.cy = stroke.viewH / 2;
             state.tendrils = [];
             state.strokeDistance = 0;
+            state.densitySkipBudget = 0;
             state.liveStroke = null;
 
             ctx.setTransform(
@@ -5529,6 +5642,7 @@
       ui.size.addEventListener("input", (event) => setSize(event.target.value));
       ui.scaleFactor.addEventListener("input", (event) => setScaleFactor(event.target.value));
       ui.expansion.addEventListener("input", (event) => setExpansion(Number(event.target.value) / 100));
+      if (ui.density) ui.density.addEventListener("input", (event) => setDensity(event.target.value));
       ui.symmetry.addEventListener("input", (event) => setSymmetry(event.target.value));
       ui.modes.forEach((button) => {
         button.addEventListener("click", () => {
