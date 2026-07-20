@@ -2266,6 +2266,10 @@
       createPigmentControls();
       resize();
       updateUi();
+      // A heavily parallel browser run can finish the inline setup before the
+      // brush rail has its final layout. Repaint once on the definitive load
+      // event so the visible canvas previews never remain at their reset state.
+      window.addEventListener("load", renderBrushPreviews, { once: true });
     })();
   </script>
 </body>
