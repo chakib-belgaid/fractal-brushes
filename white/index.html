@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" href="data:,">
   <title>Fractal Brushes Ink</title>
-  <meta name="description" content="Fractal Brushes Ink is a static white-paper canvas for drawing mirrored black ink, wash, nib, scatter, and dry-brush marks with PNG export.">
+  <meta name="description" content="Fractal Brushes Ink is a desktop ink studio: eight ink brushes (sumi, hake, mop, reed pen, nib, dry bristle, flick, water drop), colored pigments, live wet blooms, mirrored symmetry, and PNG export.">
   <style>
     :root {
       color-scheme: light;
       --paper: oklch(97.5% 0.008 92);
       --paper-deep: oklch(93.5% 0.012 88);
-      --surface: oklch(99% 0.006 92 / 0.86);
-      --surface-strong: oklch(98% 0.007 92 / 0.96);
+      --surface: oklch(99% 0.006 92 / 0.9);
+      --surface-strong: oklch(98% 0.007 92 / 0.97);
       --ink: oklch(16% 0.01 80);
       --muted: oklch(48% 0.012 78);
       --quiet: oklch(64% 0.012 78);
@@ -21,9 +21,12 @@
       --active: oklch(48% 0.15 260);
       --active-soft: oklch(48% 0.15 260 / 0.12);
       --shadow: 0 22px 62px oklch(20% 0.018 80 / 0.18);
-      --control: 44px;
+      --topbar-h: 56px;
+      --rail-w: 236px;
+      --side-w: 300px;
+      --pig-deep: 16 15 12;
+      --pig-wash: 76 74 68;
       --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-      --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
     }
 
     * {
@@ -41,7 +44,6 @@
       font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       text-rendering: optimizeLegibility;
       overscroll-behavior: none;
-      touch-action: manipulation;
     }
 
     body::before,
@@ -65,10 +67,8 @@
       opacity: 0.12;
       mix-blend-mode: multiply;
       background-image:
-        linear-gradient(90deg, oklch(32% 0.012 82 / 0.08) 1px, transparent 1px),
-        linear-gradient(oklch(32% 0.012 82 / 0.07) 1px, transparent 1px),
         url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.78' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.24  0 0 0 0 0.21  0 0 0 0 0.16  0 0 0 0.72 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-      background-size: 86px 86px, 86px 86px, 180px 180px;
+      background-size: 180px 180px;
     }
 
     a {
@@ -82,56 +82,29 @@
       font: inherit;
     }
 
-    button {
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    #stage {
-      position: fixed;
-      inset: 58px 0 0;
-      z-index: 1;
-      overflow: hidden;
-      cursor: crosshair;
-      touch-action: none;
-    }
-
-    canvas {
-      position: absolute;
-      inset: 0;
-      width: 100vw;
-      height: calc(100dvh - 58px);
-      display: block;
-    }
-
-    .topbar,
-    .panel,
-    .dock,
-    .status {
-      position: fixed;
-      z-index: 4;
-      user-select: none;
-    }
+    /* ---- Top bar ---------------------------------------------------- */
 
     .topbar {
+      position: fixed;
       top: 0;
       left: 0;
       right: 0;
       z-index: 6;
-      min-height: 58px;
+      height: var(--topbar-h);
       display: grid;
       grid-template-columns: minmax(220px, 1fr) auto minmax(220px, 1fr);
       align-items: center;
       gap: 12px;
       padding: 0 18px;
       border-bottom: 1px solid var(--line);
-      background: oklch(99% 0.006 92 / 0.86);
+      background: oklch(99% 0.006 92 / 0.88);
       box-shadow: 0 1px 14px oklch(25% 0.012 78 / 0.08);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
+      user-select: none;
     }
 
     .brand {
-      min-height: 44px;
       display: inline-flex;
       align-items: center;
       justify-self: start;
@@ -139,42 +112,20 @@
       font-family: ui-serif, "Iowan Old Style", Baskerville, Georgia, serif;
       font-size: 20px;
       font-weight: 760;
-      letter-spacing: 0;
     }
 
     .brand svg {
-      width: 31px;
-      height: 31px;
+      width: 30px;
+      height: 30px;
       flex: 0 0 auto;
     }
 
-    .tabs {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 10px;
-      color: var(--muted);
-      font-size: 14px;
-      font-weight: 650;
-    }
-
-    .tab {
-      min-height: 44px;
-      display: inline-flex;
-      align-items: center;
-      padding: 0 13px;
-      border: 0;
-      border-bottom: 2px solid transparent;
-      color: inherit;
-      background: transparent;
-      cursor: pointer;
-      appearance: none;
-      transition: color 160ms var(--ease-out), border-color 160ms var(--ease-out), transform 160ms var(--ease-out);
-    }
-
-    .tab[aria-pressed="true"] {
-      color: var(--active);
-      border-bottom-color: var(--active);
+    .tagline {
+      justify-self: center;
+      color: var(--quiet);
+      font-size: 13px;
+      font-weight: 620;
+      letter-spacing: 0.02em;
     }
 
     .actions {
@@ -185,8 +136,8 @@
     }
 
     .tool,
-    .brush,
     .edge-button,
+    .chip,
     .export {
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -194,32 +145,29 @@
       background: oklch(99% 0.006 92 / 0.72);
       box-shadow: inset 0 1px 0 oklch(100% 0 0 / 0.72);
       cursor: pointer;
-      touch-action: manipulation;
       appearance: none;
       transition:
         transform 150ms var(--ease-out),
         border-color 150ms var(--ease-out),
         background 150ms var(--ease-out),
-        box-shadow 150ms var(--ease-out),
         color 150ms var(--ease-out);
     }
 
     .tool,
     .export {
-      min-width: var(--control);
-      min-height: var(--control);
+      min-width: 40px;
+      min-height: 40px;
       display: inline-grid;
       place-items: center;
-      padding: 0 12px;
+      padding: 0 11px;
       font-size: 13px;
       font-weight: 760;
     }
 
     .tool svg,
-    .export svg,
-    .dock-button svg {
-      width: 19px;
-      height: 19px;
+    .export svg {
+      width: 18px;
+      height: 18px;
       display: block;
       fill: none;
       stroke: currentColor;
@@ -230,6 +178,7 @@
 
     .export {
       display: inline-flex;
+      align-items: center;
       gap: 8px;
       padding: 0 15px;
       color: oklch(98% 0.008 92);
@@ -240,9 +189,8 @@
     .tool:focus-visible,
     .brush:focus-visible,
     .edge-button:focus-visible,
+    .chip:focus-visible,
     .export:focus-visible,
-    .tab:focus-visible,
-    .dock-button:focus-visible,
     a:focus-visible,
     input:focus-visible {
       outline: 3px solid oklch(58% 0.16 260 / 0.34);
@@ -252,9 +200,8 @@
     .tool:active,
     .brush:active,
     .edge-button:active,
-    .export:active,
-    .tab:active,
-    .dock-button:active {
+    .chip:active,
+    .export:active {
       transform: scale(0.97);
     }
 
@@ -266,54 +213,67 @@
       box-shadow: none;
     }
 
-    .panel {
-      display: grid;
-      gap: 14px;
-      width: 250px;
-      padding: 14px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
+    /* ---- Docked columns --------------------------------------------- */
+
+    .rail,
+    .side {
+      position: fixed;
+      top: var(--topbar-h);
+      bottom: 0;
+      z-index: 4;
+      overflow-y: auto;
+      padding: 16px 14px 20px;
       background: var(--surface);
-      box-shadow: var(--shadow);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
+      user-select: none;
     }
 
-    .panel[hidden],
-    .status[hidden] {
-      display: none;
+    .rail {
+      left: 0;
+      width: var(--rail-w);
+      border-right: 1px solid var(--line);
     }
 
-    .brush-panel {
-      left: 30px;
-      top: 135px;
+    .side {
+      right: 0;
+      width: var(--side-w);
+      display: grid;
+      gap: 18px;
+      align-content: start;
+      border-left: 1px solid var(--line);
     }
 
-    .settings-panel {
-      right: 30px;
-      top: 48%;
-      transform: translateY(-42%);
-      width: 276px;
-    }
-
-    .panel-title {
+    .section-title {
       display: flex;
-      align-items: center;
+      align-items: baseline;
       justify-content: space-between;
-      gap: 12px;
+      gap: 10px;
+      margin: 0 2px 10px;
       color: var(--muted);
-      font-size: 12px;
-      font-weight: 760;
-      letter-spacing: 0.05em;
+      font-size: 11px;
+      font-weight: 780;
+      letter-spacing: 0.09em;
       text-transform: uppercase;
     }
 
-    .mini {
-      display: none;
-      width: 44px;
-      height: 44px;
-      padding: 0;
+    .side .section-title {
+      margin-bottom: 0;
     }
+
+    .side section {
+      display: grid;
+      gap: 9px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .side section:last-of-type {
+      padding-bottom: 0;
+      border-bottom: 0;
+    }
+
+    /* ---- Brush rail -------------------------------------------------- */
 
     .brush-list {
       display: grid;
@@ -321,13 +281,21 @@
     }
 
     .brush {
-      min-height: 50px;
       display: grid;
-      grid-template-columns: 86px 1fr 22px;
-      align-items: center;
-      gap: 10px;
-      padding: 7px 9px;
+      gap: 5px;
+      padding: 7px 9px 8px;
       text-align: left;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: oklch(99% 0.006 92 / 0.72);
+      box-shadow: inset 0 1px 0 oklch(100% 0 0 / 0.72);
+      cursor: pointer;
+      appearance: none;
+      transition:
+        transform 150ms var(--ease-out),
+        border-color 150ms var(--ease-out),
+        background 150ms var(--ease-out),
+        box-shadow 150ms var(--ease-out);
     }
 
     .brush[aria-pressed="true"] {
@@ -336,36 +304,68 @@
       box-shadow: 0 0 0 3px var(--active-soft);
     }
 
-    .stroke-sample {
-      position: relative;
-      height: 24px;
-      overflow: hidden;
-      border-radius: 999px;
+    .brush-preview {
+      width: 100%;
+      height: 34px;
+      display: block;
+      border-radius: 6px;
       background:
-        radial-gradient(ellipse at 16% 50%, oklch(12% 0.01 80 / var(--dot-a, 0.82)) 0 16%, transparent 20%),
-        linear-gradient(90deg, oklch(12% 0.01 80 / var(--dot-b, 0.84)), oklch(28% 0.012 78 / 0.26) 64%, transparent);
-      mask-image: radial-gradient(ellipse at 24% 50%, black 0 38%, transparent 72%);
+        radial-gradient(circle at 30% 30%, oklch(100% 0 0 / 0.5), transparent 60%),
+        oklch(98% 0.007 90);
+      box-shadow: inset 0 0 0 1px oklch(54% 0.016 78 / 0.12);
+    }
+
+    .brush-caption {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
     }
 
     .brush-name {
+      display: grid;
+      gap: 1px;
       font-size: 13px;
       font-weight: 720;
+      line-height: 1.15;
     }
 
-    .check {
-      width: 18px;
-      height: 18px;
+    .brush-name em {
+      color: var(--quiet);
+      font-size: 11px;
+      font-style: normal;
+      font-weight: 620;
+      white-space: nowrap;
+    }
+
+    .brush kbd {
+      flex: 0 0 auto;
+      min-width: 20px;
+      padding: 2px 5px;
       border: 1px solid var(--line-strong);
-      border-radius: 50%;
-      opacity: 0.42;
+      border-radius: 5px;
+      color: var(--muted);
+      background: oklch(97% 0.007 90);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      font-weight: 700;
+      text-align: center;
     }
 
-    .brush[aria-pressed="true"] .check {
-      opacity: 1;
+    .brush[aria-pressed="true"] kbd {
+      color: var(--active);
       border-color: var(--active);
-      background:
-        radial-gradient(circle at center, var(--active) 0 42%, transparent 45%);
     }
+
+    .rail-foot {
+      margin-top: 14px;
+      color: var(--quiet);
+      font-size: 11px;
+      font-weight: 620;
+      text-align: center;
+    }
+
+    /* ---- Settings column --------------------------------------------- */
 
     .field {
       display: grid;
@@ -377,7 +377,6 @@
       align-items: center;
       justify-content: space-between;
       gap: 10px;
-      color: var(--ink);
       font-size: 13px;
       font-weight: 680;
     }
@@ -391,7 +390,7 @@
 
     input[type="range"] {
       width: 100%;
-      height: 28px;
+      height: 26px;
       margin: 0;
       accent-color: var(--active);
       background: transparent;
@@ -415,11 +414,53 @@
       appearance: none;
     }
 
+    .pigment-row {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 7px;
+    }
+
+    .pigment {
+      width: 100%;
+      height: 34px;
+      padding: 0;
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      cursor: pointer;
+      appearance: none;
+      box-shadow: inset 0 1px 0 oklch(100% 0 0 / 0.22);
+      transition:
+        transform 150ms var(--ease-out),
+        border-color 150ms var(--ease-out),
+        box-shadow 150ms var(--ease-out);
+    }
+
+    .pigment[aria-pressed="true"] {
+      border-color: var(--active);
+      box-shadow: 0 0 0 3px var(--active-soft), inset 0 1px 0 oklch(100% 0 0 / 0.22);
+    }
+
+    .pigment:active {
+      transform: scale(0.94);
+    }
+
+    input.pigment-custom {
+      background: conic-gradient(oklch(62% 0.21 20), oklch(78% 0.16 90), oklch(66% 0.17 150), oklch(60% 0.16 230), oklch(56% 0.2 300), oklch(62% 0.21 20));
+    }
+
+    input.pigment-custom::-webkit-color-swatch-wrapper {
+      padding: 4px;
+    }
+
+    input.pigment-custom::-webkit-color-swatch {
+      border: 0;
+      border-radius: 4px;
+    }
+
     .edge-row {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 7px;
-      padding-top: 2px;
     }
 
     .edge-button {
@@ -444,63 +485,93 @@
       stroke-width: 1.8;
     }
 
-    .dock {
-      left: 50%;
-      bottom: 22px;
-      z-index: 7;
-      width: min(840px, calc(100vw - 64px));
-      min-height: 74px;
+    .chip-row {
       display: grid;
-      grid-template-columns: repeat(6, minmax(60px, 1fr));
+      grid-template-columns: 1fr 1fr;
+      gap: 7px;
+    }
+
+    .chip {
+      min-height: 40px;
+      display: inline-flex;
       align-items: center;
-      gap: 10px;
-      padding: 9px 12px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: var(--surface-strong);
-      box-shadow: var(--shadow);
-      transform: translateX(-50%);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
+      justify-content: center;
+      gap: 8px;
+      padding: 0 10px;
+      font-size: 13px;
+      font-weight: 720;
     }
 
-    .dock-button {
-      min-height: 54px;
-      display: grid;
-      justify-items: center;
-      align-content: center;
-      gap: 4px;
-      border: 1px solid transparent;
-      border-radius: 8px;
-      color: var(--muted);
-      background: transparent;
-      cursor: pointer;
-      appearance: none;
-      transition: transform 150ms var(--ease-out), color 150ms var(--ease-out), background 150ms var(--ease-out), border-color 150ms var(--ease-out);
+    .chip svg {
+      width: 17px;
+      height: 17px;
+      fill: none;
+      stroke: currentColor;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 1.9;
     }
 
-    .dock-button span {
-      max-width: 100%;
-      overflow: hidden;
-      font-size: 11px;
-      font-weight: 740;
-      line-height: 1;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .dock-button[aria-pressed="true"],
-    .dock-button[aria-expanded="true"] {
+    .chip[aria-pressed="true"] {
       color: var(--active);
-      border-color: oklch(48% 0.15 260 / 0.28);
+      border-color: var(--active);
       background: var(--active-soft);
     }
 
-    .status {
+    /* ---- Stage -------------------------------------------------------- */
+
+    #stage {
+      position: fixed;
+      top: var(--topbar-h);
+      right: var(--side-w);
+      bottom: 0;
+      left: var(--rail-w);
+      z-index: 1;
+      overflow: hidden;
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    canvas#art {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .hints {
+      position: absolute;
       left: 50%;
-      bottom: 112px;
-      max-width: min(460px, calc(100vw - 32px));
-      padding: 10px 12px;
+      bottom: 14px;
+      z-index: 2;
+      padding: 7px 14px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--quiet);
+      background: oklch(99% 0.006 92 / 0.78);
+      font-size: 11.5px;
+      font-weight: 640;
+      white-space: nowrap;
+      transform: translateX(-50%);
+      pointer-events: none;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    .hints kbd {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10.5px;
+      color: var(--muted);
+    }
+
+    .status {
+      position: fixed;
+      left: calc(50vw - (var(--side-w) - var(--rail-w)) / 2);
+      bottom: 56px;
+      z-index: 5;
+      max-width: min(460px, 60vw);
+      padding: 10px 14px;
       border: 1px solid var(--line);
       border-radius: 8px;
       color: var(--ink);
@@ -510,145 +581,41 @@
       font-weight: 680;
       text-align: center;
       transform: translateX(-50%);
+      user-select: none;
+    }
+
+    .status[hidden] {
+      display: none;
     }
 
     @media (hover: hover) and (pointer: fine) {
+      .pigment:hover {
+        border-color: var(--active);
+      }
+
       .tool:hover,
       .brush:hover,
       .edge-button:hover,
-      .tab:hover,
-      .dock-button:hover {
+      .chip:hover {
         color: var(--active);
         border-color: oklch(48% 0.15 260 / 0.32);
         background: var(--active-soft);
       }
 
       .export:hover {
+        color: oklch(98% 0.008 92);
         background: oklch(23% 0.012 80 / 0.98);
       }
     }
 
-    @media (max-width: 960px) {
-      .topbar {
-        grid-template-columns: 1fr auto;
-      }
-
-      .tabs {
-        display: none;
-      }
-
-      .brand {
-        font-size: 17px;
-      }
-
-      .actions .tool:not(#undo):not(#redo),
-      .actions .export span {
-        display: none;
-      }
-
-      .panel {
-        width: min(300px, calc(100vw - 20px));
-      }
-
-      .brush-panel {
-        left: 10px;
-        top: 78px;
-      }
-
-      .settings-panel {
-        right: 10px;
-        top: 78px;
-        transform: none;
-      }
-    }
-
-    @media (max-width: 620px) {
+    @media (max-width: 1060px) {
       :root {
-        --control: 44px;
-        --dock-height: 86px;
+        --rail-w: 208px;
+        --side-w: 264px;
       }
 
-      #stage {
-        inset: 58px 0 var(--dock-height);
-      }
-
-      canvas {
-        height: calc(100dvh - 58px - var(--dock-height));
-      }
-
-      .topbar {
-        padding: 0 10px;
-        gap: 8px;
-      }
-
-      .brand {
-        min-width: 0;
-        font-size: 15px;
-      }
-
-      .brand svg {
-        width: 28px;
-        height: 28px;
-      }
-
-      .actions {
-        gap: 5px;
-      }
-
-      .actions #undo,
-      .actions #redo {
+      .tagline {
         display: none;
-      }
-
-      .panel {
-        left: 10px;
-        right: 10px;
-        top: auto;
-        bottom: calc(var(--dock-height) + 14px + env(safe-area-inset-bottom));
-        width: auto;
-        max-height: calc(100dvh - 58px - var(--dock-height) - 32px);
-        overflow: auto;
-      }
-
-      .settings-panel {
-        transform: none;
-      }
-
-      .panel[hidden] {
-        display: none;
-      }
-
-      .mini {
-        display: inline-grid;
-        place-items: center;
-      }
-
-      .dock {
-        left: 0;
-        right: 0;
-        bottom: 0;
-        width: auto;
-        min-height: var(--dock-height);
-        grid-template-columns: repeat(6, minmax(0, 1fr));
-        gap: 4px;
-        padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
-        border-right: 0;
-        border-bottom: 0;
-        border-left: 0;
-        border-radius: 0;
-        transform: none;
-      }
-
-      .dock-button {
-        min-height: 62px;
-      }
-
-      .dock-button span {
-        font-size: 10px;
-      }
-
-      .status {
-        bottom: calc(var(--dock-height) + 16px + env(safe-area-inset-bottom));
       }
     }
 
@@ -664,128 +631,103 @@
   </style>
 </head>
 <body>
-  <header class="topbar" aria-label="Ink canvas controls">
+  <header class="topbar" aria-label="Ink studio controls">
     <a class="brand" href="../" aria-label="Fractal Brushes home">
       <svg viewBox="0 0 32 32" aria-hidden="true">
         <circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" stroke-width="1.3" opacity="0.28"/>
-        <path d="M16 4.5c0 6.2-6.5 7.4-10.1 11.5C9.5 20.1 16 21.3 16 27.5"/>
-        <path d="M16 4.5c0 6.2 6.5 7.4 10.1 11.5C22.5 20.1 16 21.3 16 27.5"/>
-        <path d="M7.2 10.6c4.3.4 6.4 2.1 8.8 5.4 2.4-3.3 4.5-5 8.8-5.4"/>
-        <path d="M7.2 21.4c4.3-.4 6.4-2.1 8.8-5.4 2.4 3.3 4.5 5 8.8 5.4"/>
+        <path d="M16 4.5c0 6.2-6.5 7.4-10.1 11.5C9.5 20.1 16 21.3 16 27.5" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M16 4.5c0 6.2 6.5 7.4 10.1 11.5C22.5 20.1 16 21.3 16 27.5" fill="none" stroke="currentColor" stroke-width="1.4"/>
         <circle cx="16" cy="16" r="2.2" fill="currentColor"/>
       </svg>
       <span>Fractal Brushes Ink</span>
     </a>
 
-    <nav class="tabs" aria-label="Ink modes">
-      <button class="tab" data-tab-brush="ink" type="button" aria-pressed="true">Ink</button>
-      <button class="tab" data-tab-brush="nib" type="button" aria-pressed="false">Nib</button>
-      <button class="tab" data-tab-brush="wash" type="button" aria-pressed="false">Wash</button>
-      <button class="tab" data-tab-brush="scatter" type="button" aria-pressed="false">Scatter</button>
-      <button class="tab" data-tab-brush="dry" type="button" aria-pressed="false">Dry</button>
-    </nav>
+    <div class="tagline">Eight ink brushes · liquid pigment on paper</div>
 
     <div class="actions">
-      <button class="tool" id="undo" type="button" aria-label="Undo" title="Undo" disabled>
+      <button class="tool" id="undo" type="button" aria-label="Undo" title="Undo (Cmd/Ctrl+Z)" disabled>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7H4v5"/><path d="M5 12a8 8 0 1 0 2.35-5.65L4 9.7"/></svg>
       </button>
-      <button class="tool" id="redo" type="button" aria-label="Redo" title="Redo" disabled>
+      <button class="tool" id="redo" type="button" aria-label="Redo" title="Redo (Cmd/Ctrl+Shift+Z)" disabled>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 7h5v5"/><path d="M19 12a8 8 0 1 1-2.35-5.65L20 9.7"/></svg>
       </button>
-      <button class="tool" id="clear" type="button" aria-label="Clear" title="Clear">
+      <button class="tool" id="clear" type="button" aria-label="Clear" title="Clear (C)">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/></svg>
       </button>
-      <button class="export" id="export" type="button" aria-label="Export PNG" title="Export PNG">
+      <button class="export" id="export" type="button" aria-label="Export PNG" title="Export PNG (P)">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11"/><path d="m7 9 5 5 5-5"/><path d="M5 19h14"/></svg>
         <span>Export PNG</span>
       </button>
     </div>
   </header>
 
-  <main id="stage" aria-label="Fractal Brushes Ink drawing surface">
-    <canvas id="art" aria-label="Fractal Brushes Ink drawing canvas"></canvas>
-  </main>
-
-  <aside class="panel brush-panel" id="brushPanel" aria-label="Brushes">
-    <div class="panel-title">
-      <span>Brushes</span>
-      <button class="tool mini" id="closeBrushPanel" type="button" aria-label="Close brushes" title="Close brushes">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-      </button>
-    </div>
+  <aside class="rail" aria-label="Ink brushes">
+    <div class="section-title"><span>Brushes</span></div>
     <div class="brush-list" id="brushList"></div>
+    <div class="rail-foot">Press 1–8 to switch brushes</div>
   </aside>
 
-  <aside class="panel settings-panel" id="settingsPanel" aria-label="Ink settings">
-    <div class="panel-title">
-      <span>Ink settings</span>
-      <button class="tool mini" id="closeSettingsPanel" type="button" aria-label="Close settings" title="Close settings">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-      </button>
+  <main id="stage" aria-label="Fractal Brushes Ink drawing surface">
+    <canvas id="art" aria-label="Fractal Brushes Ink drawing canvas"></canvas>
+    <div class="hints" aria-hidden="true">
+      <kbd>1–8</kbd> brushes &nbsp;·&nbsp; <kbd>[</kbd><kbd>]</kbd> size &nbsp;·&nbsp; <kbd>M</kbd> mirror &nbsp;·&nbsp; <kbd>⌘Z</kbd> undo &nbsp;·&nbsp; <kbd>C</kbd> clear &nbsp;·&nbsp; <kbd>P</kbd> export
     </div>
+  </main>
 
-    <label class="field">
-      <span class="field-head"><span>Ink density</span><span class="value" id="densityValue">62%</span></span>
-      <input id="density" type="range" min="18" max="100" value="62" aria-label="Ink density">
-    </label>
+  <aside class="side" id="settingsPanel" aria-label="Ink settings">
+    <section>
+      <div class="section-title"><span>Pigment</span><span class="value" id="pigmentValue">Sumi Black</span></div>
+      <div class="pigment-row" id="pigmentRow" role="group" aria-label="Ink color"></div>
+    </section>
 
-    <label class="field">
-      <span class="field-head"><span>Water</span><span class="value" id="waterValue">38%</span></span>
-      <input id="water" type="range" min="0" max="100" value="38" aria-label="Water">
-    </label>
+    <section>
+      <div class="section-title"><span>Ink mix</span></div>
+      <label class="field">
+        <span class="field-head"><span>Ink density</span><span class="value" id="densityValue">62%</span></span>
+        <input id="density" type="range" min="18" max="100" value="62" aria-label="Ink density">
+      </label>
+      <label class="field">
+        <span class="field-head"><span>Water</span><span class="value" id="waterValue">38%</span></span>
+        <input id="water" type="range" min="0" max="100" value="38" aria-label="Water">
+      </label>
+      <label class="field">
+        <span class="field-head"><span>Brush size</span><span class="value" id="sizeValue">56 px</span></span>
+        <input id="size" type="range" min="8" max="120" value="56" aria-label="Brush size">
+      </label>
+    </section>
 
-    <div class="field">
-      <span class="field-head"><span>Edge</span><span class="value" id="edgeValue">Soft</span></span>
+    <section>
+      <div class="section-title"><span>Edge</span><span class="value" id="edgeValue">Soft</span></div>
       <div class="edge-row" role="group" aria-label="Edge style">
-        <button class="edge-button" data-edge="soft" type="button" aria-label="Soft edge" aria-pressed="true">
+        <button class="edge-button" data-edge="soft" type="button" aria-label="Soft edge" aria-pressed="true" title="Soft edge">
           <svg viewBox="0 0 32 18" aria-hidden="true"><path d="M3 10c4-6 7 6 12 0 5-6 8 6 14 0"/></svg>
         </button>
-        <button class="edge-button" data-edge="wave" type="button" aria-label="Wave edge" aria-pressed="false">
+        <button class="edge-button" data-edge="wave" type="button" aria-label="Wave edge" aria-pressed="false" title="Wave edge">
           <svg viewBox="0 0 32 18" aria-hidden="true"><path d="M3 11c4-4 7 4 12 0 5-4 8 4 14 0"/></svg>
         </button>
-        <button class="edge-button" data-edge="dry" type="button" aria-label="Dry edge" aria-pressed="false">
+        <button class="edge-button" data-edge="dry" type="button" aria-label="Dry edge" aria-pressed="false" title="Dry edge">
           <svg viewBox="0 0 32 18" aria-hidden="true"><path d="M3 9c3-2 5 2 8 0m4 0c3-2 5 2 8 0m3 0h3"/></svg>
         </button>
       </div>
-    </div>
+    </section>
 
-    <label class="field">
-      <span class="field-head"><span>Brush size</span><span class="value" id="sizeValue">56 px</span></span>
-      <input id="size" type="range" min="8" max="120" value="56" aria-label="Brush size">
-    </label>
-
-    <label class="field">
-      <span class="field-head"><span>Symmetry</span><span class="value" id="symmetryValue">8</span></span>
-      <input id="symmetry" type="range" min="1" max="16" value="8" aria-label="Symmetry">
-    </label>
+    <section>
+      <div class="section-title"><span>Symmetry</span><span class="value" id="symmetryValue">8</span></div>
+      <label class="field">
+        <input id="symmetry" type="range" min="1" max="16" value="8" aria-label="Symmetry">
+      </label>
+      <div class="chip-row">
+        <button class="chip" id="mirror" type="button" aria-label="Mirror" aria-pressed="true" title="Mirror (M)">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16"/><path d="M4 8l6 4-6 4V8Z"/><path d="M20 8l-6 4 6 4V8Z"/></svg>
+          Mirror
+        </button>
+        <button class="chip" id="randomize" type="button" aria-label="Randomize settings" title="Randomize">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>
+          Random
+        </button>
+      </div>
+    </section>
   </aside>
-
-  <nav class="dock" aria-label="Mobile tool dock">
-    <button class="dock-button" id="brushToggle" type="button" aria-label="Brushes" aria-controls="brushPanel" aria-expanded="true">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20c4 0 5.5-1.5 6-4"/><path d="M10 16 20 6a2 2 0 0 0-2.8-2.8L7.2 13.2"/><path d="M7 13c2.6.3 3.7 1.4 4 4"/></svg>
-      <span>Brushes</span>
-    </button>
-    <button class="dock-button" id="settingsToggle" type="button" aria-label="Settings" aria-controls="settingsPanel" aria-expanded="true">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10"/><path d="M18 7h2"/><circle cx="16" cy="7" r="2"/><path d="M4 17h2"/><path d="M10 17h10"/><circle cx="8" cy="17" r="2"/></svg>
-      <span>Settings</span>
-    </button>
-    <button class="dock-button" id="dockUndo" type="button" aria-label="Undo stroke" disabled>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7H4v5"/><path d="M5 12a8 8 0 1 0 2.35-5.65L4 9.7"/></svg>
-      <span>Undo</span>
-    </button>
-    <button class="dock-button" id="dockRedo" type="button" aria-label="Redo stroke" disabled>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 7h5v5"/><path d="M19 12a8 8 0 1 1-2.35-5.65L20 9.7"/></svg>
-      <span>Redo</span>
-    </button>
-    <button class="dock-button" id="mirror" type="button" aria-label="Mirror" aria-pressed="true">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16"/><path d="M4 8l6 4-6 4V8Z"/><path d="M20 8l-6 4 6 4V8Z"/></svg>
-      <span>Mirror</span>
-    </button>
-    <button class="dock-button" id="randomize" type="button" aria-label="Randomize">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>
-      <span>Random</span>
-    </button>
-  </nav>
 
   <div class="status" id="status" hidden role="status" aria-live="polite"></div>
 
@@ -800,18 +742,11 @@
       const ui = {
         undo: document.getElementById("undo"),
         redo: document.getElementById("redo"),
-        dockUndo: document.getElementById("dockUndo"),
-        dockRedo: document.getElementById("dockRedo"),
         clear: document.getElementById("clear"),
         export: document.getElementById("export"),
-        brushToggle: document.getElementById("brushToggle"),
-        settingsToggle: document.getElementById("settingsToggle"),
-        brushPanel: document.getElementById("brushPanel"),
-        settingsPanel: document.getElementById("settingsPanel"),
-        closeBrushPanel: document.getElementById("closeBrushPanel"),
-        closeSettingsPanel: document.getElementById("closeSettingsPanel"),
         brushList: document.getElementById("brushList"),
-        tabs: Array.from(document.querySelectorAll("[data-tab-brush]")),
+        pigmentRow: document.getElementById("pigmentRow"),
+        pigmentValue: document.getElementById("pigmentValue"),
         density: document.getElementById("density"),
         densityValue: document.getElementById("densityValue"),
         water: document.getElementById("water"),
@@ -827,65 +762,115 @@
         status: document.getElementById("status")
       };
 
+      // Eight ink brushes. "wet" scales how much each mark feeds the live wet
+      // bloom layer; "drain" is reservoir depletion per stamp so long strokes
+      // starve toward dry, broken marks.
       const brushProfiles = {
-        ink: {
-          name: "Ink",
-          kind: "ink",
+        sumi: {
+          name: "Sumi Brush",
+          hint: "tapered, flying white",
+          kind: "sumi",
           spacing: 0.16,
           sizeScale: 0.86,
           opacity: 0.82,
-          drain: 0.009,
+          drain: 0.01,
           bristles: 22,
-          softness: 0.62,
-          sample: [0.9, 0.72]
+          wet: 0.78
+        },
+        hake: {
+          name: "Hake Flat",
+          hint: "wide streaked band",
+          kind: "hake",
+          spacing: 0.17,
+          sizeScale: 1.34,
+          opacity: 0.52,
+          drain: 0.008,
+          bristles: 14,
+          wet: 0.92
+        },
+        mop: {
+          name: "Water Mop",
+          hint: "soaked wash, blooms",
+          kind: "mop",
+          spacing: 0.2,
+          sizeScale: 1.26,
+          opacity: 0.26,
+          drain: 0.004,
+          bristles: 18,
+          wet: 1.15
+        },
+        reed: {
+          name: "Reed Pen",
+          hint: "chisel, thick–thin",
+          kind: "reed",
+          spacing: 0.12,
+          sizeScale: 0.62,
+          opacity: 0.9,
+          drain: 0.013,
+          bristles: 6,
+          wet: 0.3
         },
         nib: {
-          name: "Nib",
+          name: "Steel Nib",
+          hint: "fine crisp line",
           kind: "nib",
           spacing: 0.12,
           sizeScale: 0.36,
           opacity: 0.92,
           drain: 0.006,
           bristles: 4,
-          softness: 0.1,
-          sample: [0.96, 0.62]
-        },
-        wash: {
-          name: "Wash",
-          kind: "wash",
-          spacing: 0.2,
-          sizeScale: 1.22,
-          opacity: 0.26,
-          drain: 0.004,
-          bristles: 18,
-          softness: 0.92,
-          sample: [0.5, 0.36]
-        },
-        scatter: {
-          name: "Scatter",
-          kind: "scatter",
-          spacing: 0.3,
-          sizeScale: 0.72,
-          opacity: 0.68,
-          drain: 0.012,
-          bristles: 10,
-          softness: 0.3,
-          sample: [0.72, 0.38]
+          wet: 0.4
         },
         dry: {
-          name: "Dry brush",
+          name: "Dry Bristle",
+          hint: "broken dry streaks",
           kind: "dry",
           spacing: 0.11,
           sizeScale: 0.98,
           opacity: 0.78,
           drain: 0.021,
           bristles: 30,
-          softness: 0.08,
-          sample: [0.86, 0.48]
+          wet: 0.2
+        },
+        flick: {
+          name: "Ink Flick",
+          hint: "thrown spatter",
+          kind: "flick",
+          spacing: 0.3,
+          sizeScale: 0.72,
+          opacity: 0.68,
+          drain: 0.012,
+          bristles: 10,
+          wet: 0.65
+        },
+        drip: {
+          name: "Water Drop",
+          hint: "clear water blooms",
+          kind: "drip",
+          spacing: 0.5,
+          sizeScale: 1.12,
+          opacity: 0.17,
+          drain: 0.003,
+          bristles: 6,
+          wet: 1.5
         }
       };
 
-      const brushOrder = ["ink", "nib", "wash", "scatter", "dry"];
+      const brushOrder = ["sumi", "hake", "mop", "reed", "nib", "dry", "flick", "drip"];
+      const CONTINUOUS = new Set(["sumi", "hake", "mop", "reed"]);
+
+      const pigments = {
+        sumi: { name: "Sumi Black", deep: [16, 15, 12], wash: [76, 74, 68] },
+        indigo: { name: "Indigo", deep: [30, 44, 116], wash: [96, 118, 186] },
+        payne: { name: "Payne's Grey", deep: [36, 48, 70], wash: [114, 130, 156] },
+        sepia: { name: "Sepia", deep: [72, 48, 24], wash: [158, 116, 74] },
+        vermilion: { name: "Vermilion", deep: [168, 38, 24], wash: [232, 116, 84] },
+        ochre: { name: "Yellow Ochre", deep: [166, 112, 28], wash: [220, 174, 98] },
+        viridian: { name: "Viridian", deep: [14, 84, 66], wash: [96, 162, 136] },
+        violet: { name: "Mulberry", deep: [94, 32, 102], wash: [168, 110, 174] }
+      };
+      const pigmentOrder = ["sumi", "indigo", "payne", "sepia", "vermilion", "ochre", "viridian", "violet"];
+
       const edgeLabels = {
         soft: "Soft",
         wave: "Wave",
@@ -898,7 +883,11 @@
         dpr: 1,
         cx: 0,
         cy: 0,
-        brush: "ink",
+        brush: "sumi",
+        pigment: "sumi",
+        custom: null,
+        wet: [],
+        wetRaf: 0,
         density: 0.62,
         water: 0.38,
         edge: "soft",
@@ -915,13 +904,46 @@
         redo: [],
         exporting: false,
         statusTimer: null,
-        mobileLayout: null
+        previewPigKey: ""
       };
 
       const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
       const rand = (min, max) => min + Math.random() * (max - min);
-      const isMobileLayout = () => window.innerWidth <= 620;
-      const inkColor = (alpha, shade = 14) => `rgba(${shade}, ${shade}, ${Math.max(10, shade - 4)}, ${clamp(alpha, 0, 1)})`;
+      const reducedMotion = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : { matches: false };
+
+      function hexToRgb(hex) {
+        const raw = String(hex || "").replace("#", "");
+        const full = raw.length === 3 ? raw.split("").map((c) => c + c).join("") : raw.padEnd(6, "0").slice(0, 6);
+        return [0, 2, 4].map((i) => clamp(parseInt(full.slice(i, i + 2), 16) || 0, 0, 255));
+      }
+
+      function customPigment(hex) {
+        const base = hexToRgb(hex);
+        return {
+          name: "Custom",
+          deep: base.map((v) => Math.round(v * 0.52)),
+          wash: base.map((v) => Math.round(v + (255 - v) * 0.24))
+        };
+      }
+
+      function activePigment() {
+        if (state.pigment === "custom" && state.custom) return state.custom;
+        return pigments[state.pigment] || pigments.sumi;
+      }
+
+      // Maps the grayscale "shade" (8 = dense core, 46 = faint halo) onto the
+      // active pigment's deep -> wash tone ramp. Water pushes tones toward the
+      // lighter, more chromatic wash anchor so dilution reads as a transparent tint.
+      const inkColor = (alpha, shade = 14) => {
+        const pig = activePigment();
+        const tone = clamp(((shade - 8) / 38) * (0.78 + state.water * 0.3), 0, 1);
+        const r = Math.round(pig.deep[0] + (pig.wash[0] - pig.deep[0]) * tone);
+        const g = Math.round(pig.deep[1] + (pig.wash[1] - pig.deep[1]) * tone);
+        const b = Math.round(pig.deep[2] + (pig.wash[2] - pig.deep[2]) * tone);
+        return `rgba(${r}, ${g}, ${b}, ${clamp(alpha, 0, 1)})`;
+      };
+
+      const wetRgba = (rgb, alpha) => `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${clamp(alpha, 0, 1)})`;
 
       function hashUnit(x, y = 0, seed = state.paperSeed) {
         const value = Math.sin(x * 127.1 + y * 311.7 + seed * 74.7) * 43758.5453123;
@@ -933,9 +955,11 @@
         return from + delta * amount;
       }
 
+      // ---- Brush rail with live canvas previews ---------------------------
+
       function createBrushControls() {
         ui.brushList.innerHTML = "";
-        brushOrder.forEach((id) => {
+        brushOrder.forEach((id, index) => {
           const profile = brushProfiles[id];
           const button = document.createElement("button");
           button.className = "brush";
@@ -943,39 +967,221 @@
           button.dataset.brush = id;
           button.setAttribute("aria-label", `${profile.name} brush`);
           button.setAttribute("aria-pressed", "false");
-          button.style.setProperty("--dot-a", String(profile.sample[0]));
-          button.style.setProperty("--dot-b", String(profile.sample[1]));
-          button.innerHTML = `<span class="stroke-sample" aria-hidden="true"></span><span class="brush-name">${profile.name}</span><span class="check" aria-hidden="true"></span>`;
+          const preview = document.createElement("canvas");
+          preview.className = "brush-preview";
+          preview.setAttribute("aria-hidden", "true");
+          const caption = document.createElement("span");
+          caption.className = "brush-caption";
+          caption.innerHTML = `<span class="brush-name">${profile.name}<em>${profile.hint}</em></span><kbd>${index + 1}</kbd>`;
+          button.append(preview, caption);
           button.addEventListener("click", () => setBrush(id));
           ui.brushList.append(button);
         });
       }
 
-      function setPanelVisibility(panel, visible) {
-        panel.hidden = !visible;
+      function previewPath(t, w, h) {
+        return {
+          x: w * 0.08 + t * w * 0.84,
+          y: h * 0.52 + Math.sin(t * Math.PI * 1.7 - 0.5) * h * 0.2
+        };
       }
 
-      function applyResponsiveMode() {
-        const mobile = isMobileLayout();
-        if (state.mobileLayout === mobile) return;
-        state.mobileLayout = mobile;
-        if (mobile) {
-          setPanelVisibility(ui.brushPanel, false);
-          setPanelVisibility(ui.settingsPanel, false);
-        } else {
-          setPanelVisibility(ui.brushPanel, true);
-          setPanelVisibility(ui.settingsPanel, true);
+      function paintBrushPreview(preview, kind) {
+        const dpr = clamp(window.devicePixelRatio || 1, 1, 2);
+        const w = Math.max(60, Math.round(preview.clientWidth || 180));
+        const h = Math.max(24, Math.round(preview.clientHeight || 40));
+        preview.width = w * dpr;
+        preview.height = h * dpr;
+        const p = preview.getContext("2d");
+        p.setTransform(dpr, 0, 0, dpr, 0, 0);
+        p.clearRect(0, 0, w, h);
+        const pig = activePigment();
+        const deep = (a) => wetRgba(pig.deep, a);
+        const wash = (a) => wetRgba(pig.wash, a);
+        const steps = 26;
+        p.lineCap = "round";
+        p.lineJoin = "round";
+
+        if (kind === "sumi") {
+          for (let i = 0; i < steps; i += 1) {
+            const a = previewPath(i / steps, w, h);
+            const b = previewPath((i + 1) / steps, w, h);
+            const bell = Math.sin(((i + 0.5) / steps) * Math.PI);
+            p.strokeStyle = deep(0.66 + bell * 0.24);
+            p.lineWidth = 1 + bell * h * 0.34;
+            p.beginPath();
+            p.moveTo(a.x, a.y);
+            p.lineTo(b.x, b.y);
+            p.stroke();
+          }
+        } else if (kind === "hake") {
+          for (let lane = 0; lane < 6; lane += 1) {
+            const offset = (lane / 5 - 0.5) * h * 0.56;
+            p.strokeStyle = lane % 2 ? wash(0.8) : deep(0.42 + hashUnit(lane, 2, 7) * 0.3);
+            p.lineWidth = 1.6;
+            p.beginPath();
+            for (let i = 0; i <= steps; i += 1) {
+              const pt = previewPath(i / steps, w, h);
+              if (i === 0) p.moveTo(pt.x, pt.y + offset);
+              else p.lineTo(pt.x, pt.y + offset);
+            }
+            p.stroke();
+          }
+        } else if (kind === "mop") {
+          p.filter = "blur(2px)";
+          p.strokeStyle = wash(0.55);
+          p.lineWidth = h * 0.62;
+          p.beginPath();
+          for (let i = 0; i <= steps; i += 1) {
+            const pt = previewPath(i / steps, w, h);
+            if (i === 0) p.moveTo(pt.x, pt.y);
+            else p.lineTo(pt.x, pt.y);
+          }
+          p.stroke();
+          p.filter = "none";
+          p.strokeStyle = deep(0.2);
+          p.lineWidth = h * 0.2;
+          p.stroke();
+        } else if (kind === "reed") {
+          const ex = Math.cos(-0.66) * h * 0.3;
+          const ey = Math.sin(-0.66) * h * 0.3;
+          p.fillStyle = deep(0.88);
+          for (let i = 0; i < steps; i += 1) {
+            const a = previewPath(i / steps, w, h);
+            const b = previewPath((i + 1) / steps, w, h);
+            p.beginPath();
+            p.moveTo(a.x - ex, a.y - ey);
+            p.lineTo(a.x + ex, a.y + ey);
+            p.lineTo(b.x + ex, b.y + ey);
+            p.lineTo(b.x - ex, b.y - ey);
+            p.closePath();
+            p.fill();
+          }
+        } else if (kind === "nib") {
+          p.strokeStyle = deep(0.9);
+          p.lineWidth = 1.3;
+          p.beginPath();
+          for (let i = 0; i <= steps; i += 1) {
+            const pt = previewPath(i / steps, w, h);
+            if (i === 0) p.moveTo(pt.x, pt.y);
+            else p.lineTo(pt.x, pt.y);
+          }
+          p.stroke();
+          p.strokeStyle = deep(0.34);
+          p.lineWidth = 0.8;
+          p.beginPath();
+          for (let i = 0; i <= steps; i += 1) {
+            const pt = previewPath(i / steps, w, h);
+            if (i === 0) p.moveTo(pt.x, pt.y + 2.4);
+            else p.lineTo(pt.x, pt.y + 2.4);
+          }
+          p.stroke();
+        } else if (kind === "dry") {
+          for (let lane = 0; lane < 8; lane += 1) {
+            const offset = (lane / 7 - 0.5) * h * 0.5;
+            p.strokeStyle = deep(0.4 + hashUnit(lane, 3, 11) * 0.4);
+            p.lineWidth = 1.1;
+            p.setLineDash([3 + hashUnit(lane, 4, 11) * 6, 3 + hashUnit(lane, 5, 11) * 5]);
+            p.lineDashOffset = hashUnit(lane, 6, 11) * 9;
+            p.beginPath();
+            for (let i = 0; i <= steps; i += 1) {
+              const pt = previewPath(i / steps, w, h);
+              if (i === 0) p.moveTo(pt.x, pt.y + offset);
+              else p.lineTo(pt.x, pt.y + offset);
+            }
+            p.stroke();
+          }
+          p.setLineDash([]);
+        } else if (kind === "flick") {
+          for (let i = 0; i < 22; i += 1) {
+            const t = hashUnit(i, 8, 13);
+            const pt = previewPath(t, w, h);
+            const r = 0.7 + hashUnit(i, 9, 13) * 2.6;
+            p.fillStyle = deep(0.28 + hashUnit(i, 10, 13) * 0.6);
+            p.beginPath();
+            p.ellipse(
+              pt.x + (hashUnit(i, 11, 13) - 0.5) * 14,
+              pt.y + (hashUnit(i, 12, 13) - 0.5) * h * 0.7,
+              r * 1.4,
+              r * 0.8,
+              hashUnit(i, 13, 13) * Math.PI,
+              0,
+              Math.PI * 2
+            );
+            p.fill();
+          }
+        } else if (kind === "drip") {
+          [[0.3, 0.9], [0.62, 0.62], [0.84, 0.42]].forEach(([t, scale], i) => {
+            const pt = previewPath(t, w, h);
+            const radius = h * 0.42 * scale;
+            const gradient = p.createRadialGradient(pt.x, pt.y, radius * 0.1, pt.x, pt.y, radius);
+            gradient.addColorStop(0, wash(0.16));
+            gradient.addColorStop(0.72, wash(0.44));
+            gradient.addColorStop(1, wash(0));
+            p.fillStyle = gradient;
+            p.beginPath();
+            p.arc(pt.x, pt.y, radius, 0, Math.PI * 2);
+            p.fill();
+            p.strokeStyle = deep(0.24);
+            p.lineWidth = 0.9;
+            p.beginPath();
+            p.arc(pt.x, pt.y, radius * 0.86, hashUnit(i, 14, 17) * 6, hashUnit(i, 14, 17) * 6 + 4.2);
+            p.stroke();
+          });
         }
+      }
+
+      function renderBrushPreviews() {
+        Array.from(ui.brushList.querySelectorAll(".brush")).forEach((button) => {
+          const preview = button.querySelector(".brush-preview");
+          if (preview) paintBrushPreview(preview, brushProfiles[button.dataset.brush].kind);
+        });
+      }
+
+      function setPigment(id) {
+        if (id !== "custom" && !pigments[id]) return;
+        state.pigment = id;
+        updateUi();
+      }
+
+      function createPigmentControls() {
+        ui.pigmentRow.innerHTML = "";
+        pigmentOrder.forEach((id) => {
+          const pig = pigments[id];
+          const button = document.createElement("button");
+          button.className = "pigment";
+          button.type = "button";
+          button.dataset.pigment = id;
+          button.title = pig.name;
+          button.setAttribute("aria-label", `${pig.name} ink`);
+          button.setAttribute("aria-pressed", "false");
+          button.style.background = `linear-gradient(135deg, rgb(${pig.deep.join(",")}) 0%, rgb(${pig.deep.join(",")}) 40%, rgb(${pig.wash.join(",")}) 100%)`;
+          button.addEventListener("click", () => setPigment(id));
+          ui.pigmentRow.append(button);
+        });
+
+        const custom = document.createElement("input");
+        custom.type = "color";
+        custom.id = "customColor";
+        custom.className = "pigment pigment-custom";
+        custom.value = "#2f9e9b";
+        custom.title = "Custom ink";
+        custom.dataset.pigment = "custom";
+        custom.setAttribute("aria-label", "Custom ink color");
+        custom.setAttribute("aria-pressed", "false");
+        state.custom = customPigment(custom.value);
+        custom.addEventListener("input", () => {
+          state.custom = customPigment(custom.value);
+          setPigment("custom");
+        });
+        custom.addEventListener("click", () => setPigment("custom"));
+        ui.pigmentRow.append(custom);
       }
 
       function updateUi() {
         ui.undo.disabled = state.history.length === 0;
         ui.redo.disabled = state.redo.length === 0;
-        ui.dockUndo.disabled = state.history.length === 0;
-        ui.dockRedo.disabled = state.redo.length === 0;
         ui.export.disabled = state.exporting;
-        ui.brushToggle.setAttribute("aria-expanded", String(!ui.brushPanel.hidden));
-        ui.settingsToggle.setAttribute("aria-expanded", String(!ui.settingsPanel.hidden));
         ui.mirror.setAttribute("aria-pressed", String(state.mirror));
         ui.density.value = String(Math.round(state.density * 100));
         ui.densityValue.textContent = `${Math.round(state.density * 100)}%`;
@@ -987,16 +1193,29 @@
         ui.symmetryValue.textContent = String(state.symmetry);
         ui.edgeValue.textContent = edgeLabels[state.edge] || "Soft";
 
+        const pig = activePigment();
+        ui.pigmentValue.textContent = pig.name;
+        document.documentElement.style.setProperty("--pig-deep", pig.deep.join(" "));
+        document.documentElement.style.setProperty("--pig-wash", pig.wash.join(" "));
+        Array.from(ui.pigmentRow.children).forEach((swatch) => {
+          swatch.setAttribute("aria-pressed", String(swatch.dataset.pigment === state.pigment));
+        });
+
         Array.from(ui.brushList.querySelectorAll(".brush")).forEach((button) => {
           button.setAttribute("aria-pressed", String(button.dataset.brush === state.brush));
-        });
-        ui.tabs.forEach((button) => {
-          button.setAttribute("aria-pressed", String(button.dataset.tabBrush === state.brush));
         });
         ui.edgeButtons.forEach((button) => {
           button.setAttribute("aria-pressed", String(button.dataset.edge === state.edge));
         });
+
+        const pigKey = pig.deep.join() + "|" + pig.wash.join();
+        if (pigKey !== state.previewPigKey) {
+          state.previewPigKey = pigKey;
+          renderBrushPreviews();
+        }
       }
+
+      // ---- Paper ------------------------------------------------------
 
       function makePaperNoise(width = state.width, height = state.height) {
         const gridWidth = 180;
@@ -1022,6 +1241,150 @@
         const nx = clamp(Math.floor((x / Math.max(1, paper.width)) * paper.gridWidth), 0, paper.gridWidth - 1);
         const ny = clamp(Math.floor((y / Math.max(1, paper.height)) * paper.gridHeight), 0, paper.gridHeight - 1);
         return paper.data[ny * paper.gridWidth + nx] / 255;
+      }
+
+      // --- Wet layer -------------------------------------------------------
+      // Fresh marks register bounded wet regions. While a region is wet, a
+      // requestAnimationFrame loop feathers diluted pigment outward along the
+      // paper-absorbency field; when it dries, pigment settles into a darker,
+      // broken rim plus granulation. settleWet() fast-forwards every pending
+      // region so history snapshots, undo/redo, export, and resize always see
+      // the final dried pixels. An empty wet list costs zero CPU.
+
+      function drawWetPass(region, fromP, toP) {
+        const dp = toP - fromP;
+        if (dp <= 0) return;
+        const eased = 1 - (1 - toP) * (1 - toP);
+        const radius = region.r * (1 + region.grow * eased);
+        const absorb = paperAbsorbency(region.x, region.y);
+        const bandAlpha = clamp(region.alpha * dp * (0.9 + absorb * 0.8), 0, 0.5);
+
+        ctx.save();
+        ctx.globalCompositeOperation = "multiply";
+
+        const bloom = ctx.createRadialGradient(region.x, region.y, radius * 0.22, region.x, region.y, radius);
+        bloom.addColorStop(0, wetRgba(region.wash, bandAlpha * 0.38));
+        bloom.addColorStop(0.52, wetRgba(region.wash, bandAlpha * 0.46));
+        bloom.addColorStop(1, wetRgba(region.wash, 0));
+        ctx.fillStyle = bloom;
+        ctx.beginPath();
+        ctx.arc(region.x, region.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        for (let i = 0; i < 4; i += 1) {
+          const angle = hashUnit(i, 3, region.seed) * Math.PI * 2;
+          const reach = radius * (0.82 + hashUnit(i, 4, region.seed) * 0.3);
+          const fx = region.x + Math.cos(angle) * reach;
+          const fy = region.y + Math.sin(angle) * reach;
+          const feed = paperAbsorbency(fx, fy);
+          if (feed < 0.45) continue;
+          ctx.fillStyle = wetRgba(region.wash, bandAlpha * feed * 0.55);
+          ctx.beginPath();
+          ctx.ellipse(fx, fy, radius * (0.1 + feed * 0.12), radius * 0.08, angle, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        if (toP >= 1) {
+          const rimAlpha = clamp(region.alpha * (0.34 + absorb * 0.4), 0, 0.34);
+          ctx.lineCap = "round";
+          for (let i = 0; i < 3; i += 1) {
+            const start = hashUnit(i, 7, region.seed) * Math.PI * 2;
+            const span = Math.PI * (0.42 + hashUnit(i, 8, region.seed) * 0.66);
+            const rimRadius = radius * (0.94 + (hashUnit(i, 9, region.seed) - 0.5) * 0.06);
+            ctx.strokeStyle = wetRgba(region.deep, rimAlpha * (0.5 + hashUnit(i, 10, region.seed) * 0.5));
+            ctx.lineWidth = Math.max(0.7, radius * (0.028 + hashUnit(i, 12, region.seed) * 0.03));
+            ctx.beginPath();
+            ctx.arc(region.x, region.y, rimRadius, start, start + span);
+            ctx.stroke();
+          }
+          const grains = 2 + Math.round(absorb * 4);
+          for (let i = 0; i < grains; i += 1) {
+            const angle = hashUnit(i, 15, region.seed) * Math.PI * 2;
+            const dist = radius * hashUnit(i, 16, region.seed);
+            const gx = region.x + Math.cos(angle) * dist;
+            const gy = region.y + Math.sin(angle) * dist;
+            ctx.fillStyle = wetRgba(region.deep, region.alpha * 0.16 * paperAbsorbency(gx, gy));
+            ctx.beginPath();
+            ctx.arc(gx, gy, Math.max(0.5, region.r * 0.045 * (0.5 + hashUnit(i, 17, region.seed))), 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        ctx.restore();
+      }
+
+      function wetTick(now) {
+        state.wetRaf = 0;
+        if (state.wet.length === 0) return;
+        const survivors = [];
+        for (const region of state.wet) {
+          const p = clamp((now - region.born) / region.life, 0, 1);
+          if (p >= 1) {
+            drawWetPass(region, region.p, 1);
+          } else {
+            if (p - region.p >= 0.055) {
+              drawWetPass(region, region.p, p);
+              region.p = p;
+            }
+            survivors.push(region);
+          }
+        }
+        state.wet = survivors;
+        if (state.wet.length > 0) state.wetRaf = window.requestAnimationFrame(wetTick);
+      }
+
+      function scheduleWet() {
+        if (!state.wetRaf && state.wet.length > 0) {
+          state.wetRaf = window.requestAnimationFrame(wetTick);
+        }
+      }
+
+      function settleWet() {
+        if (state.wetRaf) {
+          window.cancelAnimationFrame(state.wetRaf);
+          state.wetRaf = 0;
+        }
+        if (state.wet.length === 0) return;
+        state.wet.forEach((region) => {
+          let previous = region.p;
+          for (let step = 1; step <= 3; step += 1) {
+            const next = previous + (1 - previous) / (4 - step);
+            drawWetPass(region, previous, next);
+            previous = next;
+          }
+        });
+        state.wet = [];
+      }
+
+      function queueWet(x, y, radius, alpha, kindWet) {
+        const stampIndex = state.stroke ? state.stroke.stamps : 0;
+        if (stampIndex % 2 === 1) return;
+        const wetness = clamp(state.water * kindWet * (state.edge === "dry" ? 0.45 : 1), 0, 1.3);
+        if (wetness < 0.06 || alpha < 0.02 || radius < 1.5) return;
+        if (x < -radius || y < -radius || x > state.width + radius || y > state.height + radius) return;
+        const seed = (state.stroke ? state.stroke.seed : state.paperSeed) + stampIndex * 31 + Math.floor(x * 0.7 + y * 1.3);
+        const region = {
+          x,
+          y,
+          r: radius,
+          grow: 0.34 + wetness * 1.05,
+          alpha: clamp(alpha * (0.3 + wetness * 0.55), 0, 0.55),
+          deep: activePigment().deep,
+          wash: activePigment().wash,
+          born: performance.now(),
+          life: 460 + wetness * 1800 * (0.75 + hashUnit(stampIndex, 91, seed) * 0.5),
+          seed,
+          p: 0
+        };
+        if (reducedMotion.matches) {
+          drawWetPass(region, 0, 1);
+          return;
+        }
+        if (state.wet.length >= 320) {
+          const oldest = state.wet.shift();
+          drawWetPass(oldest, oldest.p, 1);
+        }
+        state.wet.push(region);
+        scheduleWet();
       }
 
       function drawPaper(targetCtx = ctx, width = state.width, height = state.height) {
@@ -1086,6 +1449,8 @@
         targetCtx.restore();
       }
 
+      // ---- History ------------------------------------------------------
+
       function makeSnapshot() {
         const shot = document.createElement("canvas");
         shot.width = canvas.width;
@@ -1104,6 +1469,7 @@
       }
 
       function pushHistory() {
+        settleWet();
         state.history.push(makeSnapshot());
         if (state.history.length > 14) state.history.shift();
         state.redo = [];
@@ -1111,6 +1477,7 @@
       }
 
       function resize() {
+        settleWet();
         const previous = canvas.width && canvas.height ? makeSnapshot() : null;
         state.dpr = clamp(window.devicePixelRatio || 1, 1, 2);
         state.width = Math.max(1, Math.floor(stage.clientWidth * state.dpr));
@@ -1121,9 +1488,11 @@
         canvas.height = state.height;
         if (previous) restoreSnapshot(previous);
         else drawPaper();
-        applyResponsiveMode();
+        renderBrushPreviews();
         updateUi();
       }
+
+      // ---- Geometry helpers -----------------------------------------------
 
       function rotateAroundCenter(x, y, angle) {
         const dx = x - state.cx;
@@ -1205,24 +1574,30 @@
         return profile.opacity * state.density * clamp(pressure, 0.18, 1) * load * (0.84 + absorb * 0.28);
       }
 
-      function drawContinuousInkSegment(from, to, angle, pressure, speed) {
-        const profile = brushProfiles.ink;
+      // ---- Brush renderers --------------------------------------------------
+
+      // Sumi: pointed calligraphy brush. Width tapers with reservoir load and
+      // pressure; fast strokes lift bristles off the paper ("flying white").
+      function drawContinuousSumiSegment(from, to, angle, pressure, speed) {
+        const profile = brushProfiles.sumi;
         const mid = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
         const load = state.stroke ? state.stroke.reservoir : 1;
         const size = state.size * state.dpr * profile.sizeScale;
         const alpha = segmentInkAlpha(profile, mid, pressure);
-        const width = size * (0.34 + pressure * 0.28) * (1.05 - clamp(speed, 0, 1.7) * 0.1);
+        const taper = 0.55 + load * 0.45;
+        const width = size * (0.34 + pressure * 0.28) * (1.05 - clamp(speed, 0, 1.7) * 0.1) * taper;
+        const flyingWhite = Math.max(0, speed - 1.2) * 0.4;
         const edgeWave = state.edge === "wave" ? Math.sin((state.stroke?.stamps || 0) * 0.65 + state.paperSeed) * width * 0.06 : 0;
 
         if (state.water > 0.18) {
           drawLinePass(from, to, width * (1.22 + state.water * 0.52), alpha * (0.07 + state.water * 0.12), 34, "round", width * (0.025 + state.water * 0.035));
         }
-        drawLinePass(from, to, width * (0.82 + edgeWave / Math.max(1, width)), alpha * 0.58, 10, "round");
+        drawLinePass(from, to, width * (0.82 + edgeWave / Math.max(1, width)), alpha * 0.58 * (1 - flyingWhite * 0.6), 10, "round");
         drawLinePass(from, to, width * 0.28, alpha * (0.56 + (1 - speed) * 0.12), 7, "round");
 
         const mask = state.stroke?.mask || makeBrushMask(profile, size, state.paperSeed);
         mask.bristles.forEach((bristle, index) => {
-          if (index % 2 && hashUnit(index, state.stroke?.stamps || 0, mask.seed) < 0.36) return;
+          if (index % 2 && hashUnit(index, state.stroke?.stamps || 0, mask.seed) < 0.36 + flyingWhite) return;
           const laneOffset = clamp(bristle.offset * 0.34 + edgeWave, -width * 0.48, width * 0.48);
           const laneFrom = offsetPoint(from, angle, laneOffset);
           const laneTo = offsetPoint(to, angle, laneOffset + (hashUnit(index, 61, mask.seed) - 0.5) * width * 0.08);
@@ -1233,10 +1608,52 @@
         });
 
         if (state.edge !== "soft") drawSplatter(to.x, to.y, angle, pressure, speed, load);
+        queueWet(mid.x, mid.y, width * 0.62, alpha, profile.wet);
       }
 
-      function drawContinuousWashSegment(from, to, angle, pressure, speed) {
-        const profile = brushProfiles.wash;
+      // Hake: wide flat wash brush. A translucent body band plus individually
+      // starved bristle streaks across the full width, with crisp rails at the
+      // two edges of the flat.
+      function drawContinuousHakeSegment(from, to, angle, pressure, speed) {
+        const profile = brushProfiles.hake;
+        const mid = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
+        const load = state.stroke ? state.stroke.reservoir : 1;
+        const size = state.size * state.dpr * profile.sizeScale;
+        const alpha = segmentInkAlpha(profile, mid, pressure);
+        const width = size * (0.82 + pressure * 0.22);
+        const mask = state.stroke?.mask || makeBrushMask(profile, size, state.paperSeed);
+        const stampIndex = state.stroke?.stamps || 0;
+
+        drawLinePass(from, to, width, alpha * 0.18, 30, "butt", width * 0.015);
+        drawLinePass(from, to, width * 0.88, alpha * 0.15, 22, "butt");
+
+        const lanes = 12;
+        for (let i = 0; i < lanes; i += 1) {
+          const t = i / (lanes - 1);
+          const laneOffset = (t - 0.5) * width * 0.94 + (hashUnit(i, 5, mask.seed) - 0.5) * width * 0.05;
+          const laneFrom = offsetPoint(from, angle, laneOffset);
+          const laneTo = offsetPoint(to, angle, laneOffset + (hashUnit(i, 6, mask.seed) - 0.5) * width * 0.04);
+          const absorb = paperAbsorbency(laneTo.x, laneTo.y);
+          const starve = state.edge === "dry" ? 0.34 : 0.1;
+          if (hashUnit(i, stampIndex, mask.seed) < starve * (1.2 - absorb) + (1 - load) * 0.2) continue;
+          const laneWidth = Math.max(0.6 * state.dpr, width * (0.028 + hashUnit(i, 7, mask.seed) * 0.05));
+          const laneShade = 10 + Math.round(hashUnit(i, 8, mask.seed) * 14);
+          drawLinePass(laneFrom, laneTo, laneWidth, alpha * (0.3 + hashUnit(i, 9, mask.seed) * 0.3) * load, laneShade, "butt");
+        }
+
+        [-1, 1].forEach((side) => {
+          const railFrom = offsetPoint(from, angle, side * width * 0.48);
+          const railTo = offsetPoint(to, angle, side * width * 0.48);
+          drawLinePass(railFrom, railTo, Math.max(0.6 * state.dpr, width * 0.02), alpha * 0.24, 14, "butt");
+        });
+
+        if (state.edge !== "soft") drawSplatter(to.x, to.y, angle, pressure, speed, load * 0.4);
+        queueWet(mid.x, mid.y, width * 0.55, alpha * 1.4, profile.wet);
+      }
+
+      // Mop: water-soaked wash brush with soft diffuse body and heavy blooms.
+      function drawContinuousMopSegment(from, to, angle, pressure, speed) {
+        const profile = brushProfiles.mop;
         const mid = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
         const load = state.stroke ? state.stroke.reservoir : 1;
         const size = state.size * state.dpr * profile.sizeScale;
@@ -1269,6 +1686,53 @@
         });
 
         if (state.edge !== "soft") drawSplatter(to.x, to.y, angle, pressure, speed, load * 0.55);
+        queueWet(mid.x, mid.y, width * 0.66, alpha * 2.2, profile.wet);
+      }
+
+      // Reed pen: rigid chisel edge held at a fixed angle. The ribbon between
+      // the two edge corners naturally goes thick and thin as the stroke
+      // direction changes; slow passes pool ink at the tip.
+      function drawContinuousReedSegment(from, to, angle, pressure, speed) {
+        const profile = brushProfiles.reed;
+        const mid = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
+        const load = state.stroke ? state.stroke.reservoir : 1;
+        const size = state.size * state.dpr * profile.sizeScale;
+        const alpha = clamp(segmentInkAlpha(profile, mid, pressure) * 1.08, 0, 1);
+        const chisel = -0.66;
+        const edgeLength = size * (0.6 + pressure * 0.3);
+        const ex = (Math.cos(chisel) * edgeLength) / 2;
+        const ey = (Math.sin(chisel) * edgeLength) / 2;
+
+        ctx.save();
+        ctx.globalCompositeOperation = "multiply";
+        ctx.fillStyle = inkColor(alpha * (0.62 + load * 0.24), 8);
+        ctx.beginPath();
+        ctx.moveTo(from.x - ex, from.y - ey);
+        ctx.lineTo(from.x + ex, from.y + ey);
+        ctx.lineTo(to.x + ex, to.y + ey);
+        ctx.lineTo(to.x - ex, to.y - ey);
+        ctx.closePath();
+        ctx.fill();
+
+        if (speed < 0.24) {
+          ctx.fillStyle = inkColor(alpha * 0.5, 8);
+          ctx.beginPath();
+          ctx.ellipse(to.x, to.y, edgeLength * 0.22, edgeLength * 0.13, chisel, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+
+        drawLinePass(
+          { x: from.x - ex, y: from.y - ey },
+          { x: to.x - ex, y: to.y - ey },
+          Math.max(0.7 * state.dpr, size * 0.03),
+          alpha * 0.5,
+          8,
+          "butt"
+        );
+
+        if (state.edge !== "soft") drawSplatter(to.x, to.y, angle, pressure, speed, load * 0.5);
+        queueWet(mid.x, mid.y, edgeLength * 0.4, alpha * 0.8, profile.wet);
       }
 
       function drawBloom(x, y, radius, alpha, edgeAlpha = alpha * 0.34) {
@@ -1294,8 +1758,8 @@
       }
 
       function drawSplatter(x, y, angle, pressure, speed, load) {
-        const profile = brushProfiles[state.brush] || brushProfiles.ink;
-        const factor = profile.kind === "scatter" ? 1 : state.edge === "dry" ? 0.22 : 0.08;
+        const profile = brushProfiles[state.brush] || brushProfiles.sumi;
+        const factor = profile.kind === "flick" ? 1 : state.edge === "dry" ? 0.22 : 0.08;
         if (factor <= 0) return;
         const seed = (state.stroke ? state.stroke.seed + state.stroke.stamps * 17 : state.paperSeed) + Math.floor(x + y);
         const count = Math.round((2 + state.density * 9) * factor * (0.72 + pressure));
@@ -1303,7 +1767,7 @@
 
         ctx.globalCompositeOperation = "multiply";
         for (let i = 0; i < count; i += 1) {
-          const spreadAngle = angle + (hashUnit(i, 6, seed) - 0.5) * Math.PI * (profile.kind === "scatter" ? 1.2 : 0.48);
+          const spreadAngle = angle + (hashUnit(i, 6, seed) - 0.5) * Math.PI * (profile.kind === "flick" ? 1.2 : 0.48);
           const sideAngle = spreadAngle + Math.PI / 2;
           const throwDistance = (4 + hashUnit(i, 7, seed) * (state.size * (0.42 + state.water * 0.54))) * state.dpr;
           const along = (hashUnit(i, 8, seed) - 0.5) * state.size * 0.34 * state.dpr;
@@ -1340,62 +1804,6 @@
           stampCtx.stroke();
         }
         stampCtx.restore();
-      }
-
-      function stampRoundBrush(x, y, angle, size, alpha, pressure, speed, load) {
-        const profile = brushProfiles[state.brush] || brushProfiles.ink;
-        const wet = profile.kind === "wash";
-        const diameter = size * (wet ? 2.25 + state.water * 0.75 : 1.55 + state.water * 0.36);
-        const dimension = resetStampBuffer(diameter);
-        const center = dimension / 2;
-        const radius = diameter * (wet ? 0.38 : 0.32);
-        const edgeMode = state.edge;
-        const edgeWave = edgeMode === "wave" ? 0.08 * Math.sin((state.stroke?.stamps || 0) * 0.7 + state.paperSeed) : 0;
-
-        const gradient = stampCtx.createRadialGradient(center, center, 0, center, center, radius * (1.08 + edgeWave));
-        gradient.addColorStop(0, inkColor(alpha * (wet ? 0.46 : 0.92), wet ? 34 : 10));
-        gradient.addColorStop(wet ? 0.56 : 0.42, inkColor(alpha * (wet ? 0.28 : 0.62), wet ? 38 : 14));
-        gradient.addColorStop(0.82, inkColor(alpha * (wet ? 0.14 : 0.2), 24));
-        gradient.addColorStop(1, inkColor(0, 34));
-        stampCtx.fillStyle = gradient;
-        stampCtx.beginPath();
-        stampCtx.arc(center, center, radius * (1 + edgeWave), 0, Math.PI * 2);
-        stampCtx.fill();
-
-        if (!wet && speed < 0.26) {
-          stampCtx.fillStyle = inkColor(alpha * (0.18 + (0.26 - speed) * 0.9), 8);
-          stampCtx.beginPath();
-          stampCtx.ellipse(center, center, radius * 0.22, radius * 0.14, 0, 0, Math.PI * 2);
-          stampCtx.fill();
-        }
-
-        if (wet || state.water > 0.34) {
-          stampCtx.strokeStyle = inkColor(alpha * (0.12 + state.water * 0.14), wet ? 18 : 12);
-          stampCtx.lineWidth = Math.max(0.8, radius * (edgeMode === "dry" ? 0.04 : 0.025));
-          stampCtx.beginPath();
-          stampCtx.arc(center, center, radius * (0.78 + state.water * 0.12), 0, Math.PI * 2);
-          stampCtx.stroke();
-        }
-
-        const mask = state.stroke?.mask || makeBrushMask(profile, size, state.paperSeed);
-        stampCtx.lineCap = wet ? "round" : "butt";
-        mask.bristles.forEach((bristle, index) => {
-          const absorb = paperAbsorbency(
-            x + Math.cos(angle + Math.PI / 2) * bristle.offset,
-            y + Math.sin(angle + Math.PI / 2) * bristle.offset
-          );
-          if (edgeMode === "dry" && hashUnit(index, state.stroke?.stamps || 0, mask.seed) > absorb + 0.34) return;
-          const lineAlpha = alpha * bristle.opacity * (wet ? 0.12 : 0.3) * load;
-          stampCtx.strokeStyle = inkColor(lineAlpha, wet ? 38 : 12);
-          stampCtx.lineWidth = bristle.width * (wet ? 1.4 : 1);
-          stampCtx.beginPath();
-          stampCtx.moveTo(center - bristle.length * 0.42, center + bristle.offset * 0.42);
-          stampCtx.lineTo(center + bristle.length * 0.46, center + bristle.offset * 0.42 + (hashUnit(index, 31, mask.seed) - 0.5) * size * 0.06);
-          stampCtx.stroke();
-        });
-
-        if (edgeMode === "dry") removeDryGaps(size, state.stroke?.seed || state.paperSeed, 0.54);
-        paintStampBuffer(x, y, angle);
       }
 
       function stampNib(x, y, angle, size, alpha, pressure) {
@@ -1457,8 +1865,16 @@
         paintStampBuffer(x, y, angle);
       }
 
+      // Water drop: touches clear water to the sheet. Almost no pigment core;
+      // instead it feeds the wet layer so surrounding pigment blooms outward.
+      function stampWaterDrop(x, y, size, alpha) {
+        const radius = size * (0.5 + state.water * 0.45);
+        drawBloom(x, y, radius, clamp(alpha * 2.1, 0.04, 0.4), clamp(alpha * 0.9, 0.02, 0.18));
+        queueWet(x, y, radius * 0.9, clamp(alpha * 3, 0.1, 0.5), brushProfiles.drip.wet);
+      }
+
       function stampBrush(x, y, angle, pressure, speed) {
-        const profile = brushProfiles[state.brush] || brushProfiles.ink;
+        const profile = brushProfiles[state.brush] || brushProfiles.sumi;
         const absorb = paperAbsorbency(x, y);
         const load = state.stroke ? state.stroke.reservoir : 1;
         const baseSize = state.size * state.dpr * profile.sizeScale;
@@ -1468,54 +1884,55 @@
 
         if (alpha <= 0.006) return;
 
-        if (profile.kind === "wash") {
-          const half = baseSize * 0.18;
-          drawContinuousWashSegment(
-            { x: x - Math.cos(angle) * half, y: y - Math.sin(angle) * half },
-            { x: x + Math.cos(angle) * half, y: y + Math.sin(angle) * half },
-            angle,
-            pressure,
-            speed
-          );
-          return;
-        }
-
         if (profile.kind === "nib") {
           stampNib(x, y, angle, baseSize, alpha, pressure);
+          queueWet(x, y, baseSize * 0.42, alpha, profile.wet);
           return;
         }
 
-        if (profile.kind === "scatter") {
+        if (profile.kind === "flick") {
           drawSplatter(x, y, angle, pressure, speed, load);
           if (state.water > 0.42) drawBloom(x, y, baseSize * 0.42, alpha * 0.05, alpha * 0.03);
+          queueWet(x, y, baseSize * 0.55, alpha, profile.wet);
           return;
         }
 
         if (profile.kind === "dry") {
           stampDryBrush(x, y, angle, baseSize, alpha, pressure, load);
+          queueWet(x, y, baseSize * 0.5, alpha, profile.wet);
           return;
         }
 
+        if (profile.kind === "drip") {
+          stampWaterDrop(x, y, baseSize, alpha);
+          return;
+        }
+
+        // Continuous kinds land here only for isolated taps: paint one short
+        // segment so a click still leaves a mark.
         const half = baseSize * 0.14;
-        drawContinuousInkSegment(
-          { x: x - Math.cos(angle) * half, y: y - Math.sin(angle) * half },
-          { x: x + Math.cos(angle) * half, y: y + Math.sin(angle) * half },
-          angle,
-          pressure,
-          speed
-        );
+        const from = { x: x - Math.cos(angle) * half, y: y - Math.sin(angle) * half };
+        const to = { x: x + Math.cos(angle) * half, y: y + Math.sin(angle) * half };
+        continuousSegmentPainter(profile.kind)(from, to, angle, pressure, speed);
+      }
+
+      function continuousSegmentPainter(kind) {
+        if (kind === "hake") return drawContinuousHakeSegment;
+        if (kind === "mop") return drawContinuousMopSegment;
+        if (kind === "reed") return drawContinuousReedSegment;
+        return drawContinuousSumiSegment;
       }
 
       function drainStroke(profile, pressure) {
         if (!state.stroke) return;
         const waterReturn = 1.12 - state.water * 0.42;
-        const minLoad = profile.kind === "dry" ? 0.26 : profile.kind === "wash" ? 0.56 : 0.38;
+        const minLoad = profile.kind === "dry" ? 0.26 : profile.kind === "mop" ? 0.56 : 0.38;
         state.stroke.reservoir = clamp(state.stroke.reservoir - profile.drain * (0.7 + pressure * 0.55) * waterReturn, minLoad, 1);
         state.stroke.stamps += 1;
       }
 
       function stampSymmetry(point, angle, pressure, speed) {
-        const profile = brushProfiles[state.brush] || brushProfiles.ink;
+        const profile = brushProfiles[state.brush] || brushProfiles.sumi;
         const rotations = Math.max(1, Math.round(state.symmetry));
         const passes = state.mirror ? 2 : 1;
 
@@ -1533,7 +1950,8 @@
       }
 
       function strokeSymmetrySegment(from, to, angle, pressure, speed) {
-        const profile = brushProfiles[state.brush] || brushProfiles.ink;
+        const profile = brushProfiles[state.brush] || brushProfiles.sumi;
+        const paint = continuousSegmentPainter(profile.kind);
         const rotations = Math.max(1, Math.round(state.symmetry));
         const passes = state.mirror ? 2 : 1;
 
@@ -1545,14 +1963,7 @@
             const [x0, y0] = rotateAroundCenter(startX, from.y, rotation);
             const [x1, y1] = rotateAroundCenter(endX, to.y, rotation);
             const segmentAngle = Math.atan2(y1 - y0, x1 - x0);
-            const segmentFrom = { x: x0, y: y0 };
-            const segmentTo = { x: x1, y: y1 };
-
-            if (profile.kind === "wash") {
-              drawContinuousWashSegment(segmentFrom, segmentTo, segmentAngle, pressure, speed);
-            } else {
-              drawContinuousInkSegment(segmentFrom, segmentTo, segmentAngle, pressure, speed);
-            }
+            paint({ x: x0, y: y0 }, { x: x1, y: y1 }, segmentAngle, pressure, speed);
           }
         }
 
@@ -1561,7 +1972,7 @@
 
       function sampleStrokeSegment(from, to) {
         if (!state.stroke) return;
-        const profile = brushProfiles[state.brush] || brushProfiles.ink;
+        const profile = brushProfiles[state.brush] || brushProfiles.sumi;
         const dx = to.x - from.x;
         const dy = to.y - from.y;
         const distance = Math.hypot(dx, dy);
@@ -1572,8 +1983,9 @@
         const rawAngle = Math.atan2(dy, dx);
         state.stroke.angle = lerpAngle(state.stroke.angle, rawAngle, state.stroke.stamps < 2 ? 1 : 0.38);
         const estimatedPressure = clamp((to.pressure || 0.52) + (0.28 - speed * 0.12), 0.18, 1);
-        const spacing = clamp(state.size * state.dpr * profile.spacing * (profile.kind === "wash" ? 0.92 : 1), 2.2 * state.dpr, 18 * state.dpr);
-        if (profile.kind === "ink" || profile.kind === "wash") {
+        const spacing = clamp(state.size * state.dpr * profile.spacing, 2.2 * state.dpr, 18 * state.dpr);
+
+        if (CONTINUOUS.has(profile.kind)) {
           const pressure = clamp((from.pressure + estimatedPressure) / 2, 0.18, 1);
           const segmentCount = Math.max(1, Math.floor(distance / spacing));
           for (let i = 0; i < segmentCount; i += 1) {
@@ -1607,6 +2019,8 @@
         state.stroke.spacingCarry = (state.stroke.spacingCarry + distance) % spacing;
       }
 
+      // ---- Pointer handling -----------------------------------------------
+
       function eventPosition(event) {
         const rect = canvas.getBoundingClientRect();
         const pointerPressure = event.pressure && event.pressure > 0 ? event.pressure : 0.54;
@@ -1624,7 +2038,7 @@
         state.painting = true;
         state.pointerId = event.pointerId ?? "mouse";
         const point = eventPosition(event);
-        const profile = brushProfiles[state.brush] || brushProfiles.ink;
+        const profile = brushProfiles[state.brush] || brushProfiles.sumi;
         const seed = Math.floor(performance.now() * 10 + point.x * 0.3 + point.y * 0.7);
         const brushSize = state.size * state.dpr * profile.sizeScale;
         state.stroke = {
@@ -1638,7 +2052,7 @@
           mask: makeBrushMask(profile, brushSize, seed)
         };
         state.last = point;
-        if (profile.kind !== "ink" && profile.kind !== "wash") {
+        if (!CONTINUOUS.has(profile.kind)) {
           stampSymmetry(point, 0, point.pressure, 0.04);
         }
         if (event.pointerId !== undefined && stage.setPointerCapture) {
@@ -1660,8 +2074,8 @@
       function endStroke(event) {
         const pointerId = event.pointerId ?? "mouse";
         if (!state.painting || pointerId !== state.pointerId) return;
-        const profile = brushProfiles[state.stroke?.brush] || brushProfiles.ink;
-        if (state.stroke?.last && profile.kind !== "ink" && profile.kind !== "wash") {
+        const profile = brushProfiles[state.stroke?.brush] || brushProfiles.sumi;
+        if (state.stroke?.last && !CONTINUOUS.has(profile.kind)) {
           stampSymmetry(state.stroke.last, state.stroke.angle, state.stroke.last.pressure, 0.04);
         }
         state.painting = false;
@@ -1670,6 +2084,8 @@
         state.stroke = null;
         updateUi();
       }
+
+      // ---- Actions ------------------------------------------------------
 
       function setBrush(brush) {
         if (!brushProfiles[brush]) return;
@@ -1684,6 +2100,7 @@
 
       function undo() {
         if (state.history.length === 0) return;
+        settleWet();
         state.stroke = null;
         state.redo.push(makeSnapshot());
         restoreSnapshot(state.history.pop());
@@ -1692,6 +2109,7 @@
 
       function redo() {
         if (state.redo.length === 0) return;
+        settleWet();
         state.stroke = null;
         state.history.push(makeSnapshot());
         restoreSnapshot(state.redo.pop());
@@ -1702,18 +2120,6 @@
         pushHistory();
         state.stroke = null;
         drawPaper();
-        updateUi();
-      }
-
-      function togglePanel(panel) {
-        if (isMobileLayout()) {
-          const willOpen = panel.hidden;
-          ui.brushPanel.hidden = true;
-          ui.settingsPanel.hidden = true;
-          panel.hidden = !willOpen;
-        } else {
-          panel.hidden = !panel.hidden;
-        }
         updateUi();
       }
 
@@ -1749,6 +2155,7 @@
       async function exportPng() {
         if (state.exporting) return;
         state.exporting = true;
+        settleWet();
         updateUi();
         try {
           const blob = await canvasToBlob(canvas);
@@ -1772,6 +2179,7 @@
 
       function randomize() {
         state.brush = brushOrder[Math.floor(Math.random() * brushOrder.length)];
+        state.pigment = pigmentOrder[Math.floor(Math.random() * pigmentOrder.length)];
         state.density = rand(0.34, 0.92);
         state.water = rand(0.12, 0.84);
         state.edge = ["soft", "wave", "dry"][Math.floor(Math.random() * 3)];
@@ -1780,6 +2188,8 @@
         state.mirror = Math.random() > 0.2;
         updateUi();
       }
+
+      // ---- Wiring ------------------------------------------------------
 
       stage.addEventListener("pointerdown", beginStroke);
       stage.addEventListener("pointermove", continueStroke);
@@ -1790,14 +2200,8 @@
 
       ui.undo.addEventListener("click", undo);
       ui.redo.addEventListener("click", redo);
-      ui.dockUndo.addEventListener("click", undo);
-      ui.dockRedo.addEventListener("click", redo);
       ui.clear.addEventListener("click", clearArt);
       ui.export.addEventListener("click", exportPng);
-      ui.brushToggle.addEventListener("click", () => togglePanel(ui.brushPanel));
-      ui.settingsToggle.addEventListener("click", () => togglePanel(ui.settingsPanel));
-      ui.closeBrushPanel.addEventListener("click", () => togglePanel(ui.brushPanel));
-      ui.closeSettingsPanel.addEventListener("click", () => togglePanel(ui.settingsPanel));
       ui.mirror.addEventListener("click", () => {
         state.mirror = !state.mirror;
         updateUi();
@@ -1822,9 +2226,6 @@
       ui.edgeButtons.forEach((button) => {
         button.addEventListener("click", () => setEdge(button.dataset.edge));
       });
-      ui.tabs.forEach((button) => {
-        button.addEventListener("click", () => setBrush(button.dataset.tabBrush));
-      });
 
       window.addEventListener("keydown", (event) => {
         const tag = document.activeElement && document.activeElement.tagName;
@@ -1837,6 +2238,17 @@
         } else if ((event.metaKey || event.ctrlKey) && key === "y") {
           event.preventDefault();
           redo();
+        } else if (key >= "1" && key <= "8" && !event.metaKey && !event.ctrlKey && !event.altKey) {
+          event.preventDefault();
+          setBrush(brushOrder[Number(key) - 1]);
+        } else if (key === "[") {
+          event.preventDefault();
+          state.size = clamp(state.size - 6, 8, 120);
+          updateUi();
+        } else if (key === "]") {
+          event.preventDefault();
+          state.size = clamp(state.size + 6, 8, 120);
+          updateUi();
         } else if (key === "c") {
           event.preventDefault();
           clearArt();
@@ -1851,8 +2263,13 @@
       });
 
       createBrushControls();
+      createPigmentControls();
       resize();
       updateUi();
+      // A heavily parallel browser run can finish the inline setup before the
+      // brush rail has its final layout. Repaint once on the definitive load
+      // event so the visible canvas previews never remain at their reset state.
+      window.addEventListener("load", renderBrushPreviews, { once: true });
     })();
   </script>
 </body>

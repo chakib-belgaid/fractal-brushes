@@ -24,3 +24,4 @@ Fractal Brushes is a static GitHub Pages package.
 - Confirm there are no console errors.
 - Confirm controls remain usable on desktop and mobile widths.
 - Confirm export actions do not crash and create PNG download URLs.
+- Confirm infinite zoom: draw → zoom → draw → zoom out keeps both strokes crisp (`tests/infinite-zoom.spec.js`).

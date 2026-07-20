@@ -14,7 +14,8 @@ Desktop is recommended for the best experience. The canvases remain usable on mo
 - `/` - landing page with product overview and launch link.
 - `/app/` - interactive Fractal Brushes canvas app.
 - `/app/mobile/` - lightweight touch-first canvas served automatically to phones and small tablets. `/app/?desktop=1` opts back into the desktop app for the session.
-- `/white/` - Fractal Brushes Ink, a white-paper black-ink canvas app.
+- `/white/` - Fractal Brushes Ink, a white-paper colored-ink and watercolor canvas app with animated wet blooms.
+- `/liquid-mix/` - Fractal Brushes Liquid Mix, a WebGL fluid-dynamics water canvas: tap to drop ink that blooms and drifts, hold to keep pouring, drag to stir the currents. Overlapping pigments mix subtractively like real paint in water, and the top bar offers clear plus single-click PNG export.
 
 ## Local Usage
 
@@ -33,11 +34,12 @@ The luminous `/app/` route includes the full color and 4K export toolset:
 - Draw on the canvas with pointer, mouse, or touch input.
 - Use the main toolbar for undo, redo, export, clear, mirror, brush menu, color menu, and random brush selection.
 - Use the bottom-right zoom slider to adjust zoom and inspect the current zoom percentage. Double-click the slider to reset to 100%.
+- Infinite canvas: scroll/pinch to zoom without limit, hand tool (H/Space) to pan, strokes re-render crisp at any scale, unlimited undo.
 - Open the brush and color panels independently. Panels are intended to be draggable and clamped within the viewport.
 - Use the bottom-left parameter panel for Brush Length, Scale Factor, Expansion, and Symmetry. The luminous route opens on Silk Ribbon at actual length `0.5` and actual scale `3`. The UI shows normalized control values by multiplying both numbers by `10`, so the defaults display as length `5` and scale `30`. Brush Length ranges from `0.1` to `6.4`; Scale Factor ranges from `0.1` to `15`. Scale Factor multiplies the effective brush length before the renderer derives tendril travel, spacing, and width. Brush Length primarily extends tendril travel; stroke width follows at a smaller fixed ratio. A live symmetry guide shows the mirrored/rotated drawing points while hovering or painting.
 - Keyboard shortcuts for core drawing actions should remain available when supported by the app.
 
-The `/white/` route keeps the controls focused on monochrome ink: brush swatches, ink density, water, edge style, brush size, symmetry, mirror, undo/redo, clear, randomize, and single-click PNG export. Its renderer stamps brush footprints along the pointer path, using paper grain, bristle masks, wash bloom, dry gaps, edge darkening, and splatter rather than the luminous route's animated trail system.
+The `/white/` route is a desktop-first ink studio: a docked left rail lists eight ink brushes with live canvas previews tinted by the active pigment (keys `1`-`8` switch brushes, `[` and `]` resize), and a docked right column holds the ink color palette (eight curated pigments plus a custom hue picker), ink density, water, brush size, edge style, symmetry, mirror, and randomize. Undo/redo, clear, and single-click PNG export live in the top bar. Its renderer stamps brush footprints along the pointer path, using paper grain, bristle masks, wash bloom, dry gaps, edge darkening, and splatter rather than the luminous route's animated trail system. Fresh marks stay wet for a moment: diluted pigment feathers outward along the paper-absorbency field, then dries with darker settled rims and granulation. Overlapping colors deepen subtractively (multiply compositing), and more water dilutes pigment toward transparent washes rather than white paint.
 
 ## Brush Modes
 
@@ -48,7 +50,7 @@ Fractal Brushes includes luminous and elemental brush families:
 
 Each brush profile tunes tendril spawn count, spread, speed, lifetime, width, curl, jitter, branching, drag, lift, alpha, glow layering, and color bias.
 
-Fractal Brushes Ink includes Ink, Nib, Wash, Scatter, and Dry brush modes. Those profiles tune physical ink behavior: pigment density, water bloom, nib rails, bristle streaks, paper skips, reservoir drain, and scattered flecks.
+Fractal Brushes Ink includes eight ink brushes: Sumi Brush (pointed, tapered, flying white at speed), Hake Flat (wide streaked band), Water Mop (soaked wash with heavy blooms), Reed Pen (fixed-angle chisel calligraphy), Steel Nib (fine crisp line), Dry Bristle (broken scratchy streaks), Ink Flick (thrown spatter), and Water Drop (clear water that blooms surrounding pigment). Those profiles tune physical ink behavior: pigment density, water bloom, nib rails, bristle streaks, paper skips, reservoir drain, and scattered flecks.
 
 ## Brush Algorithms
 
@@ -262,13 +264,18 @@ reservoir = clamp(
 
 Ink profile constants:
 
-| Brush | Kind | `spacing` | `sizeScale` | `opacity` | `drain` | `bristles` |
-| --- | --- | ---: | ---: | ---: | ---: | ---: |
-| Ink | `ink` | `.16` | `.86` | `.82` | `.009` | `22` |
-| Nib | `nib` | `.12` | `.36` | `.92` | `.006` | `4` |
-| Wash | `wash` | `.20` | `1.22` | `.26` | `.004` | `18` |
-| Scatter | `scatter` | `.30` | `.72` | `.68` | `.012` | `10` |
-| Dry brush | `dry` | `.11` | `.98` | `.78` | `.021` | `30` |
+| Brush | Kind | `spacing` | `sizeScale` | `opacity` | `drain` | `bristles` | `wet` |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Sumi Brush | `sumi` | `.16` | `.86` | `.82` | `.010` | `22` | `.78` |
+| Hake Flat | `hake` | `.17` | `1.34` | `.52` | `.008` | `14` | `.92` |
+| Water Mop | `mop` | `.20` | `1.26` | `.26` | `.004` | `18` | `1.15` |
+| Reed Pen | `reed` | `.12` | `.62` | `.90` | `.013` | `6` | `.30` |
+| Steel Nib | `nib` | `.12` | `.36` | `.92` | `.006` | `4` | `.40` |
+| Dry Bristle | `dry` | `.11` | `.98` | `.78` | `.021` | `30` | `.20` |
+| Ink Flick | `flick` | `.30` | `.72` | `.68` | `.012` | `10` | `.65` |
+| Water Drop | `drip` | `.50` | `1.12` | `.17` | `.003` | `6` | `1.50` |
+
+`sumi`, `hake`, `mop`, and `reed` paint continuous segments along the pointer path; `nib`, `dry`, `flick`, and `drip` stamp at spacing intervals.
 
 For a brush mask with `B = baseSize` and `n = profile.bristles`, bristle `i` is:
 
@@ -283,17 +290,48 @@ lift_i = H(i, 5, seed)
 
 Brush-specific deposition equations:
 
-- Ink:
+- Sumi Brush:
 
 ```text
-w = B * (0.34 + pressure * 0.28) * (1.05 - clamp(speed, 0, 1.7) * 0.1)
+taper = 0.55 + reservoir * 0.45
+w = B * (0.34 + pressure * 0.28) * (1.05 - clamp(speed, 0, 1.7) * 0.1) * taper
+flyingWhite = max(0, speed - 1.2) * 0.4
 edgeWave = edge == "wave" ? sin(stampIndex * 0.65 + paperSeed) * w * 0.06 : 0
 
 if water > 0.18:
   drawLine(width = w * (1.22 + water * 0.52), alpha = alpha * (0.07 + water * 0.12), blur = w * (0.025 + water * 0.035))
 
-drawLine(width = w * (0.82 + edgeWave / max(1, w)), alpha = alpha * 0.58)
+drawLine(width = w * (0.82 + edgeWave / max(1, w)), alpha = alpha * 0.58 * (1 - flyingWhite * 0.6))
 drawLine(width = w * 0.28, alpha = alpha * (0.56 + (1 - speed) * 0.12))
+bristle lanes skip when H(i, stampIndex, seed) < 0.36 + flyingWhite
+```
+
+- Hake Flat:
+
+```text
+w = B * (0.82 + pressure * 0.22)
+body band: drawLine(width = w, alpha = alpha * 0.18, blur = w * 0.015) + drawLine(width = w * 0.88, alpha = alpha * 0.15)
+12 bristle lanes across +/- w * 0.47, each starved by
+  H(i, stampIndex, seed) < starve * (1.2 - A) + (1 - reservoir) * 0.2, starve = edge == "dry" ? 0.34 : 0.10
+crisp rails at +/- w * 0.48 with alpha * 0.24
+```
+
+- Reed Pen:
+
+```text
+chisel = -0.66 rad (fixed pen-edge angle)
+edgeLength = B * (0.6 + pressure * 0.3)
+ribbon quad between stroke endpoints offset by +/- edgeLength / 2 along the chisel direction,
+filled at alpha * (0.62 + reservoir * 0.24); width goes thick-thin as travel direction changes
+leading-edge line at alpha * 0.5; if speed < 0.24, ink pools in an ellipse at the tip
+```
+
+- Water Drop:
+
+```text
+radius = B * (0.5 + water * 0.45)
+faint wash bloom via drawBloom(alpha * 2.1 clamped to [0.04, 0.4])
+queueWet(radius * 0.9, alpha * 3 clamped to [0.1, 0.5], kindWet = 1.5)
 ```
 
 - Nib:
@@ -307,7 +345,7 @@ draw two rails at offsets +/- railOffset
 if pressure > 0.62: draw center line with alpha * 0.24
 ```
 
-- Wash:
+- Water Mop:
 
 ```text
 w = B * (0.74 + water * 0.56 + pressure * 0.16)
@@ -321,7 +359,7 @@ edgeOffset = +/- w * (0.38 + water * 0.08)
 edgeAlpha = alpha * (0.12 + water * 0.16)
 ```
 
-- Scatter:
+- Ink Flick:
 
 ```text
 factor = 1
@@ -333,7 +371,7 @@ radius_i = (0.55 + H(i, 9, seed) * (2.4 + S * 0.025)) * DPR
 alpha_i = profile.opacity * density * reservoir * (0.18 + H(i, 10, seed) * 0.38)
 ```
 
-- Dry brush:
+- Dry Bristle:
 
 ```text
 skip_i = 0.06 + (1 - reservoir) * 0.28 + (1 - A(x_i, y_i)) * 0.12 + lift_i * 0.08
@@ -347,6 +385,32 @@ lineAlpha_i = alpha * opacity_i * (0.78 + pressure * 0.32)
 dryGap_j length = B * (0.12 + H(j, 23, seed) * 0.42), for j in 0..23
 dryGap_j width = max(0.8, B * (0.008 + H(j, 24, seed) * 0.02))
 ```
+
+### Pigment Color Model (`/white/`)
+
+Every mark is tinted by the active pigment. A pigment is a pair of RGB anchors: `deep` (the dense masstone) and `wash` (the lighter, more chromatic undertone). The legacy grayscale `shade` parameter (8 = dense core, 46 = faint halo) is mapped onto that ramp, with water pushing tones toward the wash anchor:
+
+```text
+tone = clamp(((shade - 8) / 38) * (0.78 + water * 0.30), 0, 1)
+rgb = lerp(deep, wash, tone)
+```
+
+All deposition uses `multiply` compositing, so overlapping pigments darken subtractively like real wet media, and adding water lowers alpha so dilution trends toward transparent paper, never white paint.
+
+Curated pigments: Sumi Black, Indigo, Payne's Grey, Sepia, Vermilion, Yellow Ochre, Viridian, and Mulberry. A ninth swatch is a native color input; the chosen hue derives its anchors as `deep = rgb * 0.52` and `wash = rgb + (255 - rgb) * 0.24`.
+
+### Wet Bloom Animation (`/white/`)
+
+Fresh marks register bounded wet regions (capped at 320; overflow settles instantly). Each region stores position, base radius, growth, an alpha budget, its pigment anchors, a deterministic seed, and a lifetime:
+
+```text
+wetness = clamp(water * kindWet * (edge == "dry" ? 0.45 : 1), 0, 1.3)
+kindWet (per profile `wet`): drip 1.50, mop 1.15, hake 0.92, sumi 0.78, flick 0.65, nib 0.40, reed 0.30, dry 0.20
+grow = 0.34 + wetness * 1.05
+life = 460ms + wetness * 1800ms * (0.75 + H(...) * 0.5)
+```
+
+While wet, a `requestAnimationFrame` loop expands each region with an ease-out radius curve, laying down faint wash-tone veils and capillary feather blobs where paper absorbency exceeds `0.45`. When a region dries (`p = 1`) the pigment settles: a darker broken rim of `deep`-tone arcs plus granulation speckles weighted by absorbency. A settled canvas has an empty wet list and costs zero CPU. `settleWet()` fast-forwards all pending regions before history snapshots, undo/redo, clear, export, and resize, so those features always operate on dried pixels; `prefers-reduced-motion` settles each region immediately.
 
 ## Color
 
@@ -391,7 +455,7 @@ After visual changes, verify all routes in a browser with Playwright:
 
 - Landing page renders the Fractal Brushes logo with no console errors.
 - `/app/` renders the toolbar, brush panel, color panel, zoom controls, and export menu without layout overlap.
-- `/white/` renders the ink canvas, brush panel, ink settings, tool dock, and export action without layout overlap.
+- `/white/` renders the ink canvas, the eight-brush rail with painted previews, the ink settings column (including the ink color palette row), and export action without layout overlap, and drawing with a non-black pigment settles into stable colored pixels.
 - Export actions create PNG download URLs for all presets without crashing.
 
 ## License And Notices

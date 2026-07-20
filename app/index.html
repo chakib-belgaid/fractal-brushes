@@ -85,6 +85,9 @@
       touch-action: none;
     }
 
+    body.hand-mode #stage { cursor: grab; }
+    body.panning #stage { cursor: grabbing; }
+
     #art {
       position: absolute;
       left: 50%;
@@ -368,7 +371,8 @@
       bottom: 18px;
       opacity: 0.72;
       display: grid;
-      grid-template-columns: minmax(124px, 180px) 56px;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
       gap: 10px;
       width: min(260px, calc(100vw - 36px));
       padding: 8px 10px;
@@ -381,6 +385,13 @@
       font-size: 12px;
       font-weight: 720;
       text-align: center;
+    }
+
+    .zoom-btn {
+      width: 30px;
+      height: 30px;
+      font-size: 16px;
+      line-height: 1;
     }
 
     .panel {
@@ -402,6 +413,8 @@
     .brush-panel {
       right: 18px;
       top: 84px;
+      max-height: calc(100vh - 170px);
+      overflow-y: auto;
     }
 
     .color-panel {
@@ -414,6 +427,10 @@
       left: 18px;
       bottom: 18px;
       width: 280px;
+      /* Keep the panel top below the color panel (bottom edge ~420px with
+         default content) so its drag handle is never buried under it. */
+      max-height: calc(100vh - 450px);
+      overflow-y: auto;
     }
 
     .panel-head {
@@ -504,6 +521,49 @@
     .brush-name {
       font-size: 13px;
       font-weight: 680;
+    }
+
+    .custom-tune[hidden] {
+      display: none;
+    }
+
+    .custom-tune {
+      display: grid;
+      gap: 9px;
+      margin-top: 10px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(190, 215, 255, 0.14);
+    }
+
+    .custom-tune-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .copy-brush {
+      padding: 5px 10px;
+      border: 1px solid rgba(190, 215, 255, 0.18);
+      border-radius: 9px;
+      color: color-mix(in srgb, var(--active) 76%, white 16%);
+      background: rgba(255, 255, 255, 0.05);
+      font-size: 11px;
+      font-weight: 680;
+      cursor: pointer;
+    }
+
+    .copy-brush:hover {
+      border-color: color-mix(in srgb, var(--active) 62%, white 10%);
+      background: color-mix(in srgb, var(--active) 12%, transparent);
+    }
+
+    .custom-tune-fields {
+      display: grid;
+      gap: 8px;
+      max-height: min(38vh, 340px);
+      overflow-y: auto;
+      padding-right: 4px;
     }
 
     .field {
@@ -1252,7 +1312,7 @@
       .toolbar {
         position: relative;
         display: grid;
-        grid-template-columns: repeat(5, minmax(0, 1fr));
+        grid-template-columns: repeat(6, minmax(0, 1fr));
         gap: 5px;
         max-width: none;
         padding: 6px;
@@ -1618,6 +1678,9 @@
       <button class="tool" id="redo" type="button" title="Redo" aria-label="Redo" data-mobile-label="Redo" disabled>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 7h5v5"/><path d="M19 12a8 8 0 1 1-2.35-5.65L20 9.7"/></svg>
       </button>
+      <button class="tool" id="handTool" type="button" title="Hand — pan the view (H)" aria-label="Hand tool" aria-pressed="false" data-mobile-label="Pan">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12V6.5a1.5 1.5 0 0 1 3 0V11"/><path d="M11 11V5a1.5 1.5 0 0 1 3 0v6"/><path d="M14 11V6.5a1.5 1.5 0 0 1 3 0V13"/><path d="M17 12.5a1.5 1.5 0 0 1 3 1c0 3-1.5 4.5-2.5 6-1 1.4-2.6 2.5-5 2.5-3.2 0-4.6-1.6-6.4-4.8L4.4 14a1.4 1.4 0 0 1 2.4-1.4L8 14.5"/></svg>
+      </button>
       <button class="tool" id="exportToggle" type="button" title="Export" aria-label="Export" data-mobile-label="Export" aria-expanded="false" aria-controls="exportMenu">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11"/><path d="m7 9 5 5 5-5"/><path d="M5 19h14"/></svg>
       </button>
@@ -1680,6 +1743,13 @@
       </div>
     </div>
     <div class="field">
+      <span class="field-label">Density</span>
+      <div class="slider-row">
+        <input id="density" type="range" min="30" max="200" value="100" aria-label="Brush density">
+        <span class="value" id="densityValue">100%</span>
+      </div>
+    </div>
+    <div class="field">
       <span class="field-label">Points</span>
       <div class="slider-row">
         <input id="symmetry" type="range" min="1" max="16" value="6" aria-label="Symmetry">
@@ -1696,6 +1766,13 @@
       </button>
     </div>
     <div class="brush-list" id="brushList"></div>
+    <div class="custom-tune" id="customTune" hidden>
+      <div class="custom-tune-head">
+        <span class="field-label">Tune custom brush</span>
+        <button class="copy-brush" id="copyBrushToCustom" type="button" title="Copy settings from the last preset brush" aria-label="Copy settings from the last preset brush">Copy last brush</button>
+      </div>
+      <div class="custom-tune-fields" id="customTuneFields"></div>
+    </div>
   </aside>
 
   <aside class="panel color-panel" id="colorPanel" aria-label="Color menu">
@@ -1724,8 +1801,9 @@
   </aside>
 
   <div class="zoom-cluster" aria-label="Zoom controls">
-    <input id="zoom" type="range" min="50" max="220" step="5" value="100" aria-label="Zoom">
-    <span class="zoom-value" id="zoomValue">100%</span>
+    <button class="tool zoom-btn" id="zoomOut" type="button" title="Zoom out (−)" aria-label="Zoom out">−</button>
+    <span class="zoom-value" id="zoomValue" title="Double-click to reset view">×1.00</span>
+    <button class="tool zoom-btn" id="zoomIn" type="button" title="Zoom in (+)" aria-label="Zoom in">+</button>
   </div>
 
   <div class="status" id="status" hidden role="status" aria-live="polite"></div>
@@ -1740,7 +1818,7 @@
         <span class="tutorial-progress" id="tutorialProgress">1 / 7</span>
       </div>
       <h2 class="tutorial-title" id="tutorialTitle">Draw on the canvas</h2>
-      <p class="tutorial-copy" id="tutorialCopy">Drag anywhere on the canvas to paint. Hold still for a small bloom, or move in arcs to let the symmetry build a larger form.</p>
+      <p class="tutorial-copy" id="tutorialCopy">Drag anywhere on the canvas to paint. Hold still for a small bloom, or move in arcs to let the symmetry build a larger form. Scroll or pinch to zoom — the canvas is infinite; press H (or hold Space) to pan with the hand tool.</p>
       <div class="tutorial-target" id="tutorialTarget">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19c3.5-8 10.5-12 14-14"/><path d="M7 16c3 2 6 2 9 0"/><path d="M5 19h.01"/><path d="M19 5h.01"/></svg>
         <span>Start with a steady drag. The demo button paints a short sample stroke.</span>
@@ -1765,6 +1843,7 @@
       const ui = {
         undo: document.getElementById("undo"),
         redo: document.getElementById("redo"),
+        handTool: document.getElementById("handTool"),
         exportToggle: document.getElementById("exportToggle"),
         exportMenu: document.getElementById("exportMenu"),
         exportOptions: Array.from(document.querySelectorAll("[data-export]")),
@@ -1786,7 +1865,8 @@
         modes: Array.from(document.querySelectorAll(".mode")),
         targets: Array.from(document.querySelectorAll(".target")),
         targetSwitch: document.querySelector(".target-switch"),
-        zoom: document.getElementById("zoom"),
+        zoomIn: document.getElementById("zoomIn"),
+        zoomOut: document.getElementById("zoomOut"),
         zoomValue: document.getElementById("zoomValue"),
         symmetryGuide: document.getElementById("symmetryGuide"),
         size: document.getElementById("size"),
@@ -1795,6 +1875,8 @@
         scaleFactorValue: document.getElementById("scaleFactorValue"),
         expansion: document.getElementById("expansion"),
         expansionValue: document.getElementById("expansionValue"),
+        density: document.getElementById("density"),
+        densityValue: document.getElementById("densityValue"),
         symmetry: document.getElementById("symmetry"),
         symmetryValue: document.getElementById("symmetryValue"),
         status: document.getElementById("status"),
@@ -1811,25 +1893,28 @@
         tutorialDone: document.getElementById("tutorialDone")
       };
 
+      // NOTE: every profile except "custom" is replaced wholesale by the
+      // "Brush engine patch v2" Object.assign further down — edit brush
+      // parameters THERE, not here. Only "custom" below is live.
       const brushProfiles = {
         fairy: {
           name: "Fairy",
           hues: [292, 188],
           dot: ["#f8a7ff", "#9ff8ff", "#f7f2bf"],
-          count: [3, 5],
+          count: [2, 4],
           spread: 1.25,
-          velocity: [0.22, 1.45],
+          velocity: [0.22, 1.3],
           life: [58, 128],
           width: [0.3, 0.72],
-          jitter: 0.24,
+          jitter: 0.2,
           curl: 0.16,
           branch: 0.004,
           drag: 0.972,
           lift: [0, 0.04],
-          alpha: 0.15,
+          alpha: 0.1,
           hueShift: [-44, 56],
           cap: "round",
-          layers: [[4.3, 54, 58, 0.08], [1.45, 22, 70, 0.23], [0.42, -18, 84, 0.54], [0.12, 0, 96, 0.22, "white"]]
+          layers: [[4.3, 54, 58, 0.07], [1.45, 22, 70, 0.2], [0.42, -18, 84, 0.46], [0.12, 0, 96, 0.16, "white"]]
         },
         flame: {
           name: "Flame",
@@ -1844,8 +1929,8 @@
           curl: 0.2,
           branch: 0.002,
           drag: 0.956,
-          lift: [0.1, 0.65],
-          alpha: 0.074,
+          lift: [0.08, 0.5],
+          alpha: 0.062,
           hueShift: [-14, 24],
           cap: "round",
           maxTendrils: 760,
@@ -1866,11 +1951,11 @@
           branch: 0.032,
           drag: 0.956,
           lift: [0, 0],
-          alpha: 0.2,
+          alpha: 0.115,
           hueShift: [-18, 24],
           angular: 0.22,
           cap: "butt",
-          layers: [[4.6, -24, 52, 0.13], [1.05, 10, 66, 0.44], [0.2, 0, 96, 0.68, "white"]]
+          layers: [[4.6, -24, 52, 0.11], [1.05, 10, 66, 0.4], [0.2, 0, 96, 0.46, "white"]]
         },
         silk: {
           name: "Silk Ribbon",
@@ -1881,12 +1966,12 @@
           velocity: [0.28, 1.32],
           life: [72, 128],
           width: [0.58, 1.1],
-          jitter: 0.08,
+          jitter: 0.05,
           curl: 0.19,
           branch: 0.001,
           drag: 0.981,
           lift: [-0.03, 0.03],
-          alpha: 0.068,
+          alpha: 0.06,
           hueShift: [-18, 34],
           cap: "round",
           composite: "screen",
@@ -1908,7 +1993,7 @@
           branch: 0.007,
           drag: 0.952,
           lift: [0, 0.03],
-          alpha: 0.078,
+          alpha: 0.06,
           hueShift: [-16, 22],
           cap: "round",
           composite: "screen",
@@ -1922,18 +2007,18 @@
           dot: ["#b98bff", "#6ef8d4", "#ff8adf"],
           count: [3, 6],
           spread: 1.08,
-          velocity: [0.12, 0.85],
+          velocity: [0.1, 0.6],
           life: [118, 210],
           width: [0.72, 1.62],
-          jitter: 0.15,
+          jitter: 0.12,
           curl: 0.22,
           branch: 0.002,
           drag: 0.988,
           lift: [-0.05, 0.08],
-          alpha: 0.08,
+          alpha: 0.058,
           hueShift: [-54, 64],
           cap: "round",
-          layers: [[8.4, -32, 46, 0.09], [4.2, 18, 60, 0.12], [1.2, 0, 76, 0.23], [0.24, 0, 96, 0.12, "white"]]
+          layers: [[8.4, -32, 46, 0.08], [4.2, 18, 60, 0.11], [1.2, 0, 76, 0.2], [0.24, 0, 96, 0.08, "white"]]
         },
         crystal: {
           name: "Crystal Filament",
@@ -1949,49 +2034,49 @@
           branch: 0.024,
           drag: 0.968,
           lift: [0, 0],
-          alpha: 0.2,
+          alpha: 0.115,
           hueShift: [-12, 30],
           angular: 0.52,
           cap: "butt",
-          layers: [[3.1, -8, 58, 0.09], [0.84, 16, 72, 0.42], [0.18, 0, 98, 0.76, "white"]]
+          layers: [[3.1, -8, 58, 0.08], [0.84, 16, 72, 0.38], [0.18, 0, 98, 0.5, "white"]]
         },
         water: {
           name: "Water",
           hues: [196, 226],
           dot: ["#38e8ff", "#386dff", "#d8fbff"],
-          count: [4, 6],
-          spread: 0.66,
+          count: [3, 5],
+          spread: 0.58,
           velocity: [0.34, 1.48],
           life: [72, 146],
           width: [0.5, 1.2],
-          jitter: 0.1,
-          curl: 0.24,
+          jitter: 0.08,
+          curl: 0.28,
           branch: 0.002,
           drag: 0.978,
           lift: [-0.04, 0.04],
-          alpha: 0.14,
+          alpha: 0.095,
           hueShift: [-28, 18],
           cap: "round",
-          layers: [[5.4, -22, 48, 0.1], [2.0, 8, 62, 0.25], [0.5, 0, 82, 0.48], [0.15, 0, 98, 0.25, "white"]]
+          layers: [[5.4, -22, 48, 0.09], [2.0, 8, 62, 0.22], [0.5, 0, 82, 0.42], [0.15, 0, 98, 0.18, "white"]]
         },
         ember: {
           name: "Ember",
           hues: [22, 48],
           dot: ["#ff5b2f", "#ffd166", "#6d1a00"],
-          count: [3, 6],
+          count: [2, 5],
           spread: 0.92,
-          velocity: [0.48, 2.05],
+          velocity: [0.48, 1.8],
           life: [24, 58],
           width: [0.28, 0.78],
-          jitter: 0.26,
+          jitter: 0.22,
           curl: 0.12,
-          branch: 0.018,
+          branch: 0.012,
           drag: 0.94,
-          lift: [0.08, 0.42],
-          alpha: 0.22,
+          lift: [0.06, 0.3],
+          alpha: 0.11,
           hueShift: [-10, 34],
           cap: "round",
-          layers: [[3.8, -14, 40, 0.1], [1.2, 12, 58, 0.32], [0.3, 38, 78, 0.56], [0.12, 0, 96, 0.28, "warm"]]
+          layers: [[3.8, -14, 40, 0.09], [1.2, 12, 58, 0.28], [0.3, 38, 78, 0.48], [0.12, 0, 96, 0.2, "warm"]]
         },
         frost: {
           name: "Frost",
@@ -2007,34 +2092,58 @@
           branch: 0.03,
           drag: 0.966,
           lift: [0, 0],
-          alpha: 0.18,
+          alpha: 0.11,
           hueShift: [-18, 20],
           angular: 0.42,
           cap: "butt",
-          layers: [[3.7, -8, 64, 0.08], [1.0, 10, 78, 0.34], [0.2, 0, 98, 0.78, "white"]]
+          layers: [[3.7, -8, 64, 0.07], [1.0, 10, 78, 0.3], [0.2, 0, 98, 0.5, "white"]]
         },
         plasma: {
           name: "Plasma",
           hues: [310, 188],
           dot: ["#ff38d8", "#38e8ff", "#f7fbff"],
-          count: [5, 8],
+          count: [3, 6],
           spread: 0.86,
-          velocity: [0.62, 2.35],
+          velocity: [0.62, 2.1],
           life: [44, 102],
           width: [0.42, 1.08],
-          jitter: 0.32,
+          jitter: 0.22,
           curl: 0.28,
-          branch: 0.016,
+          branch: 0.012,
           drag: 0.958,
           lift: [-0.02, 0.02],
-          alpha: 0.21,
+          alpha: 0.12,
           hueShift: [-38, 42],
           cap: "round",
-          layers: [[5.7, -30, 48, 0.13], [1.8, 24, 62, 0.35], [0.42, 0, 84, 0.58], [0.16, 0, 98, 0.52, "white"]]
+          layers: [[5.7, -30, 48, 0.11], [1.8, 24, 62, 0.32], [0.42, 0, 84, 0.5], [0.16, 0, 98, 0.34, "white"]]
+        },
+        custom: {
+          name: "Custom",
+          hues: [326, 196],
+          dot: ["#ffd166", "#77f5ff", "#f7fbff"],
+          renderer: "line",
+          count: [2, 4],
+          spread: 0.6,
+          velocity: [0.28, 1.3],
+          life: [55, 120],
+          width: [0.3, 0.75],
+          jitter: 0.1,
+          curl: 0.18,
+          branch: 0.004,
+          drag: 0.975,
+          lift: [0, 0],
+          alpha: 0.26,
+          hueShift: [-24, 30],
+          cap: "round",
+          composite: "lighter",
+          maxTendrils: 520,
+          spacing: 1.5,
+          energy: 1.0,
+          layers: [[3.0, -16, 50, 0.13], [1.1, 12, 64, 0.36], [0.3, 0, 80, 0.52], [0.12, 0, 94, 0.36, "white"]]
         }
       };
 
-      const brushOrder = ["fairy", "flame", "thunder", "silk", "comet", "nebula", "crystal", "water", "ember", "frost", "plasma"];
+      const brushOrder = ["fairy", "flame", "thunder", "silk", "comet", "nebula", "crystal", "water", "ember", "frost", "plasma", "custom"];
       const exportPresets = {
         current: { label: "current", width: 0, height: 0 },
         wide4k: { label: "4k-16-9", width: 3840, height: 2160 },
@@ -2054,7 +2163,7 @@
       const tutorialSteps = [
         {
           title: "Draw on the canvas",
-          copy: "Drag anywhere on the canvas to paint. Hold still for a small bloom, or move in arcs to let the symmetry build a larger form.",
+          copy: "Drag anywhere on the canvas to paint. Hold still for a small bloom, or move in arcs to let the symmetry build a larger form. Scroll or pinch to zoom — the canvas is infinite; press H (or hold Space) to pan with the hand tool.",
           target: "Start with a steady drag. The demo button paints a short sample stroke.",
           targetId: "stage",
           actionLabel: "Paint demo",
@@ -2130,9 +2239,18 @@
         size: BRUSH_LENGTH_RANGE.default,
         scaleFactor: SCALE_FACTOR_RANGE.default,
         expansion: 0.85,
+        density: 1,
         symmetry: 6,
         mirror: true,
         zoom: 1,
+        view: { x: 0, y: 0, scale: 1 },
+        tool: "brush",
+        spaceHeld: false,
+        panning: null,
+        strokeLog: [],
+        liveStroke: null,
+        undoStack: [],
+        redoStack: [],
         painting: false,
         pointerId: null,
         last: null,
@@ -2258,8 +2376,8 @@
         ui.hueRing.setAttribute("aria-valuenow", String(Math.round(state.colorTarget === "blend" ? state.hue2 : state.hue)));
         ui.hueRing.setAttribute("aria-valuetext", `${state.colorTarget === "blend" ? "Blend" : "Primary"} hue ${Math.round(state.colorTarget === "blend" ? state.hue2 : state.hue)} degrees`);
         ui.targetSwitch.dataset.colorMode = state.colorMode;
-        ui.undo.disabled = state.history.length === 0;
-        ui.redo.disabled = state.redo.length === 0;
+        ui.undo.disabled = (state.undoStack || []).length === 0;
+        ui.redo.disabled = (state.redoStack || []).length === 0;
         ui.mirror.setAttribute("aria-pressed", String(state.mirror));
         ui.paramsToggle.setAttribute("aria-expanded", String(!ui.paramsPanel.hidden));
         ui.brushToggle.setAttribute("aria-expanded", String(!ui.brushPanel.hidden));
@@ -2274,10 +2392,17 @@
         ui.scaleFactor.setAttribute("aria-valuetext", `${controlDisplayValue(state.scaleFactor)} normalized, ${state.scaleFactor.toFixed(1)}x actual`);
         ui.expansion.value = String(Math.round(state.expansion * 100));
         ui.expansionValue.textContent = `${Math.round(state.expansion * 100)}%`;
+        if (ui.density) {
+          ui.density.value = String(Math.round(state.density * 100));
+          ui.densityValue.textContent = `${Math.round(state.density * 100)}%`;
+          ui.density.setAttribute("aria-valuetext", `${Math.round(state.density * 100)} percent particle density`);
+        }
         ui.symmetry.value = String(state.symmetry);
         ui.symmetryValue.textContent = String(state.symmetry);
-        ui.zoom.value = String(Math.round(state.zoom * 100));
-        ui.zoomValue.textContent = `${Math.round(state.zoom * 100)}%`;
+        const totalZoom = ((state.view && state.view.scale) || 1) * (state.zoom || 1);
+        ui.zoomValue.textContent = totalZoom >= 100
+          ? `×${Math.round(totalZoom)}`
+          : totalZoom >= 10 ? `×${totalZoom.toFixed(1)}` : `×${totalZoom.toFixed(2)}`;
         Array.from(ui.brushList.querySelectorAll(".brush")).forEach((button) => {
           button.setAttribute("aria-pressed", String(button.dataset.brush === state.brush));
         });
@@ -2528,12 +2653,19 @@
           const speed = Math.max(0.001, Math.hypot(tendril.vx, tendril.vy));
           const nx = -tendril.vy / speed;
           const ny = tendril.vx / speed;
-          const curl = Math.sin((tendril.maxLife - tendril.life) * 0.16 + tendril.seed) * tendril.curl;
+          const phase = tendril.maxLife - tendril.life;
+          const curl = Math.sin(phase * 0.16 + tendril.seed) * tendril.curl;
 
           tendril.vx += nx * curl * state.dpr;
           tendril.vy += ny * curl * state.dpr;
-          tendril.vx += rand(-tendril.jitter, tendril.jitter) * state.dpr;
-          tendril.vy += rand(-tendril.jitter, tendril.jitter) * state.dpr;
+          // Angular brushes keep a share of white noise for electric texture;
+          // the rest wander on smooth per-tendril sine phases for silky lines.
+          const noiseShare = tendril.angular ? 0.42 : 0.12;
+          const seed2 = tendril.seed * 2.618;
+          const wanderX = Math.sin(phase * 0.21 + tendril.seed) * Math.cos(phase * 0.057 + seed2);
+          const wanderY = Math.cos(phase * 0.17 + seed2) * Math.sin(phase * 0.049 + tendril.seed);
+          tendril.vx += tendril.jitter * (wanderX * (1 - noiseShare) * 0.62 + rand(-1, 1) * noiseShare) * state.dpr;
+          tendril.vy += tendril.jitter * (wanderY * (1 - noiseShare) * 0.62 + rand(-1, 1) * noiseShare) * state.dpr;
           tendril.vy -= tendril.lift * state.dpr * (1 + tendril.width);
           quantizeVelocity(tendril, tendril.angular);
 
@@ -2696,6 +2828,14 @@
 
       function setExpansion(expansion) {
         state.expansion = clamp(Number(expansion), 0.35, 1.6);
+        updateUi();
+      }
+
+      // Density is a user multiplier on how many tendrils each fan spawns.
+      // Stored as a fraction (1 = 100% = the retuned baseline); the slider
+      // reports a percentage. Captured per-stroke so zoom replays match.
+      function setDensity(density) {
+        state.density = clamp(Number(density) / 100, 0.3, 2);
         updateUi();
       }
 
@@ -3263,19 +3403,19 @@
           velocity: [0.18, 1.05],
           life: [24, 62],
           width: [0.16, 0.42],
-          jitter: 0.28,
+          jitter: 0.22,
           curl: 0.24,
           branch: 0.002,
           drag: 0.963,
           lift: [0.02, 0.12],
-          alpha: 0.42,
+          alpha: 0.3,
           hueShift: [-34, 42],
           cap: "round",
           composite: "lighter",
           maxTendrils: 480,
           spacing: 1.45,
-          energy: 1.8,
-          layers: [[1.55, 0, 74, 0.35], [0.42, 0, 96, 0.7, "white"]]
+          energy: 1.25,
+          layers: [[1.55, 0, 74, 0.3], [0.42, 0, 96, 0.55, "white"]]
         },
         flame: {
           name: "Flame",
@@ -3291,14 +3431,14 @@
           curl: 0.09,
           branch: 0.0015,
           drag: 0.952,
-          lift: [0.32, 0.95],
-          alpha: 0.34,
+          lift: [0.26, 0.72],
+          alpha: 0.26,
           hueShift: [-10, 22],
           cap: "round",
           composite: "lighter",
           maxTendrils: 560,
           spacing: 1.35,
-          energy: 1.7,
+          energy: 1.1,
           layers: [[2.4, -10, 40, 0.16], [1.05, 8, 56, 0.34], [0.32, 28, 72, 0.46], [0.08, 0, 92, 0.16, "warm"]]
         },
         thunder: {
@@ -3316,15 +3456,15 @@
           branch: 0.05,
           drag: 0.964,
           lift: [0, 0],
-          alpha: 0.44,
+          alpha: 0.36,
           hueShift: [-14, 22],
           angular: 0.33,
           cap: "butt",
           composite: "lighter",
           maxTendrils: 620,
           spacing: 1.3,
-          energy: 1.5,
-          layers: [[2.6, -24, 52, 0.2], [0.78, 10, 68, 0.62], [0.14, 0, 98, 0.9, "white"]]
+          energy: 1.2,
+          layers: [[2.6, -24, 52, 0.18], [0.78, 10, 68, 0.56], [0.14, 0, 98, 0.62, "white"]]
         },
         silk: {
           name: "Silk Ribbon",
@@ -3341,14 +3481,14 @@
           branch: 0.0002,
           drag: 0.989,
           lift: [-0.02, 0.02],
-          alpha: 0.28,
+          alpha: 0.22,
           hueShift: [-16, 30],
           cap: "round",
           composite: "screen",
           maxTendrils: 180,
           spacing: 3.2,
-          energy: 1.48,
-          layers: [[3.2, -12, 54, 0.18], [1.1, 14, 70, 0.5], [0.22, 0, 92, 0.86, "white"]]
+          energy: 1.15,
+          layers: [[3.2, -12, 54, 0.16], [1.1, 14, 70, 0.46], [0.22, 0, 92, 0.6, "white"]]
         },
         comet: {
           name: "Comet Trail",
@@ -3365,13 +3505,13 @@
           branch: 0.003,
           drag: 0.962,
           lift: [0, 0.02],
-          alpha: 0.42,
+          alpha: 0.3,
           hueShift: [-12, 20],
           cap: "round",
           composite: "screen",
           maxTendrils: 460,
           spacing: 1.8,
-          energy: 1.9,
+          energy: 1.3,
           layers: [[3.8, -12, 50, 0.1], [1.0, 18, 66, 0.26], [0.22, 0, 88, 0.48], [0.06, 0, 98, 0.18, "white"]]
         },
         nebula: {
@@ -3381,15 +3521,15 @@
           renderer: "smoke",
           count: [1, 3],
           spread: 1.0,
-          velocity: [0.05, 0.38],
+          velocity: [0.04, 0.3],
           life: [62, 132],
           width: [0.9, 1.8],
-          jitter: 0.11,
+          jitter: 0.09,
           curl: 0.22,
           branch: 0.0008,
           drag: 0.986,
           lift: [-0.04, 0.06],
-          alpha: 0.18,
+          alpha: 0.15,
           hueShift: [-48, 58],
           cap: "round",
           composite: "screen",
@@ -3414,15 +3554,15 @@
           branch: 0.03,
           drag: 0.965,
           lift: [0, 0],
-          alpha: 0.46,
+          alpha: 0.32,
           hueShift: [-10, 26],
           angular: 0.5,
           cap: "butt",
           composite: "lighter",
           maxTendrils: 540,
           spacing: 1.45,
-          energy: 1.6,
-          layers: [[2.0, -8, 58, 0.18], [0.56, 16, 74, 0.62], [0.12, 0, 98, 0.88, "white"]]
+          energy: 1.2,
+          layers: [[2.0, -8, 58, 0.16], [0.56, 16, 74, 0.56], [0.12, 0, 98, 0.62, "white"]]
         },
         water: {
           name: "Water",
@@ -3435,17 +3575,17 @@
           life: [48, 104],
           width: [0.34, 0.9],
           jitter: 0.06,
-          curl: 0.27,
+          curl: 0.3,
           branch: 0.0008,
           drag: 0.975,
           lift: [-0.12, -0.03],
-          alpha: 0.3,
+          alpha: 0.24,
           hueShift: [-18, 14],
           cap: "round",
           composite: "screen",
           maxTendrils: 620,
           spacing: 1.7,
-          energy: 1.35,
+          energy: 1.0,
           layers: [[3.0, -18, 48, 0.13], [1.05, 8, 64, 0.35], [0.28, 0, 86, 0.52], [0.08, 0, 98, 0.22, "white"]]
         },
         ember: {
@@ -3458,18 +3598,18 @@
           velocity: [0.38, 1.7],
           life: [16, 40],
           width: [0.1, 0.36],
-          jitter: 0.3,
+          jitter: 0.26,
           curl: 0.08,
-          branch: 0.009,
+          branch: 0.007,
           drag: 0.935,
-          lift: [0.22, 0.66],
-          alpha: 0.5,
+          lift: [0.16, 0.5],
+          alpha: 0.34,
           hueShift: [-8, 32],
           cap: "round",
           composite: "lighter",
           maxTendrils: 540,
           spacing: 1.45,
-          energy: 1.9,
+          energy: 1.15,
           layers: [[1.6, -10, 40, 0.22], [0.52, 12, 60, 0.62], [0.12, 0, 94, 0.5, "warm"]]
         },
         frost: {
@@ -3487,41 +3627,71 @@
           branch: 0.042,
           drag: 0.962,
           lift: [0, 0],
-          alpha: 0.5,
+          alpha: 0.34,
           hueShift: [-16, 18],
           angular: 0.5,
           cap: "butt",
           composite: "lighter",
           maxTendrils: 560,
           spacing: 1.55,
-          energy: 1.7,
-          layers: [[2.2, -6, 70, 0.16], [0.62, 8, 82, 0.56], [0.13, 0, 98, 0.9, "white"]]
+          energy: 1.2,
+          layers: [[2.2, -6, 70, 0.14], [0.62, 8, 82, 0.5], [0.13, 0, 98, 0.62, "white"]]
         },
         plasma: {
           name: "Plasma",
           hues: [310, 188],
           dot: ["#ff38d8", "#38e8ff", "#f7fbff"],
           renderer: "plasma",
-          count: [3, 5],
+          count: [2, 4],
           spread: 0.72,
-          velocity: [0.48, 1.9],
+          velocity: [0.48, 1.8],
           life: [34, 82],
           width: [0.28, 0.82],
-          jitter: 0.36,
+          jitter: 0.26,
           curl: 0.3,
-          branch: 0.01,
+          branch: 0.008,
           drag: 0.954,
           lift: [-0.02, 0.02],
-          alpha: 0.32,
+          alpha: 0.24,
           hueShift: [-34, 38],
           cap: "round",
           composite: "lighter",
           maxTendrils: 680,
           spacing: 1.35,
-          energy: 1.0,
-          layers: [[3.3, -28, 48, 0.16], [1.05, 24, 64, 0.42], [0.25, 0, 86, 0.65], [0.08, 0, 98, 0.42, "white"]]
+          energy: 0.85,
+          layers: [[3.3, -28, 48, 0.14], [1.05, 24, 64, 0.38], [0.25, 0, 86, 0.56], [0.08, 0, 98, 0.3, "white"]]
         }
       });
+
+      // Density rebalance: the presets above spawn many long, thin, luminous
+      // trails that overcrowd the viewport. Nudge every preset toward SHORTER
+      // trails (less life), BIGGER individual strokes (wider), and a few FEWER
+      // particles per fan -- same visual identity, just chunkier and less dense.
+      // Runs once, right after the active profiles are installed above, so live
+      // strokes and deterministic zoom replays read identical values. The
+      // user-tuned "custom" brush keeps its own persisted values and is skipped.
+      const BRUSH_DENSITY_RETUNE = { life: 0.8, width: 1.28, count: 0.85 };
+      for (const [retuneBrushId, retuneProfile] of Object.entries(brushProfiles)) {
+        if (retuneBrushId === "custom") continue;
+        if (Array.isArray(retuneProfile.life)) {
+          retuneProfile.life = [
+            retuneProfile.life[0] * BRUSH_DENSITY_RETUNE.life,
+            retuneProfile.life[1] * BRUSH_DENSITY_RETUNE.life
+          ];
+        }
+        if (Array.isArray(retuneProfile.width)) {
+          retuneProfile.width = [
+            retuneProfile.width[0] * BRUSH_DENSITY_RETUNE.width,
+            retuneProfile.width[1] * BRUSH_DENSITY_RETUNE.width
+          ];
+        }
+        if (Array.isArray(retuneProfile.count)) {
+          retuneProfile.count = [
+            Math.max(1, Math.round(retuneProfile.count[0] * BRUSH_DENSITY_RETUNE.count)),
+            Math.max(1, Math.round(retuneProfile.count[1] * BRUSH_DENSITY_RETUNE.count))
+          ];
+        }
+      }
 
       function drawLayerPack(x0, y0, x1, y1, profile, hue, alpha, baseWidth) {
         profile.layers.forEach(([scale, hueOffset, lightness, layerAlpha, special]) => {
@@ -3772,8 +3942,8 @@
 
       {
         const CANVAS_CONFIG = {
-          desktopScale: 1.82,
-          mobileScale: 1.45,
+          desktopScale: 1,
+          mobileScale: 1,
           desktopMaxPixels: 14000000,
           mobileMaxPixels: 5200000,
           desktopDprCap: 2.15,
@@ -3837,8 +4007,6 @@
           ui.scaleFactor.min = String(SCALE_FACTOR_RANGE.min);
           ui.scaleFactor.max = String(SCALE_FACTOR_RANGE.max);
           ui.scaleFactor.step = "0.1";
-          ui.zoom.min = String(Math.ceil(100 / state.canvasScale));
-          ui.zoom.max = "240";
         }
 
         function cssCanvasSize() {
@@ -3860,14 +4028,7 @@
         }
 
         function clampPan() {
-          const cssWidth = canvasCssWidth() || cssCanvasSize().width;
-          const cssHeight = canvasCssHeight() || cssCanvasSize().height;
-          const renderedWidth = cssWidth * state.zoom;
-          const renderedHeight = cssHeight * state.zoom;
-          const maxX = Math.max(0, (renderedWidth - window.innerWidth) / 2);
-          const maxY = Math.max(0, (renderedHeight - window.innerHeight) / 2);
-          state.panX = clamp(Number(state.panX) || 0, -maxX, maxX);
-          state.panY = clamp(Number(state.panY) || 0, -maxY, maxY);
+          // Infinite canvas: pan is unbounded.
         }
 
         function expandedBrushLengthScale(length) {
@@ -4032,10 +4193,8 @@
           state.last = cursor;
         }
 
-        applyZoom = function patchedExpandedApplyZoom() {
-          syncCanvasConfig();
-          state.zoom = clamp(Number(state.zoom) || 1, 1 / (state.canvasScale || 1), 2.4);
-          clampPan();
+        applyZoom = function previewApplyZoom() {
+          state.zoom = Math.max(Number(state.zoom) || 1, 1e-9);
           canvas.style.left = `calc(50% + ${state.panX}px)`;
           canvas.style.top = `calc(50% + ${state.panY}px)`;
           canvas.style.transform = `translate(-50%, -50%) scale(${state.zoom})`;
@@ -4083,7 +4242,9 @@
           canvas.style.width = `${cssSize.width}px`;
           canvas.style.height = `${cssSize.height}px`;
 
-          if (previous) {
+          if (state.strokeLog && state.strokeLog.length) {
+            renderWorldSync();
+          } else if (previous) {
             restoreSnapshot(previous);
           } else {
             clearSurface();
@@ -4145,7 +4306,7 @@
         }
 
         function showSymmetryGuide(point) {
-          if (!point || state.gesturing) {
+          if (!point || state.gesturing || state.tool === "hand" || state.spaceHeld || state.panning) {
             hideSymmetryGuide();
             return;
           }
@@ -4175,6 +4336,19 @@
           showSymmetryGuide(state.symmetryGuidePoint);
         }
 
+        // Viewport-relative + user density multiplier. A fixed particle budget
+        // overcrowds small windows, so the viewport share compares the current
+        // css canvas area to a 960x720 reference; the user share is the Density
+        // slider (state.density, 1 = 100%). Every input (density, width,
+        // height, dpr) is restored per-stroke by replayStroke, so zoom rebuilds
+        // recompute the exact same value and stay deterministic.
+        function combinedDensityScale() {
+          const cssArea = (state.width / state.dpr) * (state.height / state.dpr);
+          const viewportScale = clamp(Math.sqrt(cssArea / (960 * 720)), 0.55, 1.15);
+          const userScale = clamp(state.density ?? 1, 0.3, 2);
+          return viewportScale * userScale;
+        }
+
         spawnFan = function patchedExpandedSpawnFan(x, y, dx, dy) {
           const profile = brushProfiles[state.brush] || brushProfiles.thunder;
           const speed = Math.hypot(dx, dy);
@@ -4190,6 +4364,12 @@
             mobile ? 0.28 : 0.44,
             mobile ? 0.6 : 0.94
           );
+          // Combined density multiplier (viewport-relative x user slider).
+          // Per-fan counts are already ~1 at default settings, so sub-1 values
+          // cannot thin the fan here (Math.max(1, ...) floors them) -- the
+          // sub-1 share is applied as wider fan SPACING in spawnAlong instead.
+          // Only the above-1 share boosts the per-fan count.
+          const densityBoost = Math.max(1, combinedDensityScale());
           const factorScale = clamp(
             (state.scaleFactor || SCALE_FACTOR_RANGE.default) / SCALE_FACTOR_RANGE.default,
             SCALE_FACTOR_RANGE.min / SCALE_FACTOR_RANGE.default,
@@ -4198,12 +4378,21 @@
           const lifeScale = (0.72 + expansionScale * 0.23) * Math.pow(lengthScale, 1.32) * Math.sqrt(factorScale) * (mobile ? 0.82 : 1);
           const velocityScale = (0.82 + expansionScale * 0.22) * Math.pow(lengthScale, 0.68) * factorScale * (mobile ? 0.82 : 1);
           const widthScale = (0.92 + expansionScale * 0.08) * (1 + (factorScale - 1) * WIDTH_TO_LENGTH_RATIO);
-          const motionBoost = clamp(0.72 + Math.sqrt(speed) * (mobile ? 0.075 : 0.105), 0.72, mobile ? 1.28 : 1.55);
-          const count = Math.max(1, Math.round(rand(profile.count[0], profile.count[1]) * densityScale));
+          const motionBoost = clamp(0.5 + Math.sqrt(speed) * (mobile ? 0.09 : 0.12), 0.5, mobile ? 1.28 : 1.55);
+          // Strokes bloom in over their first ~60 css px instead of detonating on touch.
+          const strokeRamp = clamp((state.strokeDistance ?? 999) / 60, 0, 1);
+          const rampAlpha = 0.42 + strokeRamp * 0.58;
+          const rampVelocity = 0.6 + strokeRamp * 0.4;
+          // Stochastic rounding: several profiles have per-fan counts of ~1, so
+          // plain Math.round would swallow fractional density boosts (e.g.
+          // 1.3 -> 1 regardless of the slider). Drawing the fraction from the
+          // stroke's seeded RNG keeps zoom replays byte-identical.
+          const rawCount = rand(profile.count[0], profile.count[1]) * densityScale * (0.7 + strokeRamp * 0.3) * densityBoost;
+          const count = Math.max(1, Math.floor(rawCount) + (Math.random() < rawCount % 1 ? 1 : 0));
 
           for (let i = 0; i < count; i += 1) {
             const angle = baseAngle + rand(-profile.spread, profile.spread) * spreadScale;
-            const velocity = rand(profile.velocity[0], profile.velocity[1]) * velocityScale * motionBoost;
+            const velocity = rand(profile.velocity[0], profile.velocity[1]) * velocityScale * motionBoost * rampVelocity;
             const life = rand(profile.life[0], profile.life[1]) * lifeScale;
             const lift = rand(profile.lift[0], profile.lift[1]) * state.dpr;
             const hue = tendrilHue(profile, state.hue);
@@ -4224,7 +4413,7 @@
               curl: profile.curl,
               drag: profile.drag,
               lift: (profile.lift[0] + profile.lift[1]) * 0.006,
-              alpha: profile.alpha,
+              alpha: profile.alpha * rampAlpha,
               branch: profile.branch,
               seed: Math.random() * Math.PI * 2,
               angular: profile.angular || 0,
@@ -4245,6 +4434,20 @@
           const dx = x1 - x0;
           const dy = y1 - y0;
           const distance = Math.hypot(dx, dy);
+          state.strokeDistance = (state.strokeDistance || 0) + distance;
+          // Sub-1 density thins the stroke by SKIPPING a deterministic share of
+          // fan spawns (per-fan counts are floored at 1 and the smoothed-move
+          // pipeline emits sub-spacing segments, so neither count nor spacing
+          // can thin below baseline). The budget accumulates the fractional
+          // share per call and only spawns when it crosses 1. It is reset at
+          // stroke start and at replay start, so zoom rebuilds walk the exact
+          // same skip pattern.
+          const densityThin = Math.min(1, combinedDensityScale());
+          if (densityThin < 0.999) {
+            state.densitySkipBudget = (state.densitySkipBudget || 0) + densityThin;
+            if (state.densitySkipBudget < 1) return;
+            state.densitySkipBudget -= 1;
+          }
           const sizeDistanceScale = expandedBrushSpacingScale(state.size);
           const expansionDistanceScale = 0.9 + state.expansion * 0.46;
           const spacing = clamp(11.8 * sizeDistanceScale * expansionDistanceScale * (profile.spacing || 1), mobile ? 15 : 10, mobile ? 92 : 96);
@@ -4257,9 +4460,12 @@
 
         const originalStartPainting = startPainting;
         startPainting = function patchedExpandedStartPainting(event) {
+          commitViewPreviewNow();
           if (state.gesturing) return;
           if (mobileLike()) closeTransientControls(false);
           const result = originalStartPainting(event);
+          state.strokeDistance = 0;
+          state.densitySkipBudget = 0;
           if (state.painting && state.last) {
             document.body.classList.toggle("is-painting", mobileLike());
             showSymmetryGuide(state.last);
@@ -4343,6 +4549,7 @@
         }
 
         function beginGestureIfNeeded(event) {
+          flushRenderJob();
           if (event.pointerType !== "touch") return;
           activeTouchPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
           if (activeTouchPointers.size < 2) return;
@@ -4351,10 +4558,13 @@
           if (!metrics) return;
           state.gesturing = true;
           state.painting = false;
+          commitLiveStroke();
           state.pointerId = null;
           state.last = null;
           document.body.classList.remove("is-painting");
           clearHoldBloom();
+          state.panning = null;
+          document.body.classList.remove("panning");
           hideSymmetryGuide();
           gestureStart = {
             cx: metrics.cx,
@@ -4376,7 +4586,7 @@
           const metrics = gestureMetrics();
           if (!metrics) return;
           const ratio = metrics.distance / gestureStart.distance;
-          state.zoom = clamp(gestureStart.zoom * ratio, 1 / (state.canvasScale || 1), 2.4);
+          state.zoom = gestureStart.zoom * ratio;
           state.panX = gestureStart.panX + metrics.cx - gestureStart.cx;
           state.panY = gestureStart.panY + metrics.cy - gestureStart.cy;
           applyZoom();
@@ -4388,18 +4598,271 @@
           if (event.pointerType !== "touch") return;
           activeTouchPointers.delete(event.pointerId);
           if (activeTouchPointers.size < 2) {
+            const wasGesturing = state.gesturing;
             state.gesturing = false;
             gestureStart = null;
-            state.painting = false;
-            state.pointerId = null;
-            state.last = null;
+            // Only clear the painting pointer state here if a two-finger
+            // gesture was actually in progress (beginGestureIfNeeded already
+            // nulled these when the gesture started). This handler and
+            // stopPainting are both registered on window's pointerup, and
+            // this one runs first (capture phase runs before the bubble-
+            // phase target/window listeners); unconditionally zeroing
+            // state.painting here for every solitary touch pointerup would
+            // race ahead of stopPainting's own guard and skip
+            // commitLiveStroke(), silently dropping the stroke.
+            if (wasGesturing) {
+              state.painting = false;
+              state.pointerId = null;
+              state.last = null;
+              commitViewPreview();
+            }
             hideSymmetryGuide();
             updateUi();
           }
         }
 
+        /* ---- Infinite view model ---------------------------------------- */
+        const REBUILD_DEBOUNCE_MS = 150;
+        const ZOOM_STEP_FACTOR = 1.25;
+
+        function viewCssWidth() { return state.width / (state.dpr || 1); }
+        function viewCssHeight() { return state.height / (state.dpr || 1); }
+
+        function screenToWorld(sx, sy) {
+          return [
+            state.view.x + (sx - viewCssWidth() / 2) / state.view.scale,
+            state.view.y + (sy - viewCssHeight() / 2) / state.view.scale
+          ];
+        }
+
+        function worldToScreen(wx, wy) {
+          return [
+            (wx - state.view.x) * state.view.scale + viewCssWidth() / 2,
+            (wy - state.view.y) * state.view.scale + viewCssHeight() / 2
+          ];
+        }
+
+        // v1 (soft): carry the raster across the view change by scaling it.
+        // Task 4 replaces this body with the crisp stroke-replay pipeline.
+        let rebuildView = function softRebuildView(zoom, panX, panY) {
+          const shot = makeSnapshot();
+          clearSurface();
+          ctx.globalCompositeOperation = "source-over";
+          ctx.setTransform(
+            zoom, 0, 0, zoom,
+            canvas.width / 2 - zoom * (canvas.width / 2) + panX * state.dpr,
+            canvas.height / 2 - zoom * (canvas.height / 2) + panY * state.dpr
+          );
+          ctx.drawImage(shot, 0, 0);
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+        };
+
+        function commitViewPreview() {
+          if (previewCommitTimer) {
+            window.clearTimeout(previewCommitTimer);
+            previewCommitTimer = null;
+          }
+          if (state.painting || state.panning || state.gesturing) return;
+          const zoom = Number(state.zoom) || 1;
+          const panX = state.panX || 0;
+          const panY = state.panY || 0;
+          if (zoom === 1 && panX === 0 && panY === 0) return;
+          const nextScale = state.view.scale * zoom;
+          state.view.x -= panX / nextScale;
+          state.view.y -= panY / nextScale;
+          state.view.scale = nextScale;
+          rebuildView(zoom, panX, panY);
+          state.zoom = 1;
+          state.panX = 0;
+          state.panY = 0;
+          applyZoom();
+        }
+
+        let previewCommitTimer = null;
+        function previewZoomAt(clientX, clientY, factor) {
+          if (state.painting) return;
+          const cx = window.innerWidth / 2;
+          const cy = window.innerHeight / 2;
+          state.panX = clientX - cx - (clientX - cx - state.panX) * factor;
+          state.panY = clientY - cy - (clientY - cy - state.panY) * factor;
+          state.zoom = (Number(state.zoom) || 1) * factor;
+          applyZoom();
+          if (previewCommitTimer) window.clearTimeout(previewCommitTimer);
+          previewCommitTimer = window.setTimeout(() => {
+            previewCommitTimer = null;
+            commitViewPreview();
+          }, REBUILD_DEBOUNCE_MS);
+        }
+
+        function commitViewPreviewNow() {
+          if (previewCommitTimer) {
+            window.clearTimeout(previewCommitTimer);
+            previewCommitTimer = null;
+          }
+          if (state.zoom !== 1 || state.panX !== 0 || state.panY !== 0) {
+            commitViewPreview();
+            // "Commit now" callers (e.g. starting a stroke) need the chunked
+            // rebuild commitViewPreview() may have just scheduled to be fully
+            // settled synchronously too, or the opaque preview overlay can be
+            // left showing stale pixels while the live stroke paints beneath it.
+            flushRenderJob();
+          }
+        }
+
+        function resetView() {
+          // Mirrors mobile's resetView guard: mid-stroke (or mid-gesture, or
+          // mid-pan) this would wipe the live raster via renderWorldSync()
+          // while the live stroke keeps recording in the pre-reset view
+          // frame, so the committed stroke replays misplaced.
+          if (state.painting || state.gesturing || state.panning) return;
+          state.view = { x: 0, y: 0, scale: 1 };
+          state.zoom = 1;
+          state.panX = 0;
+          state.panY = 0;
+          flushRenderJob();
+          renderWorldSync();
+          applyZoom();
+        }
+
+        stage.addEventListener("wheel", (event) => {
+          flushRenderJob();
+          event.preventDefault();
+          if (state.painting || state.gesturing) return;
+          const factor = Math.exp(-event.deltaY * (event.ctrlKey ? 0.014 : 0.0022));
+          previewZoomAt(event.clientX, event.clientY, factor);
+        }, { passive: false });
+
+        // Safari-only proprietary pinch events; harmless elsewhere.
+        let safariGestureScale = 1;
+        stage.addEventListener("gesturestart", (event) => {
+          event.preventDefault();
+          safariGestureScale = event.scale || 1;
+        });
+        stage.addEventListener("gesturechange", (event) => {
+          event.preventDefault();
+          if (state.painting || state.gesturing) return;
+          const scale = event.scale || 1;
+          previewZoomAt(
+            event.clientX ?? window.innerWidth / 2,
+            event.clientY ?? window.innerHeight / 2,
+            scale / (safariGestureScale || 1)
+          );
+          safariGestureScale = scale;
+        });
+        stage.addEventListener("gestureend", (event) => event.preventDefault());
+
+        stepZoom = function infiniteStepZoom(delta) {
+          previewZoomAt(window.innerWidth / 2, window.innerHeight / 2,
+            delta >= 0 ? ZOOM_STEP_FACTOR : 1 / ZOOM_STEP_FACTOR);
+        };
+
+        setZoom = function infiniteSetZoom(zoom) {
+          const target = Number(zoom) || 1;
+          if (target === 1) { resetView(); return; }
+          previewZoomAt(window.innerWidth / 2, window.innerHeight / 2,
+            target / (state.view.scale * (Number(state.zoom) || 1)));
+        };
+
+        ui.zoomIn.addEventListener("click", () => stepZoom(1));
+        ui.zoomOut.addEventListener("click", () => stepZoom(-1));
+        ui.zoomValue.addEventListener("dblclick", () => resetView());
+
+        window.__fractal = {
+          state,
+          screenToWorld,
+          worldToScreen,
+          previewZoomAt,
+          commitViewPreview,
+          commitViewPreviewNow,
+          resetView
+        };
+
+        /* ---- Hand tool & drag panning ----------------------------------- */
+        function setTool(tool) {
+          state.tool = tool === "hand" ? "hand" : "brush";
+          ui.handTool.setAttribute("aria-pressed", String(state.tool === "hand"));
+          document.body.classList.toggle("hand-mode", state.tool === "hand" || state.spaceHeld);
+          if (state.tool === "hand") hideSymmetryGuide();
+        }
+
+        function panModeActive(event) {
+          if (event.button === 1) return true;
+          if (event.pointerType === "touch") return state.tool === "hand";
+          return (state.tool === "hand" || state.spaceHeld) && (event.button === 0 || event.button === undefined);
+        }
+
+        function beginPan(event) {
+          flushRenderJob();
+          if (state.painting || state.gesturing || state.panning) return;
+          if (!panModeActive(event)) return;
+          state.panning = {
+            pointerId: event.pointerId ?? "mouse",
+            startX: event.clientX,
+            startY: event.clientY,
+            panX: state.panX,
+            panY: state.panY
+          };
+          hideSymmetryGuide();
+          document.body.classList.add("panning");
+          if (event.pointerId !== undefined && stage.setPointerCapture) {
+            try { stage.setPointerCapture(event.pointerId); } catch (_) {}
+          }
+          event.preventDefault();
+          event.stopImmediatePropagation();
+        }
+
+        function movePan(event) {
+          if (!state.panning || (event.pointerId ?? "mouse") !== state.panning.pointerId) return;
+          state.panX = state.panning.panX + (event.clientX - state.panning.startX);
+          state.panY = state.panning.panY + (event.clientY - state.panning.startY);
+          applyZoom();
+          event.preventDefault();
+          event.stopImmediatePropagation();
+        }
+
+        function endPan(event) {
+          if (!state.panning || (event.pointerId ?? "mouse") !== state.panning.pointerId) return;
+          state.panning = null;
+          document.body.classList.remove("panning");
+          commitViewPreview();
+        }
+
+        ui.handTool.addEventListener("click", () => setTool(state.tool === "hand" ? "brush" : "hand"));
+
+        window.addEventListener("keydown", (event) => {
+          const tag = document.activeElement && document.activeElement.tagName;
+          if (tag === "INPUT" || tag === "TEXTAREA" || !ui.tutorial.hidden) return;
+          if (event.key === " " && !event.repeat) {
+            state.spaceHeld = true;
+            document.body.classList.add("hand-mode");
+            hideSymmetryGuide();
+            event.preventDefault();
+          } else if (event.key.toLowerCase() === "h") {
+            setTool(state.tool === "hand" ? "brush" : "hand");
+            event.preventDefault();
+          } else if (event.key === "Escape" && state.tool === "hand") {
+            setTool("brush");
+          }
+        });
+        window.addEventListener("keyup", (event) => {
+          if (event.key === " ") {
+            state.spaceHeld = false;
+            document.body.classList.toggle("hand-mode", state.tool === "hand");
+          }
+        });
+
+        window.__fractal.setTool = setTool;
+
         function previewSymmetryGuide(event) {
-          if (state.painting || state.gesturing || event.pointerType === "touch") return;
+          if (
+            state.painting ||
+            state.gesturing ||
+            event.pointerType === "touch" ||
+            state.tool === "hand" ||
+            state.spaceHeld ||
+            state.panning
+          )
+            return;
           showSymmetryGuide(eventPosition(event));
         }
 
@@ -4411,12 +4874,728 @@
         stage.addEventListener("pointerleave", endGesturePointer, { capture: true });
         stage.addEventListener("pointerleave", hideSymmetryGuide);
 
+        // Pan listeners must register after the gesture listeners above so a
+        // second touch can still be tracked into a pinch even when the hand
+        // tool has claimed the first pointer (see beginPan's
+        // stopImmediatePropagation, which only blocks later-registered
+        // capture listeners on this node).
+        stage.addEventListener("pointerdown", beginPan, { capture: true });
+        stage.addEventListener("pointermove", movePan, { capture: true });
+        window.addEventListener("pointerup", endPan, { capture: true });
+        stage.addEventListener("pointercancel", endPan, { capture: true });
+
+        /* ---- Deterministic stroke recording ------------------------------ */
+        const nativeRandom = Math.random;
+        let strokeIdCounter = 0;
+
+        function mulberry32(seed) {
+          let a = seed >>> 0;
+          return function seededRandom() {
+            a = (a + 0x6D2B79F5) >>> 0;
+            let t = a;
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+          };
+        }
+
+        function tagNewTendrils(stroke) {
+          for (const tendril of state.tendrils) {
+            if (!tendril.rng) {
+              tendril.rng = mulberry32(Math.floor(stroke.rng() * 4294967296));
+              tendril.strokeRef = stroke;
+            }
+          }
+        }
+
+        function commitLiveStroke() {
+          const stroke = state.liveStroke;
+          if (!stroke) return;
+          state.liveStroke = null;
+          if (!stroke.segments.length) return;
+          delete stroke.rng; // transient; seed is what matters
+          state.strokeLog.push(stroke);
+          state.undoStack.push({ type: "stroke" });
+          state.redoStack = [];
+          updateUi();
+        }
+
+        // Tag any tendril spawned with no live stroke (tutorial demo strokes,
+        // or any other unrecorded spawn) so a later stroke's tagNewTendrils
+        // cannot adopt it and consume RNG draws replay will never make.
+        function tagOrphanTendrils() {
+          for (const tendril of state.tendrils) {
+            if (!tendril.rng) tendril.rng = nativeRandom;
+          }
+        }
+
+        const recordedStartPainting = startPainting;
+        startPainting = function recordingStartPainting(event) {
+          flushRenderJob();
+          // Commit any pending zoom preview first, so stroke record snapshots the post-commit view.
+          commitViewPreviewNow();
+          const wasPainting = state.painting;
+          // Built BEFORE calling the patched handler: patchedExpandedStartPainting
+          // synchronously fires the hold-bloom spawnFan burst before returning, so
+          // state.liveStroke must already exist for that burst to be recorded and
+          // its tendrils tagged. Everything the record needs comes from `state`,
+          // not the event, so early creation is safe.
+          if (!wasPainting) {
+            const seed = Math.floor(nativeRandom() * 4294967296);
+            state.liveStroke = {
+              id: (strokeIdCounter += 1),
+              seed,
+              rng: mulberry32(seed),
+              brush: state.brush,
+              hue: state.hue,
+              hue2: state.hue2,
+              blend: state.blend,
+              size: state.size,
+              scaleFactor: state.scaleFactor,
+              expansion: state.expansion,
+              density: state.density,
+              symmetry: state.symmetry,
+              mirror: state.mirror,
+              custom: state.brush === "custom"
+                ? JSON.parse(JSON.stringify(brushProfiles.custom))
+                : null,
+              symCenter: { x: state.view.x, y: state.view.y },
+              drawScale: state.view.scale,
+              dpr: state.dpr,
+              viewW: state.width,
+              viewH: state.height,
+              segments: [],
+              stepCount: 0,
+              maxR: 0
+            };
+          }
+          const result = recordedStartPainting(event);
+          if (!wasPainting && !state.painting) {
+            // The patched handler early-returned (gesturing, hand tool, etc.);
+            // no stroke actually started, so discard the speculative record.
+            state.liveStroke = null;
+          }
+          return result;
+        };
+
+        // Set by replayStroke while it is synchronously re-simulating a
+        // stroke. patchedExpandedSpawnAlong (captured below as
+        // recordedSpawnAlong) internally calls the mutable `spawnFan`
+        // binding, which resolves to recordingSpawnFan below -- without this
+        // guard that nested call would see state.liveStroke === null (nulled
+        // during replay) and misfire the tagOrphanTendrils() path, tagging
+        // replayed tendrils with nativeRandom instead of the seeded replay
+        // stream and making replay non-deterministic. When replaying, defer
+        // entirely to the raw recorded* function; replayStroke's own loop
+        // calls tagNewTendrils(replayContext) once per top-level segment.
+        let replayingStroke = false;
+
+        let insideSpawnAlong = false;
+        const recordedSpawnAlong = spawnAlong;
+        spawnAlong = function recordingSpawnAlong(x0, y0, x1, y1) {
+          if (replayingStroke) {
+            recordedSpawnAlong(x0, y0, x1, y1);
+            return;
+          }
+          const stroke = state.liveStroke;
+          if (!stroke) {
+            recordedSpawnAlong(x0, y0, x1, y1);
+            tagOrphanTendrils();
+            return;
+          }
+          stroke.segments.push({ x0, y0, x1, y1, step: stroke.stepCount });
+          insideSpawnAlong = true;
+          try {
+            Math.random = stroke.rng;
+            recordedSpawnAlong(x0, y0, x1, y1);
+          } finally {
+            Math.random = nativeRandom;
+            insideSpawnAlong = false;
+          }
+          tagNewTendrils(stroke);
+        };
+
+        const recordedSpawnFan = spawnFan;
+        spawnFan = function recordingSpawnFan(x, y, dx, dy) {
+          if (replayingStroke) {
+            recordedSpawnFan(x, y, dx, dy);
+            return;
+          }
+          const stroke = state.liveStroke;
+          if (!stroke || insideSpawnAlong) {
+            recordedSpawnFan(x, y, dx, dy);
+            if (!stroke) tagOrphanTendrils();
+            return;
+          }
+          // Direct call outside spawnAlong (hold-bloom): record as a fan event.
+          stroke.segments.push({ fan: true, x, y, dx, dy, step: stroke.stepCount });
+          try {
+            Math.random = stroke.rng;
+            recordedSpawnFan(x, y, dx, dy);
+          } finally {
+            Math.random = nativeRandom;
+          }
+          tagNewTendrils(stroke);
+        };
+
+        const recordedStopPainting = stopPainting;
+        stopPainting = function recordingStopPainting(event) {
+          const wasPainting = state.painting;
+          const result = recordedStopPainting(event);
+          if (wasPainting && !state.painting) commitLiveStroke();
+          return result;
+        };
+
+        /* ---- Deterministic simulation step -------------------------------
+           Mirrors the original step() body (see `function step()` near the
+           base engine) with four changes: operates on an arbitrary list, uses
+           per-tendril seeded RNG streams, tags branch children, and tracks
+           per-stroke max reach (`maxR`) via each tendril's `strokeRef`. */
+        function stepTendrils(list) {
+          for (let i = list.length - 1; i >= 0; i -= 1) {
+            const tendril = list[i];
+            try {
+              if (tendril.rng) Math.random = tendril.rng;
+              const ox = tendril.x;
+              const oy = tendril.y;
+              const speed = Math.max(0.001, Math.hypot(tendril.vx, tendril.vy));
+              const nx = -tendril.vy / speed;
+              const ny = tendril.vx / speed;
+              const phase = tendril.maxLife - tendril.life;
+              const curl = Math.sin(phase * 0.16 + tendril.seed) * tendril.curl;
+
+              tendril.vx += nx * curl * state.dpr;
+              tendril.vy += ny * curl * state.dpr;
+              const noiseShare = tendril.angular ? 0.42 : 0.12;
+              const seed2 = tendril.seed * 2.618;
+              const wanderX = Math.sin(phase * 0.21 + tendril.seed) * Math.cos(phase * 0.057 + seed2);
+              const wanderY = Math.cos(phase * 0.17 + seed2) * Math.sin(phase * 0.049 + tendril.seed);
+              tendril.vx += tendril.jitter * (wanderX * (1 - noiseShare) * 0.62 + rand(-1, 1) * noiseShare) * state.dpr;
+              tendril.vy += tendril.jitter * (wanderY * (1 - noiseShare) * 0.62 + rand(-1, 1) * noiseShare) * state.dpr;
+              tendril.vy -= tendril.lift * state.dpr * (1 + tendril.width);
+              quantizeVelocity(tendril, tendril.angular);
+
+              const tx = tendril.x + tendril.vx;
+              const ty = tendril.y + tendril.vy;
+              drawBrushSegment(ox, oy, tx, ty, tendril);
+
+              tendril.x = tx;
+              tendril.y = ty;
+              tendril.vx *= tendril.drag;
+              tendril.vy *= tendril.drag;
+              tendril.life -= 1;
+
+              if (tendril.strokeRef) {
+                const reach = Math.hypot(tendril.x - state.cx, tendril.y - state.cy) + tendril.width * 3;
+                if (reach > tendril.strokeRef.maxR) tendril.strokeRef.maxR = reach;
+              }
+
+              const activeProfile = brushProfiles[tendril.brush] || brushProfiles.thunder;
+              const maxTendrils = Math.round((activeProfile.maxTendrils || 1600) * (0.72 + state.expansion * 0.34));
+              if (tendril.life > 12 && Math.random() < tendril.branch && list.length < maxTendrils) {
+                branchFrom(tendril, speed);
+                const child = list[list.length - 1];
+                if (child && !child.rng && tendril.rng) {
+                  child.rng = mulberry32(Math.floor(tendril.rng() * 4294967296));
+                  child.strokeRef = tendril.strokeRef;
+                }
+              }
+
+              if (
+                tendril.life <= 0 ||
+                Math.abs(tendril.vx) + Math.abs(tendril.vy) < 0.015 ||
+                tendril.x < -state.width * 0.1 ||
+                tendril.x > state.width * 1.1 ||
+                tendril.y < -state.height * 0.1 ||
+                tendril.y > state.height * 1.1
+              ) {
+                list.splice(i, 1);
+              }
+            } finally {
+              Math.random = nativeRandom;
+            }
+          }
+        }
+
+        step = function infiniteStep() {
+          stepTendrils(state.tendrils);
+          if (state.liveStroke) state.liveStroke.stepCount += 1;
+          requestAnimationFrame(step);
+        };
+
+        window.__fractal.mulberry32 = mulberry32;
+        window.__fractal.stepTendrils = stepTendrils;
+
+        /* ---- Replay & crisp rebuild -------------------------------------- */
+        const RENDER_BUDGET_MS = 8;
+        const REPLAY_STEP_GUARD = 20000;
+
+        const previewCanvas = document.createElement("canvas");
+        previewCanvas.id = "viewPreview";
+        previewCanvas.setAttribute("aria-hidden", "true");
+        previewCanvas.style.cssText =
+          "position:absolute;inset:0;width:100%;height:100%;pointer-events:none;display:none;";
+        stage.appendChild(previewCanvas);
+
+        function strokeWorldRadius(stroke) {
+          return stroke.maxR / (stroke.dpr * stroke.drawScale);
+        }
+
+        function visibleStrokes() {
+          const halfW = viewCssWidth() / 2 / state.view.scale;
+          const halfH = viewCssHeight() / 2 / state.view.scale;
+          return state.strokeLog.filter((stroke) => {
+            const r = strokeWorldRadius(stroke);
+            return stroke.symCenter.x + r > state.view.x - halfW &&
+              stroke.symCenter.x - r < state.view.x + halfW &&
+              stroke.symCenter.y + r > state.view.y - halfH &&
+              stroke.symCenter.y - r < state.view.y + halfH;
+          });
+        }
+
+        function drawStrokeDot(stroke, sx, sy) {
+          ctx.globalCompositeOperation = "lighter";
+          ctx.fillStyle = `hsla(${Math.round(normalizedHue(stroke.hue))}, 90%, 60%, 0.5)`;
+          const px = Math.max(1, Math.round(state.dpr));
+          ctx.fillRect(Math.round(sx * state.dpr), Math.round(sy * state.dpr), px, px);
+        }
+
+        function replayStroke(stroke) {
+          // k converts stroke-local device px to current device px.
+          const k = (state.view.scale / stroke.drawScale) * (state.dpr / stroke.dpr);
+          const [sx, sy] = worldToScreen(stroke.symCenter.x, stroke.symCenter.y);
+          if (stroke.maxR * k * 2 < 1.5) {
+            drawStrokeDot(stroke, sx, sy);
+            return;
+          }
+          const saved = {
+            brush: state.brush, hue: state.hue, hue2: state.hue2, blend: state.blend,
+            size: state.size, scaleFactor: state.scaleFactor, expansion: state.expansion,
+            density: state.density,
+            symmetry: state.symmetry, mirror: state.mirror,
+            dpr: state.dpr, width: state.width, height: state.height,
+            cx: state.cx, cy: state.cy,
+            tendrils: state.tendrils, strokeDistance: state.strokeDistance,
+            densitySkipBudget: state.densitySkipBudget,
+            liveStroke: state.liveStroke
+          };
+          const savedCustom = stroke.custom
+            ? JSON.parse(JSON.stringify(brushProfiles.custom)) : null;
+
+          // Everything below mutates shared, page-lifetime state (state
+          // fields, brushProfiles.custom, ctx transform, Math.random). A
+          // throw mid-replay must not leave any of that corrupted --
+          // renderWorldSync/pumpRender loop over strokes, so one bad stroke
+          // would otherwise wreck all subsequent rendering. The finally
+          // below is the single, unconditional restore path.
+          try {
+            if (stroke.custom) Object.assign(brushProfiles.custom, stroke.custom);
+
+            state.brush = stroke.brush;
+            state.hue = stroke.hue;
+            state.hue2 = stroke.hue2;
+            state.blend = stroke.blend;
+            state.size = stroke.size;
+            state.scaleFactor = stroke.scaleFactor;
+            state.expansion = stroke.expansion;
+            // Strokes recorded before the Density control existed have no
+            // stored density; fall back to 1 (100%) so they replay unchanged.
+            state.density = stroke.density ?? 1;
+            state.symmetry = stroke.symmetry;
+            state.mirror = stroke.mirror;
+            state.dpr = stroke.dpr;
+            state.width = stroke.viewW;
+            state.height = stroke.viewH;
+            state.cx = stroke.viewW / 2;
+            state.cy = stroke.viewH / 2;
+            state.tendrils = [];
+            state.strokeDistance = 0;
+            state.densitySkipBudget = 0;
+            state.liveStroke = null;
+
+            ctx.setTransform(
+              k, 0, 0, k,
+              sx * saved.dpr - k * (stroke.viewW / 2),
+              sy * saved.dpr - k * (stroke.viewH / 2)
+            );
+
+            const replayContext = { rng: mulberry32(stroke.seed) };
+            let segIndex = 0;
+            let stepIndex = 0;
+            let guard = 0;
+            replayingStroke = true;
+            try {
+              while ((segIndex < stroke.segments.length || state.tendrils.length) && guard < REPLAY_STEP_GUARD) {
+                while (segIndex < stroke.segments.length && stroke.segments[segIndex].step <= stepIndex) {
+                  const seg = stroke.segments[segIndex];
+                  segIndex += 1;
+                  Math.random = replayContext.rng;
+                  if (seg.fan) {
+                    recordedSpawnFan(seg.x, seg.y, seg.dx, seg.dy);
+                  } else {
+                    recordedSpawnAlong(seg.x0, seg.y0, seg.x1, seg.y1);
+                  }
+                  Math.random = nativeRandom;
+                  tagNewTendrils(replayContext);
+                }
+                stepTendrils(state.tendrils);
+                stepIndex += 1;
+                guard += 1;
+              }
+            } finally {
+              replayingStroke = false;
+            }
+          } finally {
+            // Unconditional backstop: guarantees these are restored even if
+            // the simulation loop above threw before reaching its own
+            // (now-redundant on the happy path) restore code.
+            Math.random = nativeRandom;
+            replayingStroke = false;
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            if (savedCustom) Object.assign(brushProfiles.custom, savedCustom);
+            Object.assign(state, saved);
+          }
+        }
+
+        let renderJob = null;
+
+        function renderWorldSync() {
+          renderJob = null;
+          previewCanvas.style.display = "none";
+          state.tendrils.length = 0;
+          clearSurface();
+          for (const stroke of visibleStrokes()) replayStroke(stroke);
+        }
+
+        function pumpRender() {
+          if (!renderJob) return;
+          const start = performance.now();
+          while (renderJob.index < renderJob.strokes.length &&
+                 performance.now() - start < RENDER_BUDGET_MS) {
+            replayStroke(renderJob.strokes[renderJob.index]);
+            renderJob.index += 1;
+          }
+          if (renderJob.index >= renderJob.strokes.length) {
+            renderJob = null;
+            previewCanvas.style.display = "none";
+          } else {
+            requestAnimationFrame(pumpRender);
+          }
+        }
+
+        function flushRenderJob() {
+          if (!renderJob) return;
+          while (renderJob.index < renderJob.strokes.length) {
+            replayStroke(renderJob.strokes[renderJob.index]);
+            renderJob.index += 1;
+          }
+          renderJob = null;
+          previewCanvas.style.display = "none";
+        }
+
+        function scheduleRebuild(zoom, panX, panY) {
+          // Soft preview: current pixels, transformed, on the overlay.
+          previewCanvas.width = canvas.width;
+          previewCanvas.height = canvas.height;
+          const pctx = previewCanvas.getContext("2d");
+          pctx.fillStyle = "#000";
+          pctx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
+          pctx.setTransform(
+            zoom, 0, 0, zoom,
+            canvas.width / 2 - zoom * (canvas.width / 2) + panX * state.dpr,
+            canvas.height / 2 - zoom * (canvas.height / 2) + panY * state.dpr
+          );
+          pctx.drawImage(canvas, 0, 0);
+          pctx.setTransform(1, 0, 0, 1, 0, 0);
+          previewCanvas.style.display = "block";
+
+          // Live tendrils are already recorded; kill them so they don't paint
+          // at stale positions while the crisp render builds underneath.
+          state.tendrils.length = 0;
+          clearSurface();
+          renderJob = { strokes: visibleStrokes(), index: 0 };
+          requestAnimationFrame(pumpRender);
+        }
+
+        rebuildView = function crispRebuildView(zoom, panX, panY) {
+          scheduleRebuild(zoom, panX, panY);
+        };
+
+        window.__fractal.renderWorldSync = renderWorldSync;
+        window.__fractal.flushRenderJob = flushRenderJob;
+        window.__fractal.replayStroke = replayStroke;
+
+        /* ---- Stroke-log history ------------------------------------------ */
+        pushHistory = function noopPushHistory() {
+          // Raster snapshots replaced by the stroke log (see undo/redo below).
+          state.history.length = 0;
+          state.redo.length = 0;
+        };
+
+        undo = function infiniteUndo() {
+          flushRenderJob();
+          const action = state.undoStack.pop();
+          if (!action) return;
+          if (action.type === "stroke") {
+            const stroke = state.strokeLog.pop();
+            state.redoStack.push({ type: "stroke", stroke });
+          } else if (action.type === "clear") {
+            state.strokeLog = action.strokes.slice();
+            state.redoStack.push({ type: "clear", strokes: action.strokes.slice() });
+          }
+          renderWorldSync();
+          updateUi();
+        };
+
+        redo = function infiniteRedo() {
+          flushRenderJob();
+          const action = state.redoStack.pop();
+          if (!action) return;
+          if (action.type === "stroke") {
+            state.strokeLog.push(action.stroke);
+            state.undoStack.push({ type: "stroke" });
+          } else if (action.type === "clear") {
+            state.strokeLog = [];
+            state.undoStack.push({ type: "clear", strokes: action.strokes.slice() });
+          }
+          renderWorldSync();
+          updateUi();
+        };
+
+        clearArt = function infiniteClearArt() {
+          flushRenderJob();
+          commitLiveStroke();
+          state.tendrils.length = 0;
+          if (state.strokeLog.length) {
+            state.undoStack.push({ type: "clear", strokes: state.strokeLog.slice() });
+            state.strokeLog = [];
+            state.redoStack = [];
+          }
+          clearSurface();
+          updateUi();
+          showStatus("Canvas cleared");
+        };
+
+        /* ---- Crisp export ------------------------------------------------- */
+        const baseExportPngPreset = exportPngPreset;
+        exportPngPreset = async function infiniteExportPngPreset(presetName) {
+          flushRenderJob();
+          commitLiveStroke();
+          if (presetName === "current" || !state.strokeLog.length) {
+            return baseExportPngPreset(presetName);
+          }
+          // Sized presets: re-render the world at target resolution.
+          if (state.exporting) return;
+          if (!exportPresets[presetName]) return;
+          state.exporting = true;
+          updateUi();
+          showStatus("Preparing PNG export...", "busy");
+          await new Promise((resolve) => requestAnimationFrame(resolve));
+          const preset = exportPresets[presetName];
+          const saved = {
+            deviceW: canvas.width, deviceH: canvas.height,
+            dpr: state.dpr, width: state.width, height: state.height,
+            cx: state.cx, cy: state.cy
+          };
+          try {
+            const fit = Math.min(preset.width / window.innerWidth, preset.height / window.innerHeight);
+            canvas.width = preset.width;
+            canvas.height = preset.height;
+            state.dpr = fit;
+            state.width = preset.width;
+            state.height = preset.height;
+            state.cx = preset.width / 2;
+            state.cy = preset.height / 2;
+            renderWorldSync();
+            window.__fractal.lastExportPath = "replay";
+            downloadBlob(await canvasToBlob(canvas), preset.label, "png");
+            showStatus("PNG export ready.", "success");
+          } catch (error) {
+            showStatus("Export failed in this browser. Try a smaller preset.", "error");
+          } finally {
+            canvas.width = saved.deviceW;
+            canvas.height = saved.deviceH;
+            state.dpr = saved.dpr;
+            state.width = saved.width;
+            state.height = saved.height;
+            state.cx = saved.cx;
+            state.cy = saved.cy;
+            renderWorldSync();
+            state.exporting = false;
+            updateUi();
+          }
+        };
+
         installMobileCssPatch();
         syncCanvasConfig();
         if (state.size < BRUSH_LENGTH_RANGE.default) {
           state.size = BRUSH_LENGTH_RANGE.default;
         }
-        state.zoom = clamp(state.zoom, 1 / (state.canvasScale || 1), 2.4);
+      }
+
+      /* ========================================================================
+         Custom brush mode
+
+         Adds a live tuning panel for the "custom" brush profile. Sliders write
+         straight into brushProfiles.custom so changes apply to the next stroke.
+         The tuned values persist in localStorage.
+      ======================================================================== */
+
+      {
+        const CUSTOM_BRUSH_STORAGE_KEY = "fractalBrushes.customBrush";
+        const customProfile = brushProfiles.custom;
+
+        ui.customTune = document.getElementById("customTune");
+        ui.customTuneFields = document.getElementById("customTuneFields");
+        ui.copyBrushToCustom = document.getElementById("copyBrushToCustom");
+
+        function buildCustomLayers(glow) {
+          return [
+            [2.4 + glow * 2.6, -16, 50, 0.09 + glow * 0.08],
+            [1.0 + glow * 0.5, 12, 64, 0.44 - glow * 0.2],
+            [0.34 + glow * 0.2, 0, 80, 0.6 - glow * 0.26],
+            [0.12, 0, 94, 0.66 - glow * 0.52, "white"]
+          ];
+        }
+
+        const customFields = [
+          { id: "intensity", label: "Intensity", min: 0.05, max: 0.6, step: 0.01, display: (v) => (v * 100).toFixed(0),
+            apply: (p, v) => { p.alpha = v; }, read: (p) => p.alpha },
+          { id: "density", label: "Density", min: 1, max: 8, step: 1, display: (v) => String(Math.round(v)),
+            apply: (p, v) => { p.count = [Math.max(1, Math.round(v * 0.55)), Math.round(v)]; }, read: (p) => p.count[1] },
+          { id: "spread", label: "Spread", min: 0.05, max: 1.4, step: 0.05, display: (v) => v.toFixed(2),
+            apply: (p, v) => { p.spread = v; }, read: (p) => p.spread },
+          { id: "speed", label: "Speed", min: 0.3, max: 3.2, step: 0.05, display: (v) => v.toFixed(2),
+            apply: (p, v) => { p.velocity = [v * 0.22, v]; }, read: (p) => p.velocity[1] },
+          { id: "flow", label: "Flow length", min: 30, max: 220, step: 5, display: (v) => String(Math.round(v)),
+            apply: (p, v) => { p.life = [v * 0.45, v]; }, read: (p) => p.life[1] },
+          { id: "width", label: "Width", min: 0.2, max: 1.8, step: 0.05, display: (v) => v.toFixed(2),
+            apply: (p, v) => { p.width = [v * 0.4, v]; }, read: (p) => p.width[1] },
+          { id: "chaos", label: "Chaos", min: 0, max: 0.5, step: 0.01, display: (v) => v.toFixed(2),
+            apply: (p, v) => { p.jitter = v; }, read: (p) => p.jitter },
+          { id: "swirl", label: "Swirl", min: 0, max: 0.4, step: 0.01, display: (v) => v.toFixed(2),
+            apply: (p, v) => { p.curl = v; }, read: (p) => p.curl },
+          { id: "branching", label: "Branching", min: 0, max: 0.04, step: 0.001, display: (v) => (v * 1000).toFixed(0),
+            apply: (p, v) => { p.branch = v; }, read: (p) => p.branch },
+          { id: "glide", label: "Glide", min: 0.93, max: 0.992, step: 0.002, display: (v) => v.toFixed(3),
+            apply: (p, v) => { p.drag = v; }, read: (p) => p.drag },
+          { id: "snap", label: "Angular snap", min: 0, max: 0.6, step: 0.01, display: (v) => v.toFixed(2),
+            apply: (p, v) => { p.angular = v; p.cap = v > 0.05 ? "butt" : "round"; }, read: (p) => p.angular || 0 },
+          { id: "glow", label: "Glow softness", min: 0, max: 1, step: 0.05, display: (v) => v.toFixed(2),
+            apply: (p, v) => { p.glowSoftness = v; p.layers = buildCustomLayers(v); },
+            read: (p) => p.glowSoftness ?? clamp(1 - (p.layers?.[p.layers.length - 1]?.[3] ?? 0.3) * 1.5, 0, 1) }
+        ];
+        const customInputs = new Map();
+
+        function persistCustomBrush() {
+          const values = {};
+          customFields.forEach((field) => {
+            values[field.id] = Number(customInputs.get(field.id).value);
+          });
+          try {
+            window.localStorage.setItem(CUSTOM_BRUSH_STORAGE_KEY, JSON.stringify({
+              version: 1,
+              values,
+              hues: customProfile.hues
+            }));
+          } catch (_) {
+            // Storage may be unavailable (private mode); tuning still works for the session.
+          }
+        }
+
+        function syncCustomFieldDisplay(field) {
+          const input = customInputs.get(field.id);
+          const valueLabel = input.closest(".slider-row").querySelector(".value");
+          valueLabel.textContent = field.display(Number(input.value));
+        }
+
+        function applyCustomField(field, value) {
+          const input = customInputs.get(field.id);
+          input.value = String(clamp(value, field.min, field.max));
+          field.apply(customProfile, Number(input.value));
+          syncCustomFieldDisplay(field);
+        }
+
+        customFields.forEach((field) => {
+          const wrap = document.createElement("div");
+          wrap.className = "field";
+          const label = document.createElement("span");
+          label.className = "field-label";
+          label.textContent = field.label;
+          const row = document.createElement("div");
+          row.className = "slider-row";
+          const input = document.createElement("input");
+          input.type = "range";
+          input.id = `custom-${field.id}`;
+          input.min = String(field.min);
+          input.max = String(field.max);
+          input.step = String(field.step);
+          input.value = String(field.read(customProfile));
+          input.setAttribute("aria-label", `Custom brush ${field.label.toLowerCase()}`);
+          const valueLabel = document.createElement("span");
+          valueLabel.className = "value";
+          row.append(input, valueLabel);
+          wrap.append(label, row);
+          ui.customTuneFields.append(wrap);
+          customInputs.set(field.id, input);
+          syncCustomFieldDisplay(field);
+          input.addEventListener("input", () => {
+            field.apply(customProfile, Number(input.value));
+            syncCustomFieldDisplay(field);
+            persistCustomBrush();
+          });
+        });
+
+        function restoreCustomBrush() {
+          let saved = null;
+          try {
+            saved = JSON.parse(window.localStorage.getItem(CUSTOM_BRUSH_STORAGE_KEY) || "null");
+          } catch (_) {
+            saved = null;
+          }
+          if (!saved || !saved.values) return;
+          customFields.forEach((field) => {
+            const value = Number(saved.values[field.id]);
+            if (Number.isFinite(value)) applyCustomField(field, value);
+          });
+          if (Array.isArray(saved.hues) && saved.hues.length) {
+            customProfile.hues = saved.hues.map(normalizedHue);
+          }
+        }
+
+        function copyPresetIntoCustom() {
+          const sourceId = state.lastPresetBrush || "silk";
+          const source = brushProfiles[sourceId];
+          if (!source || source === customProfile) return;
+          customFields.forEach((field) => {
+            applyCustomField(field, field.read(source));
+          });
+          // Keep the preset's exact layer pack; the glow slider rebuilds it when moved.
+          customProfile.layers = source.layers.map((layer) => layer.slice());
+          delete customProfile.glowSoftness;
+          customProfile.composite = source.composite;
+          customProfile.hues = Array.isArray(source.hues) ? source.hues.slice() : customProfile.hues;
+          persistCustomBrush();
+          if (state.brush === "custom") setBrush("custom");
+        }
+
+        const customBaseSetBrush = setBrush;
+        setBrush = function customAwareSetBrush(brush) {
+          if (brush && brush !== "custom" && brushProfiles[brush]) {
+            state.lastPresetBrush = brush;
+          }
+          return customBaseSetBrush(brush);
+        };
+
+        const customBaseUpdateUi = updateUi;
+        updateUi = function customAwareUpdateUi() {
+          customBaseUpdateUi();
+          ui.customTune.hidden = state.brush !== "custom";
+        };
+
+        ui.copyBrushToCustom.addEventListener("click", copyPresetIntoCustom);
+        restoreCustomBrush();
+        updateUi();
       }
 
       stage.addEventListener("pointerdown", startPainting);
@@ -4453,8 +5632,6 @@
       ui.closeParamsPanel.addEventListener("click", () => togglePanel(ui.paramsPanel, ui.paramsToggle, false));
       ui.closeBrushPanel.addEventListener("click", () => togglePanel(ui.brushPanel, ui.brushToggle, false));
       ui.closeColorPanel.addEventListener("click", () => togglePanel(ui.colorPanel, ui.colorToggle, false));
-      ui.zoom.addEventListener("input", (event) => setZoom(Number(event.target.value) / 100));
-      ui.zoom.addEventListener("dblclick", () => setZoom(1));
       ui.randomize.addEventListener("click", randomize);
       ui.help.addEventListener("click", openTutorial);
       ui.tutorialBack.addEventListener("click", previousTutorialStep);
@@ -4465,6 +5642,7 @@
       ui.size.addEventListener("input", (event) => setSize(event.target.value));
       ui.scaleFactor.addEventListener("input", (event) => setScaleFactor(event.target.value));
       ui.expansion.addEventListener("input", (event) => setExpansion(Number(event.target.value) / 100));
+      if (ui.density) ui.density.addEventListener("input", (event) => setDensity(event.target.value));
       ui.symmetry.addEventListener("input", (event) => setSymmetry(event.target.value));
       ui.modes.forEach((button) => {
         button.addEventListener("click", () => {
